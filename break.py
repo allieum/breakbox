@@ -1,11 +1,27 @@
 import pygame
+import pygame.event
 import pygame.midi
+# from pygame.locals import *
+import pygame.key
 import time
 # import rtmidi
+import os
+import sys
+import keyboard
+os.environ["SDL_VIDEODRIVER"] = "dummy"
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
+# dactyl_keys =[
+#     [K_ESCAPE, K_1, K_2, K_3, K_4, K_5]
+# ]
 
+keyboard.on_press(lambda e: print(e.name, " ", e.scan_code))
+
+pygame.init()
+
+pygame.display.set_mode((0, 0))
 pygame.midi.init()
-pygame.mixer.init()
+pygame.mixer.init(buffer=1024)
 device_id = 3
 # device_id = pygame.midi.get_default_input_id()
 for i in range(pygame.midi.get_count()):
@@ -15,7 +31,7 @@ for i in range(pygame.midi.get_count()):
         device_id = i
         print("using device ", i)
 
-sound = pygame.mixer.Sound("143-2bar-000.wav")
+sound = pygame.mixer.Sound(dir_path + "/143-2bar-000.wav")
 # sound = pygame.mixer.Sound("click143.wav")
 # while pygame.mixer.get_busy() == True:
 #     continue
@@ -27,12 +43,13 @@ STOP = 0b11111100
 # probably better to do this with milliseconds so it's agnostic to BPM
 # CLOCK_LAG = 2
 
-
+lag_time = 0.028
 
 beat_interval = 42069
 beat_start = time.time()
 
-lag_time = 0.028
+# lag_time = 0.028
+lag_time = 0.058
 max_beats = 8
 beat = 0
 clock_count = 0
@@ -41,6 +58,10 @@ is_started = False
 played_sound = False
 while True:
     # time.sleep(1)
+    for event in pygame.event.get(pygame.KEYDOWN):
+        print("pressed key ", pygame.key.name(event.key))
+    if pygame.key.get_pressed()[pygame.K_a]:
+        print("you got a!!!")
     events = midi.read(1)
     if len(events) == 1:
         (status, d1, d2, d3) = events[0][0]
@@ -76,3 +97,4 @@ while True:
         if beat == max_beats - 1 and beat_predicted and not played_sound and is_started:
             sound.play()
             played_sound = True
+    pygame.display.flip()
