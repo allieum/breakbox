@@ -9,13 +9,39 @@ import os
 import sys
 import keyboard
 from io import TextIOBase
+from ctypes import *
+from contextlib import contextmanager
+
+def restart_program():
+    python = sys.executable
+    os.execl(python, python, * sys.argv)
+
+ERROR_HANDLER_FUNC = CFUNCTYPE(None, c_char_p, c_int, c_char_p, c_int, c_char_p)
+
+def py_error_handler(filename, line, function, err, fmt):
+    # print("underrun CHOMP", fmt)
+    if b'occurred' in fmt:
+        print("we're done here")
+        restart_program()
+        # os.execl('/home/drum/breakbox/restart.sh', *sys.arg)
+
+c_error_handler = ERROR_HANDLER_FUNC(py_error_handler)
+
+@contextmanager
+def noalsaerr():
+    asound = cdll.LoadLibrary('libasound.so.2')
+    asound.snd_lib_error_set_handler(c_error_handler)
+    yield
+    asound.snd_lib_error_set_handler(None)
+
 
 class MyStdErr(TextIOBase):
     def write(self, s):
         if "underrun" in s:
             print("ahhhhhhh")
+        print("in special place")
         print(s)
-sys.stderr = MyStdErr()
+# sys.stderr = MyStdErr()
 
 dactyl_keys =[
     ['esc',   '1', '2', '3', '4', '5'],
@@ -43,6 +69,7 @@ keyboard.on_press(key_pressed)
 
 # pygame.display.set_mode((0, 0))
 pygame.midi.init()
+# pygame.mixer.init(buffer=32)
 pygame.mixer.init(buffer=1024)
 device_id = 3
 # device_id = pygame.midi.get_default_input_id()
@@ -86,41 +113,39 @@ clock_count = 0
 midi = pygame.midi.Input(device_id)
 is_started = False
 played_sound = False
-while True:
-    # time.sleep(1)
-    events = midi.read(1)
-    if len(events) == 1:
-        (status, d1, d2, d3) = events[0][0]
+with noalsaerr():
+    while True:
+        # time.sleep(1)
+        events = midi.read(1)
+        if len(events) == 1:
+            (status, d1, d2, d3) = events[0][0]
 
-        if status == START:
-            is_started = True
-            clock_count = 0
-            beat = 0
-            # could play sample with later start time so it's not out of sync the first time around
-            current_sound().play()
-
-        if status == STOP:
-            is_started = False
-
-
-        if status == CLOCK:
-            clock_count += 1
-
-        if clock_count == 24:
-            beat = (beat + 1) % 8
-            print(beat + 1)
-            clock_count = 0
-            now = time.time()
-            beat_interval = now - beat_start
-            beat_start = now
-            if not played_sound and beat == 0 and is_started:
+            if status == START:
+                is_started = True
+                clock_count = 0
+                beat = 0
+                # could play sample with later start time so it's not out of sync the first time around
                 current_sound().play()
-            played_sound = False
 
-        # if beat == 0 and clock_count == 0 and is_playing:
-        #     sound.play()
-        beat_predicted = time.time() - beat_start >= beat_interval - lag_time
-        if beat == max_beats - 1 and beat_predicted and not played_sound and is_started:
-            current_sound().play()
-            played_sound = True
-    pygame.display.flip()
+            if status == STOP:
+                is_started = False
+
+
+            if status == CLOCK:
+                clock_count += 1
+
+            if clock_count == 24:
+                beat = (beat + 1) % 8
+                # print(beat + 1)
+                clock_count = 0
+                now = time.time()
+                beat_interval = now - beat_start
+                beat_start = now
+                if not played_sound and beat == 0 and is_started:
+                    current_sound().play()
+                played_sound = False
+
+            beat_predicted = time.time() - beat_start >= beat_interval - lag_time
+            if beat == max_beats - 1 and beat_predicted and not played_sound and is_started:
+                current_sound().play()
+                played_sound = True
