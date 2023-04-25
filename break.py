@@ -11,6 +11,10 @@ import keyboard
 from io import TextIOBase
 from ctypes import *
 from contextlib import contextmanager
+from datetime import datetime
+
+current_time = datetime.now().strftime("%H:%M:%S")
+print("Start time =", current_time)
 
 def restart_program():
     python = sys.executable
@@ -22,6 +26,8 @@ def py_error_handler(filename, line, function, err, fmt):
     # print("underrun CHOMP", fmt)
     if b'occurred' in fmt:
         print("we're done here")
+        current_time = datetime.now().strftime("%H:%M:%S")
+        print("Error time =", current_time)
         restart_program()
         # os.execl('/home/drum/breakbox/restart.sh', *sys.arg)
 
@@ -85,7 +91,7 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 sounds = [pygame.mixer.Sound(dir_path + f'/143-2bar-00{i}.wav') for i in range(6)]
 
 def current_sound():
-    print(f'sound index {sound_index}')
+    # print(f'sound index {sound_index}')
     return sounds[sound_index]
 
 
@@ -100,7 +106,6 @@ STOP = 0b11111100
 # probably better to do this with milliseconds so it's agnostic to BPM
 # CLOCK_LAG = 2
 
-lag_time = 0.028
 
 beat_interval = 42069
 beat_start = time.time()

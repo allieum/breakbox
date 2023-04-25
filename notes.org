@@ -1,6 +1,10 @@
 #+title: Notes
 
 
+* MVP
+** stop audio on start / stop
+** frame size
+** mute switch
 
 * dactyl keycodes
 ** 9  10  11  12  13  14
