@@ -120,15 +120,18 @@ current_sound().unmute()
 # pygame.display.set_mode((0, 0))
 pygame.midi.init()
 # pygame.mixer.init(buffer=32)
-device_id = 3
+device_id = None
 # device_id = pygame.midi.get_default_input_id()
-for i in range(pygame.midi.get_count()):
-    print(i, pygame.midi.get_device_info(i))
-    (_,name,inp,out,opened) = pygame.midi.get_device_info(i)
-    # note, this doesn't work
-    if name == "TR-8S MIDI 1" and input == 1:
-        device_id = i
-        print("using device ", i)
+print("waiting for midi device...")
+while device_id is None:
+    for i in range(pygame.midi.get_count()):
+        print(i, pygame.midi.get_device_info(i))
+        (_,name,inp,out,opened) = pygame.midi.get_device_info(i)
+        if name == b"TR-8S MIDI 1" and inp == 1:
+            device_id = i
+            print("using device ", i)
+    if device_id == None:
+        time.sleep(0.5)
 
 # sound = pygame.mixer.Sound("click143.wav")
 # while pygame.mixer.get_busy() == True:
