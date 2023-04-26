@@ -41,14 +41,6 @@ def noalsaerr():
     asound.snd_lib_error_set_handler(None)
 
 
-class MyStdErr(TextIOBase):
-    def write(self, s):
-        if "underrun" in s:
-            print("ahhhhhhh")
-        print("in special place")
-        print(s)
-# sys.stderr = MyStdErr()
-
 dactyl_keys =[
     ['esc',   '1', '2', '3', '4', '5'],
     ['`',     'q', 'w', 'e', 'r', 't'],
@@ -61,7 +53,6 @@ dactyl_keys =[
 ]
 
 sound_index = 0
-
 def key_pressed(e):
     global sound_index
     # print(e.name, " ", e.scan_code)
@@ -82,18 +73,42 @@ device_id = 3
 for i in range(pygame.midi.get_count()):
     print(i, pygame.midi.get_device_info(i))
     (_,name,inp,out,opened) = pygame.midi.get_device_info(i)
+    # note, this doesn't work
     if name == "TR-8S MIDI 1" and input == 1:
         device_id = i
         print("using device ", i)
 
 
+class Sample:
+    def __init__(self, file):
+        self.sound = pygame.mixer.Sound(file)
+        self.sound.set_volume(0) # default mute
+
+    def mute(self):
+        self.sound.set_volume(0)
+
+    def unmute(self):
+        self.sound.set_volume(1)
+
+    def toggle_mute(self):
+        if self.sound.get_volume() > 0:
+            self.sound.set_volume(0)
+        else:
+            self.sound.set_volume(1)
+
+    def play(self):
+        self.sound.play()
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 sounds = [pygame.mixer.Sound(dir_path + f'/143-2bar-00{i}.wav') for i in range(6)]
+# sounds = [Sample(dir_path + f'/143-2bar-00{i}.wav') for i in range(6)]
 
 def current_sound():
     # print(f'sound index {sound_index}')
     return sounds[sound_index]
 
+# unmute starting sample
+# current_sound().unmute()
 
 # sound = pygame.mixer.Sound("click143.wav")
 # while pygame.mixer.get_busy() == True:

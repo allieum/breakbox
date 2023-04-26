@@ -1,10 +1,16 @@
 #+title: Notes
 
-
 * MVP
 ** stop audio on start / stop
 ** frame size
 ** mute switch
+** fix out of sync on first loop
+*** start sample later, or wait til next loop
+** dont require tr8s to be on first
+*** handle case where midi connection goes away
+** sample rate / mono?
+** survey audio quality / clipping w headphones
+*** invest in audio hat for better DAC ?
 
 * dactyl keycodes
 ** 9  10  11  12  13  14
