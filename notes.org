@@ -12,6 +12,8 @@
 ** survey audio quality / clipping w headphones
 *** invest in audio hat for better DAC ?
 
+** systemd service
+
 * dactyl keycodes
 ** 9  10  11  12  13  14
 ** 49 24  25  26  27  28

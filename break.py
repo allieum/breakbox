@@ -40,7 +40,6 @@ def noalsaerr():
     yield
     asound.snd_lib_error_set_handler(None)
 
-
 dactyl_keys =[
     ['esc',   '1', '2', '3', '4', '5'],
     ['`',     'q', 'w', 'e', 'r', 't'],
@@ -52,22 +51,75 @@ dactyl_keys =[
                                  ['enter', 'alt'],
 ]
 
+class Sample:
+    def __init__(self, file):
+        self.sound = pygame.mixer.Sound(file)
+        self.sound.set_volume(0) # default mute
+        self.queued = False
+
+    def mute(self):
+        self.sound.set_volume(0)
+
+    def unmute(self):
+        self.sound.set_volume(1)
+
+    def set_mute(self, mute):
+        if mute:
+            self.mute()
+        else:
+            self.unmute()
+
+    def toggle_mute(self):
+        if self.sound.get_volume() > 0:
+            self.sound.set_volume(0)
+        else:
+            self.sound.set_volume(1)
+
+    def play(self):
+        self.sound.stop()
+        self.sound.play()
+
+pygame.mixer.init(buffer=1024)
+dir_path = os.path.dirname(os.path.realpath(__file__))
+# sounds = [pygame.mixer.Sound(dir_path + f'/143-2bar-00{i}.wav') for i in range(6)]
+samples = [Sample(dir_path + f'/143-2bar-00{i}.wav') for i in range(6)]
+
+# print(pygame.mixer.get_num_channels())
+
+def play_samples():
+    for i, sample in enumerate(samples):
+        if sample.queued:
+            for j, sample in enumerate(samples):
+                sample.set_mute(i != j)
+                sample.queued = False
+    for i, sample in enumerate(samples):
+        # print(f"sample {i} volume: {sample.sound.get_volume()}")
+        sample.play()
+
 sound_index = 0
 def key_pressed(e):
     global sound_index
     # print(e.name, " ", e.scan_code)
     for i, key in enumerate(['esc', '`', 'tab', 'shift']):
         if key == e.name:
+            for j, sample in enumerate(samples):
+                sample.queued = i == j
+                # print(f"sample {j} queued: {sample.queued}")
             sound_index = i
 
 keyboard.on_press(key_pressed)
 
-# pygame.init()
+def current_sound():
+    # print(f'sound index {sound_index}')
+    return samples[sound_index]
 
+# unmute starting sample
+current_sound().unmute()
+
+# pygame.init()
 # pygame.display.set_mode((0, 0))
 pygame.midi.init()
 # pygame.mixer.init(buffer=32)
-pygame.mixer.init(buffer=1024)
 device_id = 3
 # device_id = pygame.midi.get_default_input_id()
 for i in range(pygame.midi.get_count()):
@@ -77,38 +129,6 @@ for i in range(pygame.midi.get_count()):
     if name == "TR-8S MIDI 1" and input == 1:
         device_id = i
         print("using device ", i)
-
-
-class Sample:
-    def __init__(self, file):
-        self.sound = pygame.mixer.Sound(file)
-        self.sound.set_volume(0) # default mute
-
-    def mute(self):
-        self.sound.set_volume(0)
-
-    def unmute(self):
-        self.sound.set_volume(1)
-
-    def toggle_mute(self):
-        if self.sound.get_volume() > 0:
-            self.sound.set_volume(0)
-        else:
-            self.sound.set_volume(1)
-
-    def play(self):
-        self.sound.play()
-
-dir_path = os.path.dirname(os.path.realpath(__file__))
-sounds = [pygame.mixer.Sound(dir_path + f'/143-2bar-00{i}.wav') for i in range(6)]
-# sounds = [Sample(dir_path + f'/143-2bar-00{i}.wav') for i in range(6)]
-
-def current_sound():
-    # print(f'sound index {sound_index}')
-    return sounds[sound_index]
-
-# unmute starting sample
-# current_sound().unmute()
 
 # sound = pygame.mixer.Sound("click143.wav")
 # while pygame.mixer.get_busy() == True:
@@ -132,7 +152,7 @@ beat = 0
 clock_count = 0
 midi = pygame.midi.Input(device_id)
 is_started = False
-played_sound = False
+played_samples = False
 with noalsaerr():
     while True:
         # time.sleep(1)
@@ -145,11 +165,10 @@ with noalsaerr():
                 clock_count = 0
                 beat = 0
                 # could play sample with later start time so it's not out of sync the first time around
-                current_sound().play()
+                play_samples()
 
             if status == STOP:
                 is_started = False
-
 
             if status == CLOCK:
                 clock_count += 1
@@ -161,11 +180,11 @@ with noalsaerr():
                 now = time.time()
                 beat_interval = now - beat_start
                 beat_start = now
-                if not played_sound and beat == 0 and is_started:
-                    current_sound().play()
-                played_sound = False
+                if not played_samples and beat == 0 and is_started:
+                    play_samples()
+                played_samples = False
 
             beat_predicted = time.time() - beat_start >= beat_interval - lag_time
-            if beat == max_beats - 1 and beat_predicted and not played_sound and is_started:
-                current_sound().play()
-                played_sound = True
+            if beat == max_beats - 1 and beat_predicted and not played_samples and is_started:
+                play_samples()
+                played_samples = True
