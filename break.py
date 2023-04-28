@@ -1,3 +1,4 @@
+from collections import defaultdict
 import pygame
 import pygame.event
 import pygame.midi
@@ -61,7 +62,7 @@ class Sample:
         self.sound.set_volume(0)
 
     def unmute(self):
-        self.sound.set_volume(1)
+        self.sound.set_volume(0.3)
 
     def set_mute(self, mute):
         if mute:
@@ -69,11 +70,14 @@ class Sample:
         else:
             self.unmute()
 
+    def is_muted(self):
+        return self.sound.get_volume() == 0
+
     def toggle_mute(self):
-        if self.sound.get_volume() > 0:
-            self.sound.set_volume(0)
+        if self.is_muted():
+            self.unmute()
         else:
-            self.sound.set_volume(1)
+            self.mute()
 
     def play(self):
         self.sound.stop()
@@ -96,18 +100,40 @@ def play_samples():
         # print(f"sample {i} volume: {sample.sound.get_volume()}")
         sample.play()
 
+
+key_held = defaultdict(bool)
 sound_index = 0
 def key_pressed(e):
     global sound_index
     # print(e.name, " ", e.scan_code)
-    for i, key in enumerate(['esc', '`', 'tab', 'shift']):
+    for i, key in enumerate(dactyl_keys[0]):
         if key == e.name:
             for j, sample in enumerate(samples):
-                sample.queued = i == j
-                # print(f"sample {j} queued: {sample.queued}")
+                if i == j and not sample.is_muted():
+                    sample.mute()
+                else:
+                    sample.queued = i == j
+                    # print(f"sample {j} queued: {sample.queued}")
             sound_index = i
+            return
+    for i, key in enumerate(dactyl_keys[1]):
+        if key == e.name and not key_held[key]:
+            samples[i].toggle_mute()
+            key_held[key] = True
 
-keyboard.on_press(key_pressed)
+def key_released(e):
+    for i, key in enumerate(dactyl_keys[1]):
+        if key == e.name:
+            samples[i].toggle_mute()
+            key_held[key] = False
+
+def on_key(e):
+    if e.event_type == keyboard.KEY_DOWN:
+        key_pressed(e)
+    elif e.event_type == keyboard.KEY_UP:
+        key_released(e)
+
+keyboard.hook(on_key)
 
 def current_sound():
     # print(f'sound index {sound_index}')
