@@ -1,12 +1,15 @@
 #+title: Notes
 
 * MVP
-** stop audio on start / stop
+** DONE stop audio on start / stop
+CLOSED: [2023-04-28 Fri 15:24]
 ** frame size
 ** mute switch
-** fix out of sync on first loop
+** DONE fix out of sync on first loop
+CLOSED: [2023-04-28 Fri 15:24]
 *** start sample later, or wait til next loop
-** dont require tr8s to be on first
+** DONE dont require tr8s to be on first
+CLOSED: [2023-04-28 Fri 15:24]
 *** handle case where midi connection goes away
 ** sample rate / mono?
 ** survey audio quality / clipping w headphones
@@ -15,12 +18,16 @@
 ** systemd service
 
 * actually to do
-** fix bugs
-** stop on stop
-** dont start on start
+** DONE fix bugs
+CLOSED: [2023-04-28 Fri 06:51]
+** DONE stop on stop
+CLOSED: [2023-04-28 Fri 06:51]
+** DONE dont start on start
+CLOSED: [2023-04-28 Fri 06:51]
 ** systemd
 ** break selection
 ** detect missing TR8 *optional*
+** mute mask fx *optional*
 
 * dactyl keycodes
 ** 9  10  11  12  13  14

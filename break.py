@@ -40,14 +40,15 @@ def noalsaerr():
     asound.snd_lib_error_set_handler(c_error_handler)
     yield
     asound.snd_lib_error_set_handler(None)
-
+STOP_KEY = 'delete'
+NEXT_BANK_KEY = '#'
 dactyl_keys =[
     ['esc',   '1', '2', '3', '4', '5'],
     ['`',     'q', 'w', 'e', 'r', 't'],
     ['tab',   'a', 's', 'd', 'f', 'g'],
     ['shift', 'z', 'x', 'c', 'v', 'b'],
-                  ['tab', '#'],
-                                 ['delete', 'shift'],
+                  ['tab', NEXT_BANK_KEY],
+                                 [STOP_KEY, 'shift'],
                                  ['space', 'ctrl'],
                                  ['enter', 'alt'],
 ]
@@ -86,17 +87,24 @@ class Sample:
 pygame.mixer.init(buffer=1024)
 dir_path = os.path.dirname(os.path.realpath(__file__))
 # sounds = [pygame.mixer.Sound(dir_path + f'/143-2bar-00{i}.wav') for i in range(6)]
-samples = [Sample(dir_path + f'/143-2bar-00{i}.wav') for i in range(6)]
+bank = 0
+BANK_SIZE = 6
+NUM_BANKS = 2
+samples = [Sample(dir_path + f'/samples/143-2bar-{i:03}.wav') for i in range(12)]
 
 # print(pygame.mixer.get_num_channels())
 
+def current_samples():
+   return samples[bank * BANK_SIZE : BANK_SIZE * (bank + 1)]
+
 def play_samples():
-    for i, sample in enumerate(samples):
+    for i, sample in enumerate(current_samples()):
         if sample.queued:
-            for j, sample in enumerate(samples):
+            for j, sample in enumerate(current_samples()):
                 sample.set_mute(i != j)
                 sample.queued = False
-    for i, sample in enumerate(samples):
+    pygame.mixer.stop()
+    for i, sample in enumerate(current_samples()):
         # print(f"sample {i} volume: {sample.sound.get_volume()}")
         sample.play()
 
@@ -105,26 +113,47 @@ key_held = defaultdict(bool)
 sound_index = 0
 def key_pressed(e):
     global sound_index
+    global bank
     # print(e.name, " ", e.scan_code)
     for i, key in enumerate(dactyl_keys[0]):
         if key == e.name:
-            for j, sample in enumerate(samples):
-                if i == j and not sample.is_muted():
-                    sample.mute()
-                else:
-                    sample.queued = i == j
-                    # print(f"sample {j} queued: {sample.queued}")
+            for j, sample in enumerate(current_samples()):
+                sample.queued = i == j
+                # print(f"sample {j} queued: {sample.queued}")
             sound_index = i
             return
     for i, key in enumerate(dactyl_keys[1]):
         if key == e.name and not key_held[key]:
-            samples[i].toggle_mute()
+            current_samples()[i].toggle_mute()
             key_held[key] = True
 
+    if STOP_KEY == e.name:
+        # cancel ongoing mute toggles
+        for key in dactyl_keys[1]:
+            key_held[key] = False
+        for sample in current_samples():
+            sample.mute()
+
+    if NEXT_BANK_KEY == e.name:
+        looping_index = None
+        for i, sample in enumerate(current_samples()):
+            if not sample.is_muted() and not key_held[dactyl_keys[1][i]]:
+                looping_index = i
+                print(f"looping index {i}")
+        # cancel ongoing mute toggles
+        for key in dactyl_keys[1]:
+            key_held[key] = False
+        bank = (bank + 1) % NUM_BANKS
+        if looping_index is not None:
+            current_samples()[looping_index].queued = True
+
+
 def key_released(e):
+    if not key_held[e.name]:
+        return
     for i, key in enumerate(dactyl_keys[1]):
         if key == e.name:
-            samples[i].toggle_mute()
+            current_samples()[i].toggle_mute()
             key_held[key] = False
 
 def on_key(e):
@@ -137,17 +166,13 @@ keyboard.hook(on_key)
 
 def current_sound():
     # print(f'sound index {sound_index}')
-    return samples[sound_index]
+    return current_samples()[sound_index]
 
 # unmute starting sample
 current_sound().unmute()
 
-# pygame.init()
-# pygame.display.set_mode((0, 0))
 pygame.midi.init()
-# pygame.mixer.init(buffer=32)
 device_id = None
-# device_id = pygame.midi.get_default_input_id()
 print("waiting for midi device...")
 while device_id is None:
     for i in range(pygame.midi.get_count()):
@@ -159,22 +184,13 @@ while device_id is None:
     if device_id == None:
         time.sleep(0.5)
 
-# sound = pygame.mixer.Sound("click143.wav")
-# while pygame.mixer.get_busy() == True:
-#     continue
-
 CLOCK = 0b11111000
 START = 0b11111010
 STOP = 0b11111100
 
-# probably better to do this with milliseconds so it's agnostic to BPM
-# CLOCK_LAG = 2
-
-
 beat_interval = 42069
 beat_start = time.time()
 
-# lag_time = 0.028
 lag_time = 0.058
 max_beats = 8
 beat = 0
@@ -184,7 +200,6 @@ is_started = False
 played_samples = False
 with noalsaerr():
     while True:
-        # time.sleep(1)
         events = midi.read(1)
         if len(events) == 1:
             (status, d1, d2, d3) = events[0][0]
@@ -193,11 +208,10 @@ with noalsaerr():
                 is_started = True
                 clock_count = 0
                 beat = 0
-                # could play sample with later start time so it's not out of sync the first time around
-                play_samples()
 
             if status == STOP:
                 is_started = False
+                pygame.mixer.stop()
 
             if status == CLOCK:
                 clock_count += 1
