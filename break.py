@@ -23,6 +23,7 @@ def restart_program():
 
 ERROR_HANDLER_FUNC = CFUNCTYPE(None, c_char_p, c_int, c_char_p, c_int, c_char_p)
 
+# sidestep ALSA underrun errors. not that cute
 def py_error_handler(filename, line, function, err, fmt):
     # print("underrun CHOMP", fmt)
     if b'occurred' in fmt:
@@ -40,6 +41,7 @@ def noalsaerr():
     asound.snd_lib_error_set_handler(c_error_handler)
     yield
     asound.snd_lib_error_set_handler(None)
+
 STOP_KEY = 'delete'
 NEXT_BANK_KEY = '#'
 dactyl_keys =[
@@ -63,6 +65,7 @@ class Sample:
         self.sound.set_volume(0)
 
     def unmute(self):
+        # low volume so poor pi soundcard doesn't clip playing multiple samples
         self.sound.set_volume(0.3)
 
     def set_mute(self, mute):
@@ -86,13 +89,10 @@ class Sample:
 
 pygame.mixer.init(buffer=1024)
 dir_path = os.path.dirname(os.path.realpath(__file__))
-# sounds = [pygame.mixer.Sound(dir_path + f'/143-2bar-00{i}.wav') for i in range(6)]
 bank = 0
 BANK_SIZE = 6
 NUM_BANKS = 2
 samples = [Sample(dir_path + f'/samples/143-2bar-{i:03}.wav') for i in range(12)]
-
-# print(pygame.mixer.get_num_channels())
 
 def current_samples():
    return samples[bank * BANK_SIZE : BANK_SIZE * (bank + 1)]
@@ -108,11 +108,11 @@ def play_samples():
         # print(f"sample {i} volume: {sample.sound.get_volume()}")
         sample.play()
 
+# unmute first sample
+current_samples()[0].unmute()
 
 key_held = defaultdict(bool)
-sound_index = 0
 def key_pressed(e):
-    global sound_index
     global bank
     # print(e.name, " ", e.scan_code)
     for i, key in enumerate(dactyl_keys[0]):
@@ -120,7 +120,6 @@ def key_pressed(e):
             for j, sample in enumerate(current_samples()):
                 sample.queued = i == j
                 # print(f"sample {j} queued: {sample.queued}")
-            sound_index = i
             return
     for i, key in enumerate(dactyl_keys[1]):
         if key == e.name and not key_held[key]:
@@ -139,14 +138,13 @@ def key_pressed(e):
         for i, sample in enumerate(current_samples()):
             if not sample.is_muted() and not key_held[dactyl_keys[1][i]]:
                 looping_index = i
-                print(f"looping index {i}")
+                # print(f"looping index {i}")
         # cancel ongoing mute toggles
         for key in dactyl_keys[1]:
             key_held[key] = False
         bank = (bank + 1) % NUM_BANKS
         if looping_index is not None:
             current_samples()[looping_index].queued = True
-
 
 def key_released(e):
     if not key_held[e.name]:
@@ -163,13 +161,6 @@ def on_key(e):
         key_released(e)
 
 keyboard.hook(on_key)
-
-def current_sound():
-    # print(f'sound index {sound_index}')
-    return current_samples()[sound_index]
-
-# unmute starting sample
-current_sound().unmute()
 
 pygame.midi.init()
 device_id = None
