@@ -59,6 +59,12 @@ class Sample:
         self.sound = pygame.mixer.Sound(file)
         self.sound.set_volume(0) # default mute
         self.queued = False
+        self.step_repeat = False
+        self.step_repeat_length = 0 # in 16th notes
+        self.step_repeat_index = 0 # which step to repeat
+
+    def repeat_step(self, index, length):
+        pass
 
     def mute(self):
         self.sound.set_volume(0)
@@ -96,16 +102,17 @@ samples = [Sample(dir_path + f'/samples/143-2bar-{i:03}.wav') for i in range(12)
 def current_samples():
    return samples[bank * BANK_SIZE : BANK_SIZE * (bank + 1)]
 
-def play_samples():
-    for i, sample in enumerate(current_samples()):
-        if sample.queued:
-            for j, sample in enumerate(current_samples()):
-                sample.set_mute(i != j)
-                sample.queued = False
-    pygame.mixer.stop()
-    for i, sample in enumerate(current_samples()):
-        # print(f"sample {i} volume: {sample.sound.get_volume()}")
-        sample.play()
+def play_samples(step = 0):
+    if step == 0:
+        for i, sample in enumerate(current_samples()):
+            if sample.queued:
+                for j, sample in enumerate(current_samples()):
+                    sample.set_mute(i != j)
+                    sample.queued = False
+        pygame.mixer.stop()
+        for i, sample in enumerate(current_samples()):
+            # print(f"sample {i} volume: {sample.sound.get_volume()}")
+            sample.play()
 
 # unmute first sample
 current_samples()[0].unmute()
@@ -184,40 +191,60 @@ beat_start = time.time()
 lag_time = 0.058
 max_beats = 8
 beat = 0
+
+
+STEPS_PER_BEAT = 4
+step_start = time.time()
+step = 0
+max_steps = max_beats * STEPS_PER_BEAT
+step_interval = 42069
+
 clock_count = 0
 midi = pygame.midi.Input(device_id)
 is_started = False
 played_samples = False
-with noalsaerr():
-    while True:
-        events = midi.read(1)
-        if len(events) == 1:
-            (status, d1, d2, d3) = events[0][0]
+played_step = False
+# with noalsaerr():
+i = 0
+while True:
+    i += 1
+    events = midi.read(1)
+    if len(events) == 1:
+        (status, d1, d2, d3) = events[0][0]
 
-            if status == START:
-                is_started = True
-                clock_count = 0
-                beat = 0
+        if status == START:
+            is_started = True
+            clock_count = 0
+            beat = 0
+            step = 0
 
-            if status == STOP:
-                is_started = False
-                pygame.mixer.stop()
+        if status == STOP:
+            is_started = False
+            pygame.mixer.stop()
 
-            if status == CLOCK:
-                clock_count += 1
+        if status == CLOCK:
+            clock_count += 1
 
-            if clock_count == 24:
-                beat = (beat + 1) % 8
-                # print(beat + 1)
-                clock_count = 0
-                now = time.time()
-                beat_interval = now - beat_start
-                beat_start = now
-                if not played_samples and beat == 0 and is_started:
-                    play_samples()
-                played_samples = False
+        if clock_count > 0 and clock_count % (24 / STEPS_PER_BEAT) == 0:
+            step = (step + 1) % max_steps
+            # print(step)
+            now = time.time()
+            step_interval = now - step_start
+            step_start = now
+            played_step = False
 
-            beat_predicted = time.time() - beat_start >= beat_interval - lag_time
-            if beat == max_beats - 1 and beat_predicted and not played_samples and is_started:
-                play_samples()
-                played_samples = True
+        if clock_count == 24:
+            beat = (beat + 1) % max_beats
+            # print(beat + 1)
+            clock_count = 0
+            now = time.time()
+            beat_interval = now - beat_start
+            beat_start = now
+
+
+    step_predicted = time.time() - step_start >= step_interval - lag_time and not played_step
+    if step_predicted and is_started:
+        next_step = (step + 1) % max_steps
+        play_samples(next_step)
+        played_step = True
+    time.sleep(0.001)
