@@ -15,7 +15,13 @@ CLOSED: [2023-04-28 Fri 15:24]
 ** survey audio quality / clipping w headphones
 *** invest in audio hat for better DAC ?
 
-** systemd service
+** DONE systemd service
+CLOSED: [2023-05-03 Wed 14:04]
+** TODO cpu usage???
+:PROPERTIES:
+:CREATED:  [2023-05-03 Wed 14:04]
+:ID:       3d61d993-b662-4249-9c3a-7d687af9cf6a
+:END:
 
 * actually to do
 ** DONE fix bugs

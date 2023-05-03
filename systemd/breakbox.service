@@ -1,0 +1,11 @@
+[Unit]
+Description=breakbox service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/drum/breakbox
+ExecStart=python -u break.py
+
+[Install]
+WantedBy=multi-user.target

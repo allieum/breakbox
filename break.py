@@ -9,7 +9,6 @@ import time
 import os
 import sys
 import keyboard
-from io import TextIOBase
 from ctypes import *
 from contextlib import contextmanager
 from datetime import datetime
