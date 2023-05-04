@@ -6,6 +6,7 @@ Type=simple
 User=root
 WorkingDirectory=/home/drum/breakbox
 ExecStart=python -u break.py
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
