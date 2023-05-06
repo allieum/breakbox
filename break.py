@@ -70,6 +70,10 @@ dactyl_keys =[
                                  ['enter', 'alt'],
 ]
 
+LOOP_KEYS = dactyl_keys[0]
+TOGGLE_KEYS = dactyl_keys[1]
+HOLD_KEYS = dactyl_keys[3]
+
 class Sample:
     # low volume so poor pi soundcard doesn't clip playing multiple samples
     MAX_VOLUME = 0.3
@@ -187,70 +191,128 @@ def play_samples(step = 0):
 # unmute first sample
 current_samples()[0].unmute()
 
+
+
+hold_active = False
 key_held = defaultdict(bool)
+key_frozen = defaultdict(bool)
+def key_active(key):
+    return key_held[key] or key_frozen[key]
+
 def key_pressed(e):
-    global bank, step
+    global bank, step, hold_active
     # print(e.name, " ", e.scan_code)
-    for i, key in enumerate(dactyl_keys[0]):
+    for i, key in enumerate(LOOP_KEYS):
         if key == e.name:
             for j, sample in enumerate(current_samples()):
                 sample.queued = i == j
                 # print(f"sample {j} queued: {sample.queued}")
             return
 
-    for i, key in enumerate(dactyl_keys[1]):
+    for i, key in enumerate(TOGGLE_KEYS):
         if key != e.name:
             continue
-        if not key_held[key]:
+        if not key_held[key] and not key_frozen[key]:
             current_samples()[i].toggle_mute()
-        key_held[key] = True
+        if not key_frozen[key]:
+            key_held[key] = True
+        if any([key_held[k] for k in HOLD_KEYS]):
+            print(f"freezing {key}")
+            key_frozen[key] = True
+        elif key_frozen[key]:
+            print(f"unfreezing {key}")
+            key_frozen[key] = False
+            process_release(key)
         # print(f"holding {key}")
         for step_repeat_key, length in SR_KEYS.items():
-            if key_held[step_repeat_key]:
+            if key_active(step_repeat_key):
                 current_samples()[i].step_repeat_start(step, length)
 
     for step_repeat_key, length in SR_KEYS.items():
         if step_repeat_key != e.name:
             continue
         # print(f"holding {step_repeat_key}")
-        key_held[step_repeat_key] = True
-        for i, key in enumerate(dactyl_keys[1]):
-            if key_held[key]:
+        if not key_frozen[step_repeat_key]:
+            key_held[step_repeat_key] = True
+        if any([key_held[k] for k in HOLD_KEYS]):
+            key_frozen[step_repeat_key] = True
+            print(f"freezing {step_repeat_key}")
+        elif key_frozen[step_repeat_key]:
+            print(f"unfreezing {step_repeat_key}")
+            key_frozen[step_repeat_key] = False
+            process_release(step_repeat_key)
+        for i, key in enumerate(TOGGLE_KEYS):
+            if key_active(key):
                 current_samples()[i].step_repeat_start(step, length)
 
     if K_STOP == e.name:
-        # cancel ongoing mute toggles
-        for key in dactyl_keys[1]:
+        # cancel held keys
+        for key in key_frozen:
             key_held[key] = False
+            key_frozen[key] = False
         for sample in current_samples():
             sample.mute()
 
     if K_NEXT_BANK == e.name:
         looping_index = None
         for i, sample in enumerate(current_samples()):
-            if not sample.is_muted() and not key_held[dactyl_keys[1][i]]:
+            if not sample.is_muted() and not key_active(TOGGLE_KEYS[i]):
                 looping_index = i
                 # print(f"looping index {i}")
-        # cancel ongoing mute toggles
-        for key in dactyl_keys[1]:
+        # cancel held keys
+        for key in key_frozen:
             key_held[key] = False
+            key_frozen[key] = False
         bank = (bank + 1) % NUM_BANKS
         if looping_index is not None:
             current_samples()[looping_index].queued = True
+
+    # cases for hold button:
+    # active means at least one key frozen
+    #
+    #   1) inactive, no other keys held -> do nothing
+    #   2) inactive, keys held -> freeze those keys
+    #   3) active, no other keys held -> unfreeze all
+    #   4) active, nonfrozen keys held -> freeze them
+    #    **active vs inactive irrelevant**
+    #   5) frozen key pressed -> unfreeze
+    #
+    # freeze key by press down when hold pressed, or press hold when key pressed
+    for key in HOLD_KEYS:
+        if key != e.name:
+            continue
+        key_held[key] = True
+        held_keys = [k for k,held in key_held.items() if held and not k in HOLD_KEYS]
+        for k in held_keys:
+            print(f"freezing {k}")
+            key_frozen[k] = True
+        if len(held_keys) == 0:
+            frozen_keys = [k for k,frozen in key_frozen.items() if frozen]
+            for k in frozen_keys:
+                print(f"unfreezing {k}")
+                key_frozen[k] = False
+                process_release(k)
+
 
 def key_released(e):
     if not key_held[e.name]:
         return
     key_held[e.name] = False
-    for i, key in enumerate(dactyl_keys[1]):
-        if key == e.name:
+    if key_frozen[e.name]:
+        return
+    process_release(e.name)
+
+def process_release(k):
+    for i, key in enumerate(TOGGLE_KEYS):
+        if key == k:
             current_samples()[i].step_repeat_stop()
             current_samples()[i].toggle_mute()
     for key, length in SR_KEYS.items():
-        if key != e.name:
+        if key != k:
             continue
         for sample in [s for s in current_samples() if s.step_repeat_length == length]:
             sample.step_repeat_stop()
+
 
 def on_key(e):
     if e.event_type == keyboard.KEY_DOWN:
