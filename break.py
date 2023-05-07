@@ -322,18 +322,38 @@ def on_key(e):
 
 keyboard.hook(on_key)
 
-pygame.midi.init()
-device_id = None
-print("waiting for midi device...")
-while device_id is None:
-    for i in range(pygame.midi.get_count()):
-        print(i, pygame.midi.get_device_info(i))
-        (_,name,inp,out,opened) = pygame.midi.get_device_info(i)
-        if name == b"TR-8S MIDI 1" and inp == 1:
-            device_id = i
-            print("using device ", i)
-    if device_id == None:
-        time.sleep(0.5)
+# how come tr8 can't come second?
+def connect_midi():
+    global time_prev_midi_message
+    device_id = None
+    print("waiting for midi device...")
+    while device_id is None:
+        pygame.midi.init()
+        for i in range(pygame.midi.get_count()):
+            # print(i, pygame.midi.get_device_info(i))
+            (_,name,inp,out,opened) = pygame.midi.get_device_info(i)
+            if name == b"TR-8S MIDI 1" and inp == 1:
+                device_id = i
+                print(f"using device {i}: {name}")
+                time_prev_midi_message = time.time()
+                break
+        if device_id is None:
+            pygame.midi.quit()
+            time.sleep(0.5)
+    return pygame.midi.Input(device_id)
+
+# pygame.midi.init()
+# device_id = None
+# print("waiting for midi device...")
+# while device_id is None:
+#     for i in range(pygame.midi.get_count()):
+#         print(i, pygame.midi.get_device_info(i))
+#         (_,name,inp,out,opened) = pygame.midi.get_device_info(i)
+#         if name == b"TR-8S MIDI 1" and inp == 1:
+#             device_id = i
+#             print("using device ", i)
+#     if device_id == None:
+#         time.sleep(0.5)
 
 CLOCK = 0b11111000
 START = 0b11111010
@@ -350,13 +370,14 @@ step = 0
 # step_interval = 42069
 step_interval = 60 / 143 / 4
 
-
-
 clock_count = 0
-midi = pygame.midi.Input(device_id)
 is_started = False
 played_samples = False
 played_step = False
+
+midi = connect_midi()
+time_prev_midi_message = time.time()
+
 # with noalsaerr():
 while True:
     step_predicted = time.time() - step_start >= step_interval - lag_time and not played_step
@@ -367,6 +388,7 @@ while True:
     events = midi.read(1)
     if len(events) == 1:
         (status, d1, d2, d3) = events[0][0]
+        time_prev_midi_message = time.time()
 
         if status == START:
             is_started = True
@@ -398,3 +420,7 @@ while True:
             beat_start = now
 
     time.sleep(0.001)
+    if time.time() - time_prev_midi_message > 6.0:
+        pygame.midi.quit()
+        is_started = False
+        midi = connect_midi()
