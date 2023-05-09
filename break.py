@@ -75,8 +75,7 @@ TOGGLE_KEYS = dactyl_keys[1]
 HOLD_KEYS = dactyl_keys[3]
 
 class Sample:
-    # low volume so poor pi soundcard doesn't clip playing multiple samples
-    MAX_VOLUME = 0.3
+    MAX_VOLUME = 1
 
     def __init__(self, file):
         self.queued = False
@@ -163,7 +162,7 @@ class Sample:
             # print(f"{step} playing {next_slice} on channel {self.step_repeat_channel}")
 
 # TODO try smaller buffer size for lower latency
-pygame.mixer.init(buffer=1024)
+pygame.mixer.init(buffer=128)
 pygame.mixer.set_num_channels(12)
 dir_path = os.path.dirname(os.path.realpath(__file__))
 bank = 0
@@ -322,7 +321,6 @@ def on_key(e):
 
 keyboard.hook(on_key)
 
-# how come tr8 can't come second?
 def connect_midi():
     global time_prev_midi_message
     device_id = None
@@ -342,19 +340,6 @@ def connect_midi():
             time.sleep(0.5)
     return pygame.midi.Input(device_id)
 
-# pygame.midi.init()
-# device_id = None
-# print("waiting for midi device...")
-# while device_id is None:
-#     for i in range(pygame.midi.get_count()):
-#         print(i, pygame.midi.get_device_info(i))
-#         (_,name,inp,out,opened) = pygame.midi.get_device_info(i)
-#         if name == b"TR-8S MIDI 1" and inp == 1:
-#             device_id = i
-#             print("using device ", i)
-#     if device_id == None:
-#         time.sleep(0.5)
-
 CLOCK = 0b11111000
 START = 0b11111010
 STOP = 0b11111100
@@ -362,7 +347,7 @@ STOP = 0b11111100
 beat_interval = 42069
 beat_start = time.time()
 
-lag_time = 0.058
+lag_time = 0.039
 beat = 0
 
 step_start = time.time()
