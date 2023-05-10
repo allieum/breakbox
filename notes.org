@@ -23,6 +23,16 @@ CLOSED: [2023-05-03 Wed 14:04]
 :ID:       3d61d993-b662-4249-9c3a-7d687af9cf6a
 :END:
 
+* features
+** reduce jitter by only syncing @ start of bar
+** pitch shifting / rate manipulation
+** mute patterns
+** probability
+** allow play without clock
+** LFO!
+*** for volume, pitch, patterns, prob..
+
+
 * bugs
 ** do HOLD on both step repeat and a toggle switch -> stop doesn't stop the sound
 

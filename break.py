@@ -10,9 +10,30 @@ import time
 import os
 import sys
 import keyboard
-from ctypes import *
-from contextlib import contextmanager
+# from ctypes import *
+# from contextlib import contextmanager
 from datetime import datetime
+
+
+class Timer:
+    def __init__(self, name):
+        self.name = name
+        self.time = time.time()
+
+    def tick(self):
+        now = time.time()
+        print(f"{self.name}: {now - self.time}")
+        self.time = now
+from collections import defaultdict
+class keydefaultdict(defaultdict):
+    def __missing__(self, key):
+        if self.default_factory is None:
+            raise KeyError( key )
+        else:
+            ret = self[key] = self.default_factory(key)
+            return ret
+
+timer = keydefaultdict(Timer)
 
 current_time = datetime.now().strftime("%H:%M:%S")
 print("Start time =", current_time)
@@ -21,26 +42,26 @@ def restart_program():
     python = sys.executable
     os.execl(python, python, * sys.argv)
 
-ERROR_HANDLER_FUNC = CFUNCTYPE(None, c_char_p, c_int, c_char_p, c_int, c_char_p)
+# ERROR_HANDLER_FUNC = CFUNCTYPE(None, c_char_p, c_int, c_char_p, c_int, c_char_p)
 
 # sidestep ALSA underrun errors. not that cute
-def py_error_handler(filename, line, function, err, fmt):
-    # print("underrun CHOMP", fmt)
-    if b'occurred' in fmt:
-        print("we're done here")
-        current_time = datetime.now().strftime("%H:%M:%S")
-        print("Error time =", current_time)
-        restart_program()
-        # os.execl('/home/drum/breakbox/restart.sh', *sys.arg)
+# def py_error_handler(filename, line, function, err, fmt):
+#     # print("underrun CHOMP", fmt)
+#     if b'occurred' in fmt:
+#         print("we're done here")
+#         current_time = datetime.now().strftime("%H:%M:%S")
+#         print("Error time =", current_time)
+#         restart_program()
+#         # os.execl('/home/drum/breakbox/restart.sh', *sys.arg)
 
-c_error_handler = ERROR_HANDLER_FUNC(py_error_handler)
+# c_error_handler = ERROR_HANDLER_FUNC(py_error_handler)
 
-@contextmanager
-def noalsaerr():
-    asound = cdll.LoadLibrary('libasound.so.2')
-    asound.snd_lib_error_set_handler(c_error_handler)
-    yield
-    asound.snd_lib_error_set_handler(None)
+# @contextmanager
+# def noalsaerr():
+#     asound = cdll.LoadLibrary('libasound.so.2')
+#     asound.snd_lib_error_set_handler(c_error_handler)
+#     yield
+#     asound.snd_lib_error_set_handler(None)
 
 MAX_BEATS = 8
 STEPS_PER_BEAT = 4
@@ -142,7 +163,6 @@ class Sample:
         self.sound.stop()
         self.sound.play()
 
-
     def play_step(self, step):
         if not self.step_repeat:
             return
@@ -153,7 +173,8 @@ class Sample:
                 self.step_repeat_channel = next_slice.play()
             else:
                 self.step_repeat_channel.play(next_slice)
-            # print(f"{step} playing {next_slice} on channel {self.step_repeat_channel}")
+            timer['played step'].tick()
+            print(f"{step} playing {next_slice} on channel {self.step_repeat_channel}")
             self.step_repeat_channel.set_volume(Sample.MAX_VOLUME)
             self.step_repeat_queue = self.sound_slices[self.step_repeat_index + 1 : self.step_repeat_index + self.step_repeat_length]
         elif len(self.step_repeat_queue) > 0:
@@ -161,7 +182,6 @@ class Sample:
             self.step_repeat_channel.play(next_slice)
             # print(f"{step} playing {next_slice} on channel {self.step_repeat_channel}")
 
-# TODO try smaller buffer size for lower latency
 pygame.mixer.init(buffer=128)
 pygame.mixer.set_num_channels(12)
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -329,7 +349,7 @@ def connect_midi():
         pygame.midi.init()
         for i in range(pygame.midi.get_count()):
             # print(i, pygame.midi.get_device_info(i))
-            (_,name,inp,out,opened) = pygame.midi.get_device_info(i)
+            (_,name,inp,_,_) = pygame.midi.get_device_info(i)
             if name == b"TR-8S MIDI 1" and inp == 1:
                 device_id = i
                 print(f"using device {i}: {name}")
@@ -344,35 +364,43 @@ CLOCK = 0b11111000
 START = 0b11111010
 STOP = 0b11111100
 
-beat_interval = 42069
-beat_start = time.time()
+# beat_interval = 42069
+# beat_start = time.time()
 
 lag_time = 0.039
 beat = 0
 
 step_start = time.time()
 step = 0
-# step_interval = 42069
 step_interval = 60 / 143 / 4
+measure_start = time.time()
 
 clock_count = 0
 is_started = False
 played_samples = False
 played_step = False
+played_step2 = False
 
 midi = connect_midi()
 time_prev_midi_message = time.time()
 
 # with noalsaerr():
 while True:
-    step_predicted = time.time() - step_start >= step_interval - lag_time and not played_step
+    # step_predicted = time.time() - step_start >= step_interval - lag_time and not played_step
+    next_step_time = step_interval * (step + 1)
+    step_predicted = time.time() - measure_start >= next_step_time - lag_time and not played_step
+    # if step2_predicted and is_started:
+    #     played_step2 = True
+        # print(f"measure prediction for {step + 1} says {time.time() - measure_start} > {step_interval * (beat + 1)}")
     if step_predicted and is_started:
         next_step = (step + 1) % MAX_STEPS
         play_samples(next_step)
         played_step = True
+        # print(f"step prediction for {step + 1} say {time.time() - step_start} > {step_interval - lag_time}")
     events = midi.read(1)
     if len(events) == 1:
         (status, d1, d2, d3) = events[0][0]
+        # timer['midi msg'].tick()
         time_prev_midi_message = time.time()
 
         if status == START:
@@ -380,6 +408,7 @@ while True:
             clock_count = 0
             beat = 0
             step = 0
+            measure_start = time.time()
 
         if status == STOP:
             is_started = False
@@ -400,9 +429,11 @@ while True:
             beat = (beat + 1) % MAX_BEATS
             # print(beat + 1)
             clock_count = 0
-            now = time.time()
-            beat_interval = now - beat_start
-            beat_start = now
+            if beat == 0:
+                measure_start = time.time()
+            # now = time.time()
+            # beat_interval = now - beat_start
+            # beat_start = now
 
     time.sleep(0.001)
     if time.time() - time_prev_midi_message > 6.0:
