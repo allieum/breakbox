@@ -102,21 +102,11 @@ def key_active(key):
     return key_held[key] or key_frozen[key]
 
 def key_pressed(e):
-    global bank
-    # print(e.name, " ", e.scan_code)
-
-    # if loop or toggle and sequence not started, start it
-    if not sequence.is_started:
-        for key in LOOP_KEYS + TOGGLE_KEYS:
-            if key == e.name:
-                sequence.start_internal()
-
     for i, key in enumerate(LOOP_KEYS):
         if key == e.name:
             for j, s in enumerate(sample.current_samples()):
                 s.queued = i == j
                 # print(f"sample {j} queued: {sample.queued}")
-            return
 
     for i, key in enumerate(TOGGLE_KEYS):
         if key != e.name:
@@ -136,6 +126,12 @@ def key_pressed(e):
         for step_repeat_key, length in SR_KEYS.items():
             if key_active(step_repeat_key):
                 sample.current_samples()[i].step_repeat_start(sequence.step, length)
+    #
+    # if loop or toggle and sequence not started, start it
+    if not sequence.is_started:
+        for key in LOOP_KEYS + TOGGLE_KEYS:
+            if key == e.name:
+                sequence.start_internal()
 
     for step_repeat_key, length in SR_KEYS.items():
         if step_repeat_key != e.name:
