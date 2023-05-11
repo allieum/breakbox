@@ -1,5 +1,4 @@
 from collections import defaultdict
-import math
 import pygame
 import pygame.event
 import pygame.midi
@@ -16,56 +15,12 @@ from datetime import datetime
 
 from sequence import Sequence
 import sample
+import midi
 
 sequence = Sequence()
 
-class Timer:
-    def __init__(self, name):
-        self.name = name
-        self.time = time.time()
-
-    def tick(self):
-        now = time.time()
-        print(f"{self.name}: {now - self.time}")
-        self.time = now
-from collections import defaultdict
-class keydefaultdict(defaultdict):
-    def __missing__(self, key):
-        if self.default_factory is None:
-            raise KeyError( key )
-        else:
-            ret = self[key] = self.default_factory(key)
-            return ret
-
-timer = keydefaultdict(Timer)
-
 current_time = datetime.now().strftime("%H:%M:%S")
 print("Start time =", current_time)
-
-def restart_program():
-    python = sys.executable
-    os.execl(python, python, * sys.argv)
-
-# ERROR_HANDLER_FUNC = CFUNCTYPE(None, c_char_p, c_int, c_char_p, c_int, c_char_p)
-
-# sidestep ALSA underrun errors. not that cute
-# def py_error_handler(filename, line, function, err, fmt):
-#     # print("underrun CHOMP", fmt)
-#     if b'occurred' in fmt:
-#         print("we're done here")
-#         current_time = datetime.now().strftime("%H:%M:%S")
-#         print("Error time =", current_time)
-#         restart_program()
-#         # os.execl('/home/drum/breakbox/restart.sh', *sys.arg)
-
-# c_error_handler = ERROR_HANDLER_FUNC(py_error_handler)
-
-# @contextmanager
-# def noalsaerr():
-#     asound = cdll.LoadLibrary('libasound.so.2')
-#     asound.snd_lib_error_set_handler(c_error_handler)
-#     yield
-#     asound.snd_lib_error_set_handler(None)
 
 
 K_STOP = 'delete'
@@ -229,43 +184,15 @@ def on_key(e):
 
 keyboard.hook(on_key)
 
-def connect_midi():
-    global time_prev_midi_message
-    device_id = None
-    print("waiting for midi device...")
-    while device_id is None:
-        pygame.midi.init()
-        for i in range(pygame.midi.get_count()):
-            # print(i, pygame.midi.get_device_info(i))
-            (_,name,inp,_,_) = pygame.midi.get_device_info(i)
-            if name == b"TR-8S MIDI 1" and inp == 1:
-                device_id = i
-                print(f"using device {i}: {name}")
-                time_prev_midi_message = time.time()
-                break
-        if device_id is None:
-            pygame.midi.quit()
-            time.sleep(0.5)
-    return pygame.midi.Input(device_id)
+midi.connect()
 
-
-# beat_interval = 42069
-# beat_start = time.time()
-
-midi = connect_midi()
-time_prev_midi_message = time.time()
-
-# with noalsaerr():
 while True:
-    events = midi.read(1)
-    midi_status = events[0][0][0] if len(events) == 1 else None
-    if midi_status is not None:
-        time_prev_midi_message = time.time()
+    sequence.update(midi.get_status())
 
-    sequence.update(midi_status)
+    if midi.lost_connection():
+        if sequence.midi_started:
+            print("lost midi connection")
+            sequence.stop_midi()
+        midi.reconnect(suppress_output = True)
 
     time.sleep(0.001)
-    if time.time() - time_prev_midi_message > 6.0:
-        pygame.midi.quit()
-        sequence.is_started = False
-        midi = connect_midi()
