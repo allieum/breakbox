@@ -14,6 +14,10 @@ import keyboard
 # from contextlib import contextmanager
 from datetime import datetime
 
+from sequence import Sequence
+import sample
+
+sequence = Sequence()
 
 class Timer:
     def __init__(self, name):
@@ -63,9 +67,6 @@ def restart_program():
 #     yield
 #     asound.snd_lib_error_set_handler(None)
 
-MAX_BEATS = 8
-STEPS_PER_BEAT = 4
-MAX_STEPS = MAX_BEATS * STEPS_PER_BEAT
 
 K_STOP = 'delete'
 K_NEXT_BANK = '#'
@@ -95,136 +96,25 @@ LOOP_KEYS = dactyl_keys[0]
 TOGGLE_KEYS = dactyl_keys[1]
 HOLD_KEYS = dactyl_keys[3]
 
-class Sample:
-    MAX_VOLUME = 1
-
-    def __init__(self, file):
-        self.queued = False
-        self.step_repeat = False
-        self.step_repeat_length = 0 # in steps
-        self.step_repeat_index = 0  # which step to repeat
-        self.step_repeat_channel = None
-        self.step_repeat_queue = []
-        self.load(file)
-
-    def load(self, file):
-        print(f"loading sample {file}")
-        self.sound = pygame.mixer.Sound(file)
-        self.sound.set_volume(0) # default mute
-        wav = self.sound.get_raw()
-        slice_size = math.ceil(len(wav) / MAX_STEPS)
-        self.sound_slices = [pygame.mixer.Sound(wav[i:i + slice_size]) for i in range(0, len(wav), slice_size)]
-
-    def step_repeat_start(self, index, length):
-        if not self.step_repeat:
-            self.step_repeat_was_muted = self.is_muted()
-            self.step_repeat_length = length
-            self.step_repeat_index = index - index % length
-            self.step_repeat = True
-            # print(f"starting step repeat at {self.step_repeat_index} with length {length}")
-        elif length != self.step_repeat_length:
-            self.step_repeat_length = length
-        else:
-            return
-
-    def step_repeat_stop(self):
-        if not self.step_repeat:
-            return
-        # print("stopping step repeat")
-        self.step_repeat = False
-        if self.step_repeat_channel is not None:
-            self.step_repeat_channel.fadeout(15)
-            self.step_repeat_channel = None
-        self.step_repeat_queue = []
-        self.set_mute(self.step_repeat_was_muted)
-
-    def mute(self):
-        self.sound.set_volume(0)
-
-    def unmute(self):
-        self.sound.set_volume(Sample.MAX_VOLUME)
-
-    def set_mute(self, mute):
-        if mute:
-            self.mute()
-        else:
-            self.unmute()
-
-    def is_muted(self):
-        return self.sound.get_volume() == 0
-
-    def toggle_mute(self):
-        if self.is_muted():
-            self.unmute()
-        else:
-            self.mute()
-
-    def play(self):
-        self.sound.stop()
-        self.sound.play()
-
-    def play_step(self, step):
-        if not self.step_repeat:
-            return
-        if step in range(self.step_repeat_index % self.step_repeat_length, MAX_STEPS, self.step_repeat_length):
-            self.mute()
-            next_slice = self.sound_slices[self.step_repeat_index]
-            if self.step_repeat_channel is None:
-                self.step_repeat_channel = next_slice.play()
-            else:
-                self.step_repeat_channel.play(next_slice)
-            timer['played step'].tick()
-            print(f"{step} playing {next_slice} on channel {self.step_repeat_channel}")
-            self.step_repeat_channel.set_volume(Sample.MAX_VOLUME)
-            self.step_repeat_queue = self.sound_slices[self.step_repeat_index + 1 : self.step_repeat_index + self.step_repeat_length]
-        elif len(self.step_repeat_queue) > 0:
-            next_slice = self.step_repeat_queue.pop(0)
-            self.step_repeat_channel.play(next_slice)
-            # print(f"{step} playing {next_slice} on channel {self.step_repeat_channel}")
-
-pygame.mixer.init(buffer=128)
-pygame.mixer.set_num_channels(12)
-dir_path = os.path.dirname(os.path.realpath(__file__))
-bank = 0
-BANK_SIZE = 6
-NUM_BANKS = 2
-samples = [Sample(dir_path + f'/samples/143-2bar-{i:03}.wav') for i in range(12)]
-
-def current_samples():
-   return samples[bank * BANK_SIZE : BANK_SIZE * (bank + 1)]
-
-def play_samples(step = 0):
-    if step == 0:
-        for i, sample in enumerate(current_samples()):
-            if sample.queued:
-                for j, sample in enumerate(current_samples()):
-                    sample.set_mute(i != j)
-                    sample.queued = False
-        pygame.mixer.stop()
-        for i, sample in enumerate(current_samples()):
-            # print(f"sample {i} volume: {sample.sound.get_volume()}")
-            sample.play()
-    for sample in current_samples():
-        sample.play_step(step)
-
-# unmute first sample
-current_samples()[0].unmute()
-
-
-
-hold_active = False
 key_held = defaultdict(bool)
 key_frozen = defaultdict(bool)
 def key_active(key):
     return key_held[key] or key_frozen[key]
 
 def key_pressed(e):
-    global bank, step, hold_active
+    global bank
     # print(e.name, " ", e.scan_code)
+
+    # if loop or toggle and sequence not started, start it
+    if not sequence.is_started:
+        for key in LOOP_KEYS + TOGGLE_KEYS:
+            if key == e.name:
+                sequence.start_internal()
+
     for i, key in enumerate(LOOP_KEYS):
         if key == e.name:
-            for j, sample in enumerate(current_samples()):
-                sample.queued = i == j
+            for j, s in enumerate(sample.current_samples()):
+                s.queued = i == j
                 # print(f"sample {j} queued: {sample.queued}")
             return
 
@@ -232,20 +122,20 @@ def key_pressed(e):
         if key != e.name:
             continue
         if not key_held[key] and not key_frozen[key]:
-            current_samples()[i].toggle_mute()
+            sample.current_samples()[i].toggle_mute()
         if not key_frozen[key]:
             key_held[key] = True
         if any([key_held[k] for k in HOLD_KEYS]):
-            print(f"freezing {key}")
+            # print(f"freezing {key}")
             key_frozen[key] = True
         elif key_frozen[key]:
-            print(f"unfreezing {key}")
+            # print(f"unfreezing {key}")
             key_frozen[key] = False
             process_release(key)
         # print(f"holding {key}")
         for step_repeat_key, length in SR_KEYS.items():
             if key_active(step_repeat_key):
-                current_samples()[i].step_repeat_start(step, length)
+                sample.current_samples()[i].step_repeat_start(sequence.step, length)
 
     for step_repeat_key, length in SR_KEYS.items():
         if step_repeat_key != e.name:
@@ -253,38 +143,42 @@ def key_pressed(e):
         # print(f"holding {step_repeat_key}")
         if not key_frozen[step_repeat_key]:
             key_held[step_repeat_key] = True
-        if any([key_held[k] for k in HOLD_KEYS]):
+        if any([key_held[k] for k in HOLD_KEYS]): # make hold_active fn
             key_frozen[step_repeat_key] = True
-            print(f"freezing {step_repeat_key}")
+            # print(f"freezing {step_repeat_key}")
         elif key_frozen[step_repeat_key]:
-            print(f"unfreezing {step_repeat_key}")
+            # print(f"unfreezing {step_repeat_key}")
             key_frozen[step_repeat_key] = False
             process_release(step_repeat_key)
         for i, key in enumerate(TOGGLE_KEYS):
             if key_active(key):
-                current_samples()[i].step_repeat_start(step, length)
+                sample.current_samples()[i].step_repeat_start(sequence.step, length)
 
     if K_STOP == e.name:
         # cancel held keys
         for key in key_frozen:
             key_held[key] = False
             key_frozen[key] = False
-        for sample in current_samples():
-            sample.mute()
+        for s in sample.current_samples():
+            s.mute()
+        if sequence.is_internal():
+            sequence.stop_internal()
 
     if K_NEXT_BANK == e.name:
         looping_index = None
-        for i, sample in enumerate(current_samples()):
-            if not sample.is_muted() and not key_active(TOGGLE_KEYS[i]):
+        for i, s in enumerate(sample.current_samples()):
+            if not s.is_muted() and not key_active(TOGGLE_KEYS[i]):
                 looping_index = i
                 # print(f"looping index {i}")
         # cancel held keys
         for key in key_frozen:
             key_held[key] = False
             key_frozen[key] = False
-        bank = (bank + 1) % NUM_BANKS
+        sample.bank = (sample.bank + 1) % sample.NUM_BANKS
+        for s in [s for s in sample.current_samples()]:
+            s.step_repeat_stop()
         if looping_index is not None:
-            current_samples()[looping_index].queued = True
+            sample.current_samples()[looping_index].queued = True
 
     # cases for hold button:
     # active means at least one key frozen
@@ -324,14 +218,12 @@ def key_released(e):
 def process_release(k):
     for i, key in enumerate(TOGGLE_KEYS):
         if key == k:
-            current_samples()[i].step_repeat_stop()
-            current_samples()[i].toggle_mute()
+            sample.current_samples()[i].step_repeat_stop()
+            sample.current_samples()[i].toggle_mute()
     for key, length in SR_KEYS.items():
         if key != k:
             continue
-        for sample in [s for s in current_samples() if s.step_repeat_length == length]:
-            sample.step_repeat_stop()
-
+        sample.step_repeat_stop(length)
 
 def on_key(e):
     if e.event_type == keyboard.KEY_DOWN:
@@ -360,83 +252,24 @@ def connect_midi():
             time.sleep(0.5)
     return pygame.midi.Input(device_id)
 
-CLOCK = 0b11111000
-START = 0b11111010
-STOP = 0b11111100
 
 # beat_interval = 42069
 # beat_start = time.time()
-
-lag_time = 0.039
-beat = 0
-
-step_start = time.time()
-step = 0
-step_interval = 60 / 143 / 4
-measure_start = time.time()
-
-clock_count = 0
-is_started = False
-played_samples = False
-played_step = False
-played_step2 = False
 
 midi = connect_midi()
 time_prev_midi_message = time.time()
 
 # with noalsaerr():
 while True:
-    # step_predicted = time.time() - step_start >= step_interval - lag_time and not played_step
-    next_step_time = step_interval * (step + 1)
-    step_predicted = time.time() - measure_start >= next_step_time - lag_time and not played_step
-    # if step2_predicted and is_started:
-    #     played_step2 = True
-        # print(f"measure prediction for {step + 1} says {time.time() - measure_start} > {step_interval * (beat + 1)}")
-    if step_predicted and is_started:
-        next_step = (step + 1) % MAX_STEPS
-        play_samples(next_step)
-        played_step = True
-        # print(f"step prediction for {step + 1} say {time.time() - step_start} > {step_interval - lag_time}")
     events = midi.read(1)
-    if len(events) == 1:
-        (status, d1, d2, d3) = events[0][0]
-        # timer['midi msg'].tick()
+    midi_status = events[0][0][0] if len(events) == 1 else None
+    if midi_status is not None:
         time_prev_midi_message = time.time()
 
-        if status == START:
-            is_started = True
-            clock_count = 0
-            beat = 0
-            step = 0
-            measure_start = time.time()
-
-        if status == STOP:
-            is_started = False
-            pygame.mixer.stop()
-
-        if status == CLOCK:
-            clock_count += 1
-
-        if clock_count > 0 and clock_count % (24 / STEPS_PER_BEAT) == 0:
-            step = (step + 1) % MAX_STEPS
-            # print(step)
-            now = time.time()
-            # step_interval = now - step_start
-            step_start = now
-            played_step = False
-
-        if clock_count == 24:
-            beat = (beat + 1) % MAX_BEATS
-            # print(beat + 1)
-            clock_count = 0
-            if beat == 0:
-                measure_start = time.time()
-            # now = time.time()
-            # beat_interval = now - beat_start
-            # beat_start = now
+    sequence.update(midi_status)
 
     time.sleep(0.001)
     if time.time() - time_prev_midi_message > 6.0:
         pygame.midi.quit()
-        is_started = False
+        sequence.is_started = False
         midi = connect_midi()

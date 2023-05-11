@@ -24,7 +24,8 @@ CLOSED: [2023-05-03 Wed 14:04]
 :END:
 
 * features
-** reduce jitter by only syncing @ start of bar
+** DONE reduce jitter by only syncing @ start of bar
+CLOSED: [2023-05-09 Tue 18:25]
 ** pitch shifting / rate manipulation
 ** mute patterns
 ** probability
@@ -32,6 +33,17 @@ CLOSED: [2023-05-03 Wed 14:04]
 ** LFO!
 *** for volume, pitch, patterns, prob..
 
+
+* refactory
+** state module (current bank, modes, etc)
+** constants
+** input / kb module
+** audio
+** sequence
+*** beats, clock, etc
+** midi
+*** connec, reconnec, get msg
+** utility
 
 * bugs
 ** do HOLD on both step repeat and a toggle switch -> stop doesn't stop the sound
