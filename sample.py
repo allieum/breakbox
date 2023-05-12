@@ -25,6 +25,7 @@ class Sample:
         self.channel = None
         self.sound_queue = []
         self.muted = True
+        self.halftime = False
         self.load(file)
 
     def load(self, file):
@@ -115,7 +116,10 @@ class Sample:
     def play_step(self, step):
         if not self.step_repeat:
             if not self.is_muted() or self.looping:
-                self.queue(self.sound_slices[step])
+                sound = self.sound_slices[step]
+                if self.halftime:
+                    sound = timestretch(sound, 0.5)
+                self.queue(sound)
             return
         if step in range(self.step_repeat_index % self.step_repeat_length, self.num_slices, self.step_repeat_length):
             self.mute()
@@ -171,13 +175,37 @@ def step_repeat_stop(length):
     for sample in [s for s in current_samples() if s.step_repeat_length == length]:
         sample.step_repeat_stop()
 
+def stop_halftime():
+    for s in current_samples():
+        if s.halftime:
+            s.sound_queue = []
+            s.halftime = False
+
 def make_even(x):
     if x % 2 == 1:
         x -= 1
     return x
 
+TS_TIME_DEFAULT = 0.048
+TS_TIME_DELTA = 0.001
+ts_time = TS_TIME_DEFAULT
+def increase_ts_time():
+    global ts_time
+    ts_time += TS_TIME_DELTA
+
+def decrease_ts_time():
+    global ts_time
+    if ts_time > TS_TIME_DELTA:
+        ts_time -= TS_TIME_DELTA
+    else:
+        ts_time /= 2
+
+def reset_ts_time():
+    global ts_time
+    ts_time = TS_TIME_DEFAULT
+
 def timestretch(sound, rate):
-    chunk_time = 0.045
+    chunk_time = ts_time
     wav = sound.get_raw()
     new_wav = bytearray(math.ceil(len(wav) / rate))
 
@@ -214,7 +242,7 @@ def change_rate(sound, rate):
     return pygame.mixer.Sound(new_wav)
     
 # unmute first sample
-current_samples()[0].unmute()
+# current_samples()[0].unmute()
 
 # orig = current_samples()[0].sound
 # print(len(orig.get_raw()) / 4 / 22050)

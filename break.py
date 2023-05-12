@@ -26,6 +26,12 @@ print("Start time =", current_time)
 K_STOP = 'delete'
 K_NEXT_BANK = '#'
 
+# halftime (0.5 timestretch)
+K_HT = 'enter'
+K_HT_UP = 'ctrl'
+K_HT_DOWN = 'space'
+K_HT_RESET = 'alt'
+
 # step repeat
 K_SR4 = 's'
 K_SR2 = 'd'
@@ -42,9 +48,9 @@ dactyl_keys =[
     ['tab',   'a', K_SR4, K_SR2, K_SR1, 'g'],
     ['shift', 'z', 'x',   'c',   'v', 'b'],
                   ['tab', K_NEXT_BANK],
-                                 [K_STOP, 'shift'],
-                                 ['space', 'ctrl'],
-                                 ['enter', 'alt'],
+                                 [K_STOP,     'shift'],
+                                 [K_HT_DOWN,  K_HT_UP],
+                                 [K_HT,    K_HT_RESET],
 ]
 
 LOOP_KEYS = dactyl_keys[0]
@@ -62,6 +68,28 @@ def key_pressed(e):
             for j, s in enumerate(sample.current_samples()):
                 s.looping = i == j
                 # print(f"sample {j} queued: {sample.queued}")
+
+    if e.name == K_HT:
+        key_held[K_HT] = True
+        for i, key in enumerate(TOGGLE_KEYS):
+            if key_active(key):
+                sample.current_samples()[i].halftime = True
+        if any([key_held[k] for k in HOLD_KEYS]):
+            # print(f"freezing {key}")
+            key_frozen[K_HT] = True
+        elif key_frozen[K_HT]:
+            # print(f"unfreezing {key}")
+            key_frozen[K_HT] = False
+            process_release(K_HT)
+
+    if e.name == K_HT_UP:
+        sample.increase_ts_time()
+
+    if e.name == K_HT_DOWN:
+        sample.decrease_ts_time()
+
+    if e.name == K_HT_RESET:
+        sample.reset_ts_time()
 
     for i, key in enumerate(TOGGLE_KEYS):
         if key != e.name:
@@ -81,6 +109,8 @@ def key_pressed(e):
         for step_repeat_key, length in SR_KEYS.items():
             if key_active(step_repeat_key):
                 sample.current_samples()[i].step_repeat_start(sequence.step, length)
+        if key_active(K_HT):
+            sample.current_samples()[i].halftime = True
     #
     # if loop or toggle and sequence not started, start it
     if not sequence.is_started:
@@ -171,11 +201,14 @@ def process_release(k):
     for i, key in enumerate(TOGGLE_KEYS):
         if key == k:
             sample.current_samples()[i].step_repeat_stop()
+            sample.current_samples()[i].halftime = False
             sample.current_samples()[i].toggle_mute()
     for key, length in SR_KEYS.items():
         if key != k:
             continue
         sample.step_repeat_stop(length)
+    if K_HT == k:
+        sample.stop_halftime()
 
 def on_key(e):
     if e.event_type == keyboard.KEY_DOWN:
