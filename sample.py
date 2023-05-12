@@ -2,13 +2,14 @@ import math
 import pygame.mixer
 import os
 
-pygame.mixer.init(buffer=256)
+pygame.mixer.init(frequency=22050, buffer=256)
 pygame.mixer.set_num_channels(16)
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 bank = 0
 BANK_SIZE = 6
 NUM_BANKS = 2
+
 
 class Sample:
     MAX_VOLUME = 1
@@ -132,6 +133,57 @@ def step_repeat_stop(length):
     for sample in [s for s in current_samples() if s.step_repeat_length == length]:
         sample.step_repeat_stop()
 
+def make_even(x):
+    if x % 2 == 1:
+        x -= 1
+    return x
+
+def timestretch(sound, rate):
+    chunk_time = 0.045
+    wav = sound.get_raw()
+    new_wav = bytearray(math.ceil(len(wav) / rate))
+
+    chunk_size = math.ceil(chunk_time * 22050) * 2 # 2 bytes per sample
+    growth_factor =  1 / rate
+
+    print(f"chunk_time {chunk_time} chunk_size {chunk_size} growth_factor {growth_factor}")
+
+    for i in range(0, len(wav), chunk_size):
+        chunks = wav[i:i + chunk_size] * math.floor(growth_factor)
+        partial_factor = growth_factor - math.floor(growth_factor)
+        leftover_chunk_size = make_even(math.floor(chunk_size * partial_factor))
+        leftover_chunk = wav[i:i + leftover_chunk_size]
+        stretched_bytes = chunks + leftover_chunk
+        j = make_even(math.floor(i * growth_factor))
+        new_wav[j:j + len(stretched_bytes)] = stretched_bytes
+
+    return pygame.mixer.Sound(new_wav)
+
+
+def change_rate(sound, rate):
+    wav = sound.get_raw()
+    new_wav = bytearray(math.ceil(len(wav) / rate))
+
+    # from new_wav -> wav
+    def convert_sample_index(i):
+        j = make_even(math.floor(i * rate))
+        return j
+
+    for i in range(0, len(new_wav), 2):
+        j = convert_sample_index(i)
+        new_wav[i:i + 2] = wav[j:j + 2]
+
+    return pygame.mixer.Sound(new_wav)
+    
 
 # unmute first sample
 current_samples()[0].unmute()
+
+# orig = current_samples()[0].sound
+# print(len(orig.get_raw()) / 4 / 22050)
+# stretched = timestretch(current_samples()[0].sound, 0.4)
+# pitched = change_rate(current_samples()[0].sound, 0.6)
+# print(len(stretched.get_raw()) / 4 / 22050)
+# print(len(orig.get_raw()) / len(pitched.get_raw()))
+# # stretched.play()
+# pitched.play()

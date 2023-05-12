@@ -29,7 +29,8 @@ CLOSED: [2023-05-09 Tue 18:25]
 ** pitch shifting / rate manipulation
 ** mute patterns
 ** probability
-** allow play without clock
+** DONE allow play without clock
+CLOSED: [2023-05-11 Thu 15:48]
 ** LFO!
 *** for volume, pitch, patterns, prob..
 

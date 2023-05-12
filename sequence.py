@@ -31,6 +31,8 @@ class Sequence:
         print("starting internal clock")
 
     def stop_internal(self):
+        if not self.is_internal():
+            return
         self.internal_start_time = None
         self._stop()
         print("stopping internal clock")
