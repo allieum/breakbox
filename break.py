@@ -60,7 +60,7 @@ def key_pressed(e):
     for i, key in enumerate(LOOP_KEYS):
         if key == e.name:
             for j, s in enumerate(sample.current_samples()):
-                s.queued = i == j
+                s.looping = i == j
                 # print(f"sample {j} queued: {sample.queued}")
 
     for i, key in enumerate(TOGGLE_KEYS):
@@ -112,6 +112,7 @@ def key_pressed(e):
             key_frozen[key] = False
         for s in sample.current_samples():
             s.mute()
+            s.looping = False
         if sequence.is_internal():
             sequence.stop_internal()
 
@@ -129,7 +130,7 @@ def key_pressed(e):
         for s in [s for s in sample.current_samples()]:
             s.step_repeat_stop()
         if looping_index is not None:
-            sample.current_samples()[looping_index].queued = True
+            sample.current_samples()[looping_index].looping = True
 
     # cases for hold button:
     # active means at least one key frozen

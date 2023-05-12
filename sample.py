@@ -1,6 +1,7 @@
 import math
 import pygame.mixer
 import os
+import time
 
 pygame.mixer.init(frequency=22050, buffer=256)
 pygame.mixer.set_num_channels(16)
@@ -16,12 +17,14 @@ class Sample:
     num_slices = 32
 
     def __init__(self, file):
-        self.queued = False
+        self.filename = file.split("samples/")[1]
+        self.looping = False
         self.step_repeat = False
         self.step_repeat_length = 0 # in steps
         self.step_repeat_index = 0  # which step to repeat
-        self.step_repeat_channel = None
-        self.step_repeat_queue = []
+        self.channel = None
+        self.sound_queue = []
+        self.muted = True
         self.load(file)
 
     def load(self, file):
@@ -49,17 +52,20 @@ class Sample:
             return
         # print("stopping step repeat")
         self.step_repeat = False
-        if self.step_repeat_channel is not None:
-            self.step_repeat_channel.fadeout(15)
-            self.step_repeat_channel = None
-        self.step_repeat_queue = []
+        if self.channel is not None:
+            self.channel.fadeout(15)
+            self.channel = None
+        self.sound_queue = []
         self.set_mute(self.step_repeat_was_muted)
 
     def mute(self):
         self.sound.set_volume(0)
+        self.muted = True
+        self.sound_queue = []
 
     def unmute(self):
         self.sound.set_volume(Sample.MAX_VOLUME)
+        self.muted = False
 
     def set_mute(self, mute):
         if mute:
@@ -68,7 +74,8 @@ class Sample:
             self.unmute()
 
     def is_muted(self):
-        return self.sound.get_volume() == 0
+        # return self.sound.get_volume() == 0
+        return self.muted
 
     def toggle_mute(self):
         if self.is_muted():
@@ -77,21 +84,48 @@ class Sample:
             self.mute()
 
     def play(self):
-        self.sound.stop()
-        self.sound.play()
+        pass
+        # self.sound.stop()
+        # self.sound.play()
+
+    def queue(self, sound):
+        # print(f"{self.filename} queueing {sound}")
+        self.sound_queue.append(sound)
+        self.process_queue()
+
+    def process_queue(self):
+        if len(self.sound_queue) == 0:
+            return
+        if self.channel is None:
+            sound = self.sound_queue.pop(0)
+            self.channel = sound.play()
+            # print(f'played {sound} on new {self.channel}')
+            return
+        if not self.channel.get_busy():
+            sound = self.sound_queue.pop(0)
+            self.channel.play(sound)
+            # print(f'{self.filename} played {sound} on existing {self.channel}')
+            return
+        if self.channel.get_queue() is None:
+            sound = self.sound_queue.pop(0)
+            self.channel.queue(sound)
+            # print(f'{self.filename} queued {sound} on existing {self.channel}')
+            return
 
     def play_step(self, step):
         if not self.step_repeat:
+            if not self.is_muted() or self.looping:
+                self.queue(self.sound_slices[step])
             return
         if step in range(self.step_repeat_index % self.step_repeat_length, self.num_slices, self.step_repeat_length):
             self.mute()
             next_slice = self.sound_slices[self.step_repeat_index]
-            if self.step_repeat_channel is None:
-                self.step_repeat_channel = next_slice.play()
+            if self.channel is None:
+                self.channel = next_slice.play()
             else:
                 # print(f"{self.step_repeat_channel.get_busy()}")
                 # self.step_repeat_channel.stop() # todo bug this can be None
-                self.step_repeat_channel.play(next_slice)
+                self.channel.play(next_slice)
             # timer['played step'].tick()
             # t = time.time()
             # while next_slice.get_num_channels() > 0:
@@ -99,11 +133,11 @@ class Sample:
             # print(time.time() - t)
 
             # print(f"{step} playing {next_slice} on channel {self.step_repeat_channel}")
-            self.step_repeat_channel.set_volume(self.MAX_VOLUME)
-            self.step_repeat_queue = self.sound_slices[self.step_repeat_index + 1 : self.step_repeat_index + self.step_repeat_length]
-        elif len(self.step_repeat_queue) > 0:
-            next_slice = self.step_repeat_queue.pop(0)
-            self.step_repeat_channel.play(next_slice)
+            self.channel.set_volume(self.MAX_VOLUME)
+            self.sound_queue = self.sound_slices[self.step_repeat_index + 1 : self.step_repeat_index + self.step_repeat_length]
+        elif len(self.sound_queue) > 0:
+            next_slice = self.sound_queue.pop(0)
+            self.channel.play(next_slice)
             # print(f"{step} playing {next_slice} on channel {self.step_repeat_channel}")
 
 
@@ -114,18 +148,22 @@ def current_samples():
 
 # current_samples()[4].sound_slices[4].play(loops=32)
 
+def update():
+    for s in current_samples():
+        s.process_queue()
+
 def play_samples(step = 0):
     # print(f'playing step {step}')
-    if step == 0:
-        for i, sample in enumerate(current_samples()):
-            if sample.queued:
-                for j, sample in enumerate(current_samples()):
-                    sample.set_mute(i != j)
-                    sample.queued = False
-        pygame.mixer.stop()
-        for i, sample in enumerate(current_samples()):
-            # print(f"sample {i} volume: {sample.sound.get_volume()}")
-            sample.play()
+    # if step == 0:
+    #     for i, sample in enumerate(current_samples()):
+    #         if sample.queued:
+    #             for j, sample in enumerate(current_samples()):
+    #                 sample.set_mute(i != j)
+    #                 sample.queued = False
+    #     pygame.mixer.stop()
+    #     for i, sample in enumerate(current_samples()):
+    #         # print(f"sample {i} volume: {sample.sound.get_volume()}")
+    #         sample.play()
     for sample in current_samples():
         sample.play_step(step)
 
@@ -175,7 +213,6 @@ def change_rate(sound, rate):
 
     return pygame.mixer.Sound(new_wav)
     
-
 # unmute first sample
 current_samples()[0].unmute()
 
@@ -187,3 +224,12 @@ current_samples()[0].unmute()
 # print(len(orig.get_raw()) / len(pitched.get_raw()))
 # # stretched.play()
 # pitched.play()
+
+# ch = None
+# for slice in current_samples()[3].sound_slices:
+#     if ch is None:
+#         ch = slice.play()
+#     else:
+#         while ch.get_queue():
+#             time.sleep(0.001)
+#         ch.queue(slice)

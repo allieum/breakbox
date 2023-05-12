@@ -90,6 +90,8 @@ class Sequence:
                 # print(f'internal step {next_step}')
                 self.step_forward()
 
+        sample.update()
+
     def step_forward(self):
         self.step = (self.step + 1) % self.steps
         self.played_step = False
