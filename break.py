@@ -12,9 +12,10 @@ import keyboard
 # from ctypes import *
 # from contextlib import contextmanager
 from datetime import datetime
+from threading import Thread
 
 from sequence import sequence
-# import sample
+import sample
 import control
 import midi
 
@@ -31,6 +32,9 @@ keyboard.hook(on_key)
 
 midi.connect()
 
+audio_thread = Thread(target=sample.play_samples)
+audio_thread.start()
+
 while True:
     sequence.update(midi.get_status())
 
@@ -40,4 +44,5 @@ while True:
             sequence.stop_midi()
         midi.reconnect(suppress_output = True)
 
+    sys.stdout.flush()
     time.sleep(0.001)

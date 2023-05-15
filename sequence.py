@@ -1,4 +1,5 @@
 import time
+from collections import defaultdict
 import pygame.mixer
 
 from midi import START, STOP, CLOCK
@@ -10,6 +11,7 @@ MAX_STEPS = MAX_BEATS * STEPS_PER_BEAT
 
 step_interval = 60 / 143 / 4
 midi_lag_time = 0.039
+lookahead_time = 0.200
 
 
 class Sequence:
@@ -20,14 +22,15 @@ class Sequence:
         self.step = 0
         self.steps = MAX_STEPS
         self.measure_start = time.time()
-        self.played_step = False
         self.internal_start_time = None
         self.midi_started = False
+        self.played_step = False
+        self.last_queued_step = -1
 
     def start_internal(self):
         self.internal_start_time = time.time()
         self._start()
-        sample.play_samples(0, self.internal_start_time)
+        sample.queue_samples(0, self.internal_start_time)
         print("starting internal clock")
 
     def stop_internal(self):
@@ -55,6 +58,7 @@ class Sequence:
         self.beat = 0
         self.step = 0
         self.measure_start = time.time()
+        self.last_queued_step = -1
 
     def _stop(self):
         self.is_started = False
@@ -72,31 +76,46 @@ class Sequence:
                 self.clock_count += 1
                 # print(f"got {self.clock_count} clocks")
                 if self.clock_count > 0 and self.clock_count % (24 / STEPS_PER_BEAT) == 0:
-                    self.step_forward()
+                    self.step_forward(time.time())
                 if self.clock_count == 24:
                     self.clock_count = 0
                     # self.beat = (self.beat + 1) % MAX_BEATS
                     # if self.beat == 0:
                     #     self.measure_start = time.time()
+        now = time.time()
+        prev = self.last_queued_step
+        for i in (self.inc(prev), self.inc(prev, 2), self.inc(prev, 3)):
+            if self.is_started and now + lookahead_time >= (t := self.step_time(i)):
+                # print(f"------- queuing step {i} === {t - self.measure_start}")
+                sample.queue_samples(i, t)
+                self.last_queued_step = i
 
-        next_step_time = self.measure_start + step_interval * (self.step + 1)
-        lag_time = midi_lag_time if self.midi_started else 0
-        step_predicted = time.time() >= next_step_time - lag_time and not self.played_step
+        next_step_time = self.step_time(self.inc(self.step))
+        step_predicted = now >= next_step_time and not self.played_step
         if step_predicted and self.is_started:
             next_step = (self.step + 1) % MAX_STEPS
-            sample.play_samples(next_step, next_step_time - lag_time)
             self.played_step = True
             if self.is_internal():
                 # print(f'internal step {next_step}')
-                self.step_forward()
+                self.step_forward(now)
 
-        sample.update()
+    def inc(self, step, n=1):
+        return (step + n) % self.steps
 
-    def step_forward(self):
-        self.step = (self.step + 1) % self.steps
+    def step_time(self, step):
+        next_step_time = self.measure_start + step_interval * step
+        lag_time = midi_lag_time if self.midi_started else 0
+        # step_predicted = (now := time.time()) >= next_step_time - lag_time and not self.played_step[step]
+        if step < self.step:
+            next_step_time += step_interval * self.steps
+        return next_step_time - lag_time
+
+
+    def step_forward(self, t):
+        self.step = self.inc(self.step)
         self.played_step = False
         if self.step == 0:
-            self.measure_start = time.time()
+            self.measure_start = t
         # print(f'step {self.step}')
 
 

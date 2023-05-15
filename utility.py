@@ -22,7 +22,10 @@ class keydefaultdict(defaultdict):
             ret = self[key] = self.default_factory(key)
             return ret
 
-timer = keydefaultdict(Timer)
+_timer = keydefaultdict(Timer)
+
+def timer(name):
+    _timer[name].tick()
 
 def restart_program():
     python = sys.executable
