@@ -27,7 +27,7 @@ class Sequence:
     def start_internal(self):
         self.internal_start_time = time.time()
         self._start()
-        sample.play_samples()
+        sample.play_samples(0, self.internal_start_time)
         print("starting internal clock")
 
     def stop_internal(self):
@@ -79,12 +79,12 @@ class Sequence:
                     # if self.beat == 0:
                     #     self.measure_start = time.time()
 
-        next_step_time = step_interval * (self.step + 1)
+        next_step_time = self.measure_start + step_interval * (self.step + 1)
         lag_time = midi_lag_time if self.midi_started else 0
-        step_predicted = time.time() - self.measure_start >= next_step_time - lag_time and not self.played_step
+        step_predicted = time.time() >= next_step_time - lag_time and not self.played_step
         if step_predicted and self.is_started:
             next_step = (self.step + 1) % MAX_STEPS
-            sample.play_samples(next_step)
+            sample.play_samples(next_step, next_step_time - lag_time)
             self.played_step = True
             if self.is_internal():
                 # print(f'internal step {next_step}')
@@ -98,3 +98,6 @@ class Sequence:
         if self.step == 0:
             self.measure_start = time.time()
         # print(f'step {self.step}')
+
+
+sequence = Sequence()

@@ -2,6 +2,9 @@ import os
 import sys
 from collections import defaultdict
 
+
+import time
+
 class Timer:
     def __init__(self, name):
         self.name = name

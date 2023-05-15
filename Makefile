@@ -4,6 +4,9 @@
 remote-deploy: push
 	ssh drum@breakbox.local 'sudo systemctl restart breakbox && sudo journalctl -f -u breakbox'
 
+log:
+	ssh drum@breakbox.local  'journalctl -f -u breakbox'
+
 
 push:
 	rsync -avr /home/rachel/allie/breakbox drum@breakbox.local:/home/drum/
