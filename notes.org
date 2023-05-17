@@ -35,6 +35,17 @@ CLOSED: [2023-05-11 Thu 15:48]
 *** for volume, pitch, patterns, prob..
 
 
+
+* stuff
+** bug w step repeat then toggle not work
+** top row should maybe be toggly / nonexclusive
+** implement chromatic rate shift
+** fix stutter on start w internal clock
+** playtest midi clock again lol
+** bug with sync at beginning when starting all samples at once?
+*** could check queue size and bail to recover from this
+*** also when sample drops should get next one in current call (while instead of if for timeout check)
+
 * refactory
 ** state module (current bank, modes, etc)
 ** constants

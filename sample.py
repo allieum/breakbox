@@ -131,18 +131,21 @@ class Sample:
 
         _sound, t = self.sound_queue[0]
 
+        now = time.time()
         timeout = 0.015
         lookahead = 0.005
-        if (now := time.time()) > t + timeout:
+        while now > t + timeout:
+            self.sound_queue.popleft()
             logger.warn(f"{self.name} dropping sample from {now - t}s ago")
-            msg = ""
-            while len(self.sound_queue) > 0:
-                _, t = self.sound_queue.popleft()
-                msg += f"{now - t} "
-            logger.warn(f"queue contents: {msg}")
-            # self.process_queue(
-            # print(self.sound_queue)
-            return
+            if len(self.sound_queue) == 0:
+                return
+            _sound, t = self.sound_queue[0]
+            # msg = ""
+            # msg += f"{now - t} "
+            # logger.warn(f"queue contents: {msg}")
+            # # self.process_queue(
+            # # print(self.sound_queue)
+            # return
 
         in_play_window = now >= t - lookahead
         in_queue_window = now >= t - lookahead - step_interval
@@ -163,8 +166,6 @@ class Sample:
             self.channel = sound.play()
             if self.channel is None:
                 print(f'{self.name} couldnt get channel')
-                # self.channel = pygame.mixer.find_channel(force=True)
-                # print(f'{self.filename} forced channel {self.channel}')
             else:
                 channels.add(self.channel)
                 print(f"seen {len(channels)} channels")
@@ -332,8 +333,8 @@ def change_rate(sound, rate):
 # unmute first sample
 # current_samples()[0].unmute()
 
-for s in current_samples():
-    s.unmute()
+# for s in current_samples():
+#     s.unmute()
 
 # orig = current_samples()[0].sound
 # print(len(orig.get_raw()) / 4 / 22050)
