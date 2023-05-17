@@ -18,10 +18,11 @@ from sequence import sequence
 import sample
 import control
 import midi
+import utility
 
-
+logger = utility.get_logger(__name__)
 current_time = datetime.now().strftime("%H:%M:%S")
-print("Start time =", current_time)
+logger.debug(f"Start time = {current_time}")
 
 def on_key(e):
     if e.event_type == keyboard.KEY_DOWN:
@@ -32,11 +33,12 @@ keyboard.hook(on_key)
 
 midi.connect()
 
-audio_thread = Thread(target=sample.play_samples)
-audio_thread.start()
+# audio_thread = Thread(target=sample.play_samples)
+# audio_thread.start()
 
 while True:
     sequence.update(midi.get_status())
+    sample.play_samples()
 
     if midi.lost_connection():
         if sequence.midi_started:
@@ -45,4 +47,5 @@ while True:
         midi.reconnect(suppress_output = True)
 
     sys.stdout.flush()
+    sys.stderr.flush()
     time.sleep(0.001)

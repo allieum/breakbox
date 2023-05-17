@@ -1,9 +1,18 @@
 import os
 import sys
 from collections import defaultdict
-
-
+import logging
 import time
+
+def get_logger(name):
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s %(threadName)s:%(funcName)s \n\t%(message)s',
+        # filename='break.log'
+    )
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    return logger
+
 
 class Timer:
     def __init__(self, name):

@@ -5,8 +5,9 @@ import time
 from collections import deque
 import concurrent.futures
 
-
 import utility
+
+logger = utility.get_logger(__name__)
 
 pygame.mixer.init(frequency=22050, buffer=256)
 pygame.mixer.set_num_channels(32)
@@ -29,7 +30,7 @@ class Sample:
     audio_executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
 
     def __init__(self, file):
-        self.filename = file.split("samples/")[1]
+        self.name = file.split("samples/")[1]
         self.looping = False
         self.step_repeat = False
         self.step_repeat_length = 0 # in steps
@@ -42,7 +43,7 @@ class Sample:
         self.last_printed = 0
 
     def load(self, file):
-        print(f"loading sample {file}")
+        logger.debug(f"loading sample {file}")
         self.sound = pygame.mixer.Sound(file)
         self.sound.set_volume(0) # default mute
         wav = self.sound.get_raw()
@@ -74,12 +75,14 @@ class Sample:
         self.set_mute(self.step_repeat_was_muted)
 
     def mute(self):
-        self.sound.set_volume(0)
+        logger.info(f"{self.name} muted {len(self.sound_queue)}")
+        # self.sound.set_volume(0)
         self.muted = True
         # self.sound_queue = []
 
     def unmute(self):
-        self.sound.set_volume(Sample.MAX_VOLUME)
+        logger.info(f"{self.name} unmuted {len(self.sound_queue)}")
+        # self.sound.set_volume(Sample.MAX_VOLUME)
         self.muted = False
 
     def set_mute(self, mute):
@@ -104,60 +107,90 @@ class Sample:
         # self.sound.play()
 
     def queue(self, sound, t):
-        # print(f"{self.filename} queueing {sound}")
+        logger.debug(f"queued sound in {self.name} for {time.localtime(t)}")
+        _, prev_t = self.sound_queue[len(self.sound_queue) - 1] if len(self.sound_queue) > 0 else None, None
         self.sound_queue.append((sound, t))
+        if prev_t and prev_t > t:
+            logger.error(f"{self.name} saw out of order sound queue")
+
 
     def process_queue(self):
+        logger.debug(f"start process queue for {self.name}")
         if len(self.sound_queue) == 0:
+            logger.debug(f"done process queue for {self.name}: queue empty")
             return
 
         if self.channel and self.channel.get_busy() and self.channel.get_queue() is not None:
+            logger.debug(f"done process queue for {self.name}: channel full")
             return
 
         if (size := len(self.sound_queue)) > 1:
-
             if not self.last_printed == size and not self.step_repeat:
                 self.last_printed = size
-                print(f"{self.filename} has queue of {size}; {self.channel.get_busy()} {self.channel.get_queue()}")
+                # print(f"{self.filename} has queue of {size}; {self.channel.get_busy()} {self.channel.get_queue()}")
 
-        _, t = self.sound_queue[0]
+        _sound, t = self.sound_queue[0]
 
         timeout = 0.015
         lookahead = 0.005
         if (now := time.time()) > t + timeout:
-            print(f"{self.filename} dropping sample from {now - t}s ago")
+            logger.warn(f"{self.name} dropping sample from {now - t}s ago")
+            msg = ""
+            while len(self.sound_queue) > 0:
+                _, t = self.sound_queue.popleft()
+                msg += f"{now - t} "
+            logger.warn(f"queue contents: {msg}")
             # self.process_queue(
             # print(self.sound_queue)
-            self.sound_queue.clear()
             return
 
         in_play_window = now >= t - lookahead
-        if not in_play_window:
+        in_queue_window = now >= t - lookahead - step_interval
+        if not in_queue_window:
+            logger.debug(f"done process queue for {self.name}: too early for queue her")
+            return
+        if not in_play_window and self.channel is None:
+            logger.debug(f"done process queue for {self.name}: too early for channel her")
             return
 
-        in_queue_window = now >= t - lookahead - step_interval
+        if self.channel and not self.channel.get_busy() and not in_play_window: # and in_queue_window:
+            return
 
         sound, _ = self.sound_queue.popleft()
-        if self.channel is None and in_play_window:
+        if sound is not _sound:
+            logger.error("sound is not sound!")
+        if self.channel is None:
             self.channel = sound.play()
             if self.channel is None:
-                print(f'{self.filename} couldnt get channel')
+                print(f'{self.name} couldnt get channel')
                 # self.channel = pygame.mixer.find_channel(force=True)
                 # print(f'{self.filename} forced channel {self.channel}')
             else:
                 channels.add(self.channel)
                 print(f"seen {len(channels)} channels")
+            logger.info(f"done process queue for {self.name}: played sample on new channel")
             return
         if not self.channel.get_busy() and in_play_window:
             self.channel.stop()
             self.channel.play(sound)
             # print(f'{self.filename} played {sound} on existing {self.channel}')
+            logger.info(f"done process queue for {self.name}: played sample")
             return
         if self.channel.get_queue() is None and in_queue_window:
             # utility.timer("queue")
             self.channel.queue(sound)
             # print(f'{self.filename} queued {sound} on existing {self.channel}')
+            logger.debug(f"done process queue for {self.name}: queued sample")
             return
+
+        # logger.info(f"done process queue for {self.name}: how you get here?")
+        logger.info(f"what wrong? {self.name} {now - t} busy:{self.channel.get_busy()} channel.queue: {self.channel.get_queue()} is_queue {in_queue_window} is_play {in_play_window}")
+        msg = ""
+        for i in range(len(self.sound_queue) - 1, -1, -1):
+            _, t = self.sound_queue[i]
+            msg += f"{now - t} "
+        logger.warn(f"queue contents: {msg}")
+
 
     def queue_step(self, step, t):
         if not self.step_repeat:
@@ -207,13 +240,16 @@ def current_samples():
    return samples[bank * BANK_SIZE : BANK_SIZE * (bank + 1)]
 
 def play_samples():
-    while True:
+    # while True:
         # t = time.time()
-        futures = [Sample.audio_executor.submit(s.process_queue) for s in current_samples()]
-        concurrent.futures.wait(futures)
+        # futures = [Sample.audio_executor.submit(s.process_queue) for s in current_samples()]
+        # concurrent.futures.wait(futures)
         # elapsed = time.time() - t
         # print(f"play_samples took {elapsed}s")
-        # time.sleep(0.001)
+    logger.debug("playing samples")
+    for s in current_samples():
+        s.process_queue()
+    # time.sleep(0.010)
 
 def queue_samples(step, t):
     # if step == 0:
@@ -296,8 +332,8 @@ def change_rate(sound, rate):
 # unmute first sample
 # current_samples()[0].unmute()
 
-# for s in current_samples():
-#     s.unmute()
+for s in current_samples():
+    s.unmute()
 
 # orig = current_samples()[0].sound
 # print(len(orig.get_raw()) / 4 / 22050)
