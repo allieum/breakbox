@@ -6,11 +6,11 @@ import time
 
 def get_logger(name):
     logging.basicConfig(
-        format='%(asctime)s - %(name)s - %(levelname)s %(threadName)s:%(funcName)s \n\t%(message)s',
+        format='%(asctime)s - %(name)s - %(levelname)s %(threadName)s:%(funcName)s: %(message)s',
         # filename='break.log'
     )
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.WARN)
     return logger
 
 

@@ -48,4 +48,4 @@ while True:
 
     sys.stdout.flush()
     sys.stderr.flush()
-    time.sleep(0.001)
+    time.sleep(0.0005)

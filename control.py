@@ -2,10 +2,13 @@ from collections import defaultdict
 
 import sample
 from sequence import sequence
+import utility
 
+logger = utility.get_logger(__name__)
 
 K_STOP = 'delete'
 K_NEXT_BANK = '#'
+K_RESET = 'tab'
 
 # halftime (0.5 timestretch)
 K_HT = 'enter'
@@ -43,7 +46,9 @@ key_frozen = defaultdict(bool)
 def key_active(key):
     return key_held[key] or key_frozen[key]
 
+# todo dict of handlers
 def key_pressed(e):
+    logger.info(f"start press handler for {e}")
     for i, key in enumerate(LOOP_KEYS):
         if key == e.name:
             for j, s in enumerate(sample.current_samples()):
@@ -170,6 +175,11 @@ def key_pressed(e):
                 key_frozen[k] = False
                 process_release(k)
 
+    if e.name == K_RESET:
+        utility.restart_program()
+
+    logger.info(f"finish press handler for {e}")
+
 
 def key_released(e):
     if not key_held[e.name]:
@@ -180,6 +190,7 @@ def key_released(e):
     process_release(e.name)
 
 def process_release(k):
+    logger.info(f"start release handler for {k}")
     for i, key in enumerate(TOGGLE_KEYS):
         if key == k:
             sample.current_samples()[i].step_repeat_stop()
@@ -191,3 +202,4 @@ def process_release(k):
         sample.step_repeat_stop(length)
     if K_HT == k:
         sample.stop_halftime()
+    logger.info(f"finish release handler for {k}")

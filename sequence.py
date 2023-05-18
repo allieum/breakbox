@@ -4,6 +4,9 @@ import pygame.mixer
 
 from midi import START, STOP, CLOCK
 import sample
+import utility
+
+logger = utility.get_logger(__name__)
 
 MAX_BEATS = 8
 STEPS_PER_BEAT = 4
@@ -11,8 +14,8 @@ MAX_STEPS = MAX_BEATS * STEPS_PER_BEAT
 
 step_interval = 60 / 143 / 4
 midi_lag_time = 0.039
-lookahead_time = 0.200
-
+lookahead_time = 0.100
+# lookahead_time = 0.100
 
 class Sequence:
     def __init__(self):
@@ -30,7 +33,7 @@ class Sequence:
     def start_internal(self):
         self.internal_start_time = time.time()
         self._start()
-        sample.queue_samples(0, self.internal_start_time)
+        # sample.queue_samples(0, self.internal_start_time)
         print("starting internal clock")
 
     def stop_internal(self):
@@ -86,7 +89,7 @@ class Sequence:
         prev = self.last_queued_step
         for i in (self.inc(prev), self.inc(prev, 2), self.inc(prev, 3)):
             if self.is_started and now + lookahead_time >= (t := self.step_time(i)):
-                # print(f"------- queuing step {i} === {t - self.measure_start}")
+                logger.debug(f"------- queuing step {i} === {t - self.measure_start}")
                 sample.queue_samples(i, t)
                 self.last_queued_step = i
 
@@ -104,10 +107,9 @@ class Sequence:
 
     def step_time(self, step):
         next_step_time = self.measure_start + step_interval * step
-        lag_time = midi_lag_time if self.midi_started else 0
-        # step_predicted = (now := time.time()) >= next_step_time - lag_time and not self.played_step[step]
         if step < self.step:
             next_step_time += step_interval * self.steps
+        lag_time = midi_lag_time if self.midi_started else 0
         return next_step_time - lag_time
 
 
