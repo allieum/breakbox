@@ -209,9 +209,6 @@ class Sample:
         print(f"seen {(n := len(channels))} channels")
         pygame.mixer.set_reserved(n)
 
-    def set_channel(self, ch):
-        self.channel = ch
-
     def queue_step(self, step, t):
         if self.step_repeat and step in range(self.step_repeat_index % self.step_repeat_length, self.num_slices, self.step_repeat_length):
             self.step_repeating = True
@@ -370,8 +367,8 @@ def change_rate(sound, rate):
 # unmute first sample
 # current_samples()[0].unmute()
 
-for s in current_samples():
-    s.unmute()
+# for s in current_samples():
+#     s.unmute()
 
 # orig = current_samples()[0].sound
 # print(len(orig.get_raw()) / 4 / 22050)

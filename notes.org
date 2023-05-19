@@ -38,9 +38,11 @@ CLOSED: [2023-05-11 Thu 15:48]
 
 * stuff
 ** bug w step repeat then toggle not work
+** refactor key handlers
 ** top row should maybe be toggly / nonexclusive
 ** implement chromatic rate shift
-** fix stutter on start w internal clock
+** DONE fix stutter on start w internal clock
+CLOSED: [2023-05-19 Fri 08:59]
 ** playtest midi clock again lol
 ** bug with sync at beginning when starting all samples at once?
 *** could check queue size and bail to recover from this
