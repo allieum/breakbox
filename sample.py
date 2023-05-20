@@ -5,10 +5,12 @@ import time
 from collections import deque
 import concurrent.futures
 
+import modulation
 import utility
 from datetime import datetime
 
 logger = utility.get_logger(__name__)
+
 
 pygame.mixer.init(frequency=22050, buffer=256)
 pygame.mixer.set_num_channels(32)
@@ -45,6 +47,7 @@ class Sample:
         self.halftime = False
         self.load(file)
         self.last_printed = 0
+        self.pitch = modulation.Param(0)
 
     def load(self, file):
         logger.debug(f"loading sample {file}")
@@ -113,10 +116,14 @@ class Sample:
 
     def queue(self, sound, t):
         logger.info(f"queued sound in {self.name} for {datetime.fromtimestamp(t)}")
-        _, prev_t = self.sound_queue[len(self.sound_queue) - 1] if len(self.sound_queue) > 0 else None, None
+        # _, prev_t = self.sound_queue[len(self.sound_queue) - 1] if len(self.sound_queue) > 0 else None, None
         self.sound_queue.append((sound, t))
-        if prev_t and prev_t > t:
-            logger.error(f"{self.name} saw out of order sound queue")
+        # if prev_t and prev_t > t:
+        #     logger.error(f"{self.name} saw out of order sound queue")
+
+    # call provided fn to create sound and add to queue
+    def queue_async(self, generate_sound, t):
+        self.audio_executor.submit(lambda: self.queue(generate_sound(), t))
 
     def warn_dropped(self, dropped, now):
         if (n := len(dropped)) == 0:
@@ -134,7 +141,6 @@ class Sample:
         if len(self.sound_queue) == 0:
             logger.debug(f"{self.name}: queue empty")
             return None
-
 
         if (size := len(self.sound_queue)) > 1:
             if not self.last_printed == size and not self.step_repeat:
@@ -177,25 +183,18 @@ class Sample:
         if sound is not _sound:
             logger.error("sound is not sound!")
         if self.channel is None:
-            # self.channel = sound.play()
             logger.debug(f"{self.name}: played sample on new channel")
             return lambda: self.play_sound_new_channel(sound)
         if in_play_window:
             if self.channel.get_busy():
                 logger.warn(f"{self.name} interrupted sample")
-                # self.channel.stop() # is this needed
-            # self.channel.play(sound)
-            # print(f'{self.filename} played {sound} on existing {self.channel}')
             logger.debug(f"{self.name}: played sample")
             return lambda: self.channel.play(sound)
         if self.channel.get_queue() is None and in_queue_window:
-            # utility.timer("queue")
             self.channel.queue(sound)
-            # print(f'{self.filename} queued {sound} on existing {self.channel}')
             logger.debug(f"{self.name}: queued sample")
             return lambda: self.channel.queue(sound)
 
-        # logger.info(f"done process queue for {self.name}: how you get here?")
         logger.warn(f"what wrong? {self.name} {now - t} busy:{self.channel.get_busy()} channel.queue: {self.channel.get_queue()} is_queue {in_queue_window} is_play {in_play_window}")
         msg = ""
         for i in range(len(self.sound_queue) - 1, -1, -1):
@@ -210,46 +209,42 @@ class Sample:
         pygame.mixer.set_reserved(n)
 
     def queue_step(self, step, t):
-        if self.step_repeat and step in range(self.step_repeat_index % self.step_repeat_length, self.num_slices, self.step_repeat_length):
+        srlength = self.step_repeat_length * 2 if self.halftime else self.step_repeat_length
+        if self.step_repeat and step in range(self.step_repeat_index % srlength, self.num_slices, srlength):
             self.step_repeating = True
             # self.mute()
             self.sound_queue.clear()
-            for i, s in enumerate(self.sound_slices[self.step_repeat_index: self.step_repeat_index + self.step_repeat_length]):
-                self.queue(s, t + i * step_interval)
+            slices = self.sound_slices[self.step_repeat_index: self.step_repeat_index + self.step_repeat_length]
+            for i, s in enumerate(slices):
+                ts =  t + i * step_interval
+                if self.halftime:
+                    ts = t + i * step_interval * 2
+                    self.queue_async(lambda: timestretch(s, 0.5), ts)
+                    logger.warn(f"queueing {s}")
+                elif self.pitch != 0:
+                    self.queue_async(lambda: pitch_shift(s, self.pitch.get()), ts)
+                else:
+                    self.queue(s, ts)
         if not self.step_repeating:
             if not self.is_muted() or self.looping:
                 sound = self.sound_slices[step]
                 if self.halftime:
                     if step % 2 != 0:
                         return
+                    sound = self.sound_slices[step // 2]
                     self.queue_async(lambda: timestretch(sound, 0.5), t)
+                elif self.pitch != 0:
+                   self.queue_async(lambda: pitch_shift(sound, self.pitch.get()), t)
                 else:
                     self.queue(sound, t)
             return
 
-    # call provided fn to create sound and add to queue
-    def queue_async(self, generate_sound, t):
-        self.audio_executor.submit(lambda: self.queue(generate_sound(), t))
+    def pitch_mod(self, sequence):
+        self.modulate(sequence, self.pitch, 8, modulation.Lfo.Shape.TRIANGLE, 4)
 
-            #
-            # next_slice = self.sound_slices[self.step_repeat_index]
-            # if self.channel is None:
-            #     self.channel = next_slice.play()
-            # else:
-                # print(f"{self.step_repeat_channel.get_busy()}")
-                # self.step_repeat_channel.stop() # todo bug this can be None
-                # self.channel.play(next_slice)
-            # timer['played step'].tick()
-            # t = time.time()
-            # while next_slice.get_num_channels() > 0:
-            #     pass
-            # print(time.time() - t)
-
-            # print(f"{step} playing {next_slice} on channel {self.step_repeat_channel}")
-        # elif len(self.sound_queue) > 0:
-        #     next_slice = self.sound_queue.pop(0)
-        #     self.channel.play(next_slice)
-            # print(f"{step} playing {next_slice} on channel {self.step_repeat_channel}")
+    def modulate(self, sequence, param, period, shape, amount):
+        lfo = sequence.make_lfo(period, shape)
+        sequence.modulate(param, lfo, amount)
 
 
 samples = [Sample(f'{dir_path}/samples/143-2bar-{i:03}.wav') for i in range(12)]
@@ -258,33 +253,19 @@ def current_samples():
    return samples[bank * BANK_SIZE : BANK_SIZE * (bank + 1)]
 
 def play_samples():
-    # while True:
-        # t = time.time()
-        # futures = [Sample.audio_executor.submit(s.process_queue) for s in current_samples()]
-        # concurrent.futures.wait(futures)
-        # elapsed = time.time() - t
-        # print(f"play_samples took {elapsed}s")
     logger.debug("playing samples")
-    # logger.info(queues_to_string())
     now = time.time()
     play_hooks = [s.process_queue(now) for s in current_samples()]
     for hook in play_hooks:
         if hook is not None:
             hook()
-    # if changed and not queues_empty():
-    #     logger.info(queues_to_string())
-    # time.sleep(0.010)
 
 def queues_empty():
     return all([len(s.sound_queue) == 0] for s in current_samples())
 
 def queue_samples(step, t):
-    # if step == 0:
-    #     pygame.mixer.stop()
-    # utility.timer['step'].tick()
     for sample in current_samples():
         sample.queue_step(step, t)
-        # utility.timer['interstep'].tick()
 
 def queues_to_string():
      s = "\n============\n"
@@ -348,7 +329,6 @@ def timestretch(sound, rate):
 
     return pygame.mixer.Sound(new_wav)
 
-
 def change_rate(sound, rate):
     wav = sound.get_raw()
     new_wav = bytearray(math.ceil(len(wav) / rate))
@@ -363,7 +343,12 @@ def change_rate(sound, rate):
         new_wav[i:i + 2] = wav[j:j + 2]
 
     return pygame.mixer.Sound(new_wav)
-    
+
+def pitch_shift(sound, semitones):
+    ratio = 1.05946 # 12th root of 2
+    rate = ratio ** semitones
+    return change_rate(sound, rate)
+
 # unmute first sample
 # current_samples()[0].unmute()
 

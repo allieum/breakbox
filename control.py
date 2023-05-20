@@ -14,7 +14,7 @@ K_RESET = 'tab'
 K_HT = 'enter'
 K_HT_UP = 'ctrl'
 K_HT_DOWN = 'space'
-K_HT_RESET = 'alt'
+K_PITCH = 'alt'
 
 # step repeat
 K_SR4 = 's'
@@ -34,7 +34,7 @@ dactyl_keys =[
                   ['tab', K_NEXT_BANK],
                                  [K_STOP,     'shift'],
                                  [K_HT_DOWN,  K_HT_UP],
-                                 [K_HT,    K_HT_RESET],
+                                 [K_HT,    K_PITCH],
 ]
 
 LOOP_KEYS = dactyl_keys[0]
@@ -45,6 +45,14 @@ key_held = defaultdict(bool)
 key_frozen = defaultdict(bool)
 def key_active(key):
     return key_held[key] or key_frozen[key]
+
+
+def get_activated_samples():
+    return [sample.current_samples()[i] for i, k in enumerate(TOGGLE_KEYS) if key_active(k)]
+
+def pitch_down():
+    for s in get_activated_samples():
+        s.pitch_mod(sequence)
 
 # todo dict of handlers
 def key_pressed(e):
@@ -74,8 +82,9 @@ def key_pressed(e):
     if e.name == K_HT_DOWN:
         sample.decrease_ts_time()
 
-    if e.name == K_HT_RESET:
-        sample.reset_ts_time()
+    if e.name == K_PITCH:
+        s = sample.current_samples()[4]
+        # s.pitch -= 1
 
     for i, key in enumerate(TOGGLE_KEYS):
         if key != e.name:

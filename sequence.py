@@ -4,6 +4,7 @@ import pygame.mixer
 
 from midi import START, STOP, CLOCK
 import sample
+import modulation
 import utility
 
 logger = utility.get_logger(__name__)
@@ -18,6 +19,7 @@ lookahead_time = 0.100
 # lookahead_time = 0.100
 
 class Sequence:
+
     def __init__(self):
         self.is_started = False
         self.clock_count = 0
@@ -29,6 +31,7 @@ class Sequence:
         self.midi_started = False
         self.played_step = False
         self.last_queued_step = -1
+        self.lfos = []
 
     def start_internal(self):
         self.internal_start_time = time.time()
@@ -113,12 +116,18 @@ class Sequence:
         return next_step_time - lag_time
 
 
+    def modulate(self, param, lfo, amount):
+        param.modulate(lfo, amount)
+
     def step_forward(self, t):
         self.step = self.inc(self.step)
         self.played_step = False
         if self.step == 0:
             self.measure_start = t
-        # print(f'step {self.step}')
+        for lfo in self.lfos:
+            lfo.step()
 
+    def make_lfo(self, period, shape):
+        self.lfos.append(modulation.Lfo(period, shape))
 
 sequence = Sequence()
