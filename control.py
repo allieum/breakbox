@@ -50,13 +50,28 @@ def key_active(key):
 def get_activated_samples():
     return [sample.current_samples()[i] for i, k in enumerate(TOGGLE_KEYS) if key_active(k)]
 
-def pitch_down():
+def pitch_press():
     for s in get_activated_samples():
+        logger.info(f"activate pitch mod for {s.name}")
         s.pitch_mod(sequence)
+
+press = {
+    K_PITCH: pitch_press
+}
 
 # todo dict of handlers
 def key_pressed(e):
-    logger.info(f"start press handler for {e}")
+    logger.debug(f"start press handler for {e}")
+
+    if key_active(e.name):
+        logger.debug(f"{e} already active, doing nothing")
+        return
+
+    if e.name in press:
+        press[e.name]()
+        key_held[e.name] = True
+        return
+
     for i, key in enumerate(LOOP_KEYS):
         if key == e.name:
             for j, s in enumerate(sample.current_samples()):
@@ -81,10 +96,6 @@ def key_pressed(e):
 
     if e.name == K_HT_DOWN:
         sample.decrease_ts_time()
-
-    if e.name == K_PITCH:
-        s = sample.current_samples()[4]
-        # s.pitch -= 1
 
     for i, key in enumerate(TOGGLE_KEYS):
         if key != e.name:
@@ -187,7 +198,7 @@ def key_pressed(e):
     if e.name == K_RESET:
         utility.restart_program()
 
-    logger.info(f"finish press handler for {e}")
+    logger.debug(f"finish press handler for {e}")
 
 
 def key_released(e):
@@ -199,7 +210,7 @@ def key_released(e):
     process_release(e.name)
 
 def process_release(k):
-    logger.info(f"start release handler for {k}")
+    logger.debug(f"start release handler for {k}")
     for i, key in enumerate(TOGGLE_KEYS):
         if key == k:
             sample.current_samples()[i].step_repeat_stop()
@@ -211,4 +222,4 @@ def process_release(k):
         sample.step_repeat_stop(length)
     if K_HT == k:
         sample.stop_halftime()
-    logger.info(f"finish release handler for {k}")
+    logger.debug(f"finish release handler for {k}")

@@ -38,6 +38,7 @@ CLOSED: [2023-05-11 Thu 15:48]
 
 * stuff
 ** bug w step repeat then toggle not work
+** variable bpm
 ** crossfade
 ** refactor key handlers
 ** top row should maybe be toggly / nonexclusive

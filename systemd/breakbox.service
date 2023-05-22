@@ -5,7 +5,7 @@ Description=breakbox service
 Type=simple
 User=root
 WorkingDirectory=/home/drum/breakbox
-ExecStart=python break.py
+ExecStart=python3.11 break.py
 Restart=always
 
 [Install]

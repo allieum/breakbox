@@ -10,7 +10,7 @@ import utility
 from datetime import datetime
 
 logger = utility.get_logger(__name__)
-
+# logger.setLevel('WARN')
 
 pygame.mixer.init(frequency=22050, buffer=256)
 pygame.mixer.set_num_channels(32)
@@ -48,6 +48,14 @@ class Sample:
         self.load(file)
         self.last_printed = 0
         self.pitch = modulation.Param(0)
+        self.cache = {
+            'pitch': {
+                **dict.fromkeys(range(self.num_slices), {})
+            },
+            'halftime': {
+                **dict.fromkeys(range(self.num_slices), {})
+            }
+        }
 
     def load(self, file):
         logger.debug(f"loading sample {file}")
@@ -115,7 +123,7 @@ class Sample:
         # self.sound.play()
 
     def queue(self, sound, t):
-        logger.info(f"queued sound in {self.name} for {datetime.fromtimestamp(t)}")
+        logger.debug(f"queued sound in {self.name} for {datetime.fromtimestamp(t)}")
         # _, prev_t = self.sound_queue[len(self.sound_queue) - 1] if len(self.sound_queue) > 0 else None, None
         self.sound_queue.append((sound, t))
         # if prev_t and prev_t > t:
@@ -123,7 +131,8 @@ class Sample:
 
     # call provided fn to create sound and add to queue
     def queue_async(self, generate_sound, t):
-        self.audio_executor.submit(lambda: self.queue(generate_sound(), t))
+        logger.info(f"{self.name} scheduling async sound for {t}")
+        future = self.audio_executor.submit(lambda: self.queue(generate_sound(), t))
 
     def warn_dropped(self, dropped, now):
         if (n := len(dropped)) == 0:
@@ -221,8 +230,8 @@ class Sample:
                     ts = t + i * step_interval * 2
                     self.queue_async(lambda: timestretch(s, 0.5), ts)
                     logger.warn(f"queueing {s}")
-                elif self.pitch != 0:
-                    self.queue_async(lambda: pitch_shift(s, self.pitch.get()), ts)
+                elif (p := self.pitch.get()) != 0:
+                    self.queue_async(lambda: self.change_pitch(self.step_repeat_index + i, s, p), ts)
                 else:
                     self.queue(s, ts)
         if not self.step_repeating:
@@ -233,11 +242,24 @@ class Sample:
                         return
                     sound = self.sound_slices[step // 2]
                     self.queue_async(lambda: timestretch(sound, 0.5), t)
-                elif self.pitch != 0:
-                   self.queue_async(lambda: pitch_shift(sound, self.pitch.get()), t)
+                elif (p := self.pitch.get()) != 0:
+                    logger.info(f"{self.name} setting pitch to {p}")
+                    self.queue_async(lambda: self.change_pitch(step, sound, p), t)
                 else:
                     self.queue(sound, t)
             return
+
+    def change_pitch(self, step, sound, semitones):
+        # logger.warn(f"{self.name}: step {step} by {semitones} semitones")
+        logger.info(f"{self.name}: step {step} by {semitones} semitones")
+        if semitones in (cache := self.cache['pitch'][step]):
+            logger.warn(f"{self.name}: got from cache step {step} by {semitones} semitones")
+            return cache[semitones]
+        pitched_sound = pitch_shift(sound, semitones)
+        cache[semitones] = pitched_sound
+        logger.warn(f"{self.name}: caching step {step} by {semitones} semitones")
+        logger.warn(f"cache {cache}")
+        return pitched_sound
 
     def pitch_mod(self, sequence):
         self.modulate(sequence, self.pitch, 8, modulation.Lfo.Shape.TRIANGLE, 4)
@@ -273,7 +295,6 @@ def queues_to_string():
          s += " " + "o" * len(sample.sound_queue) + "\n"
      s += "============\n"
      return s
-
 
 def step_repeat_stop(length):
     for sample in [s for s in current_samples() if s.step_repeat_length == length]:
@@ -345,6 +366,8 @@ def change_rate(sound, rate):
     return pygame.mixer.Sound(new_wav)
 
 def pitch_shift(sound, semitones):
+    if semitones == 0:
+        return sound
     ratio = 1.05946 # 12th root of 2
     rate = ratio ** semitones
     return change_rate(sound, rate)

@@ -10,7 +10,7 @@ def get_logger(name):
         # filename='break.log'
     )
     logger = logging.getLogger(name)
-    logger.setLevel(logging.WARN)
+    logger.setLevel(logging.INFO)
     return logger
 
 

@@ -128,6 +128,7 @@ class Sequence:
             lfo.step()
 
     def make_lfo(self, period, shape):
-        self.lfos.append(modulation.Lfo(period, shape))
+        self.lfos.append(lfo := modulation.Lfo(period, shape))
+        return lfo
 
 sequence = Sequence()
