@@ -15,6 +15,7 @@ class Lfo:
         self.period = period
         self.shape = shape
         self.steps = 0
+        self.enabled = True
         match shape:
             case self.Shape.TRIANGLE:
                 self.fn = triangle(period)
@@ -24,24 +25,37 @@ class Lfo:
     def step(self):
         self.steps = (self.steps + 1) % self.period
 
-    def value(self):
-        return self.fn(self.steps)
+    def value(self, x = None):
+        if x is None:
+            x = self.steps
+        return self.fn(x)
 
 class Param:
     def __init__(self, value) -> None:
         self.value = value
         self.lfo = None
+        self.start_step = None
+        self.steps = None
 
-    def modulate(self, lfo, amount):
-        # logger.info(f"modulating param with {lfo} x {amount}")
+    def modulate(self, lfo, amount, steps=None):
+        logger.info(f"modulating param with {lfo} x {amount}")
         self.lfo = lfo
         self.scale = amount
+        self.steps = steps
+        self.start_step = None
 
-    def get(self):
+    def get(self, step):
         value = self.value
-        if self.lfo:
-            value += round(self.lfo.value() * self.scale)
-        # logger.info(f"LFO {self.lfo} value {value}")
+        if self.steps is not None:
+            self.steps -= 1
+        if self.lfo and self.lfo.enabled:
+            if self.start_step is None:
+                self.start_step = step
+            lfo_step = (step - self.start_step) % self.lfo.period
+            value += round(self.lfo.value(lfo_step) * self.scale)
+            logger.info(f"LFO {self.lfo} value {value} step {step} lfo_step {lfo_step} start_step {self.start_step}")
+        if self.steps == 0:
+             self.lfo.enabled = False
         return value
 
 def triangle(period):
@@ -49,7 +63,6 @@ def triangle(period):
 
 for i in range(8):
     print(round(triangle(8)(i) * 4))
-
 
 
 def sin(period):

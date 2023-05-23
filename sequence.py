@@ -115,20 +115,19 @@ class Sequence:
         lag_time = midi_lag_time if self.midi_started else 0
         return next_step_time - lag_time
 
-
-    def modulate(self, param, lfo, amount):
-        param.modulate(lfo, amount)
+    # def modulate(self, param, lfo, amount):
+    #     param.modulate(lfo, amount, self.step)
 
     def step_forward(self, t):
         self.step = self.inc(self.step)
         self.played_step = False
         if self.step == 0:
             self.measure_start = t
-        for lfo in self.lfos:
-            lfo.step()
+        # for lfo in self.lfos:
+        #     lfo.step()
 
-    def make_lfo(self, period, shape):
-        self.lfos.append(lfo := modulation.Lfo(period, shape))
-        return lfo
+    # def make_lfo(self, period, shape):
+    #     self.lfos.append(lfo := modulation.Lfo(period, shape))
+    #     return lfo
 
 sequence = Sequence()

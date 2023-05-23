@@ -32,7 +32,7 @@ class Sample:
     num_slices = 32
     timeout = 0.005
     lookahead = 0.001
-    audio_executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
+    audio_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
     def __init__(self, file):
         self.name = file.split("samples/")[1]
@@ -122,23 +122,23 @@ class Sample:
         # self.sound.stop()
         # self.sound.play()
 
-    def queue(self, sound, t):
+    def queue(self, sound, t, step):
         logger.debug(f"queued sound in {self.name} for {datetime.fromtimestamp(t)}")
         # _, prev_t = self.sound_queue[len(self.sound_queue) - 1] if len(self.sound_queue) > 0 else None, None
-        self.sound_queue.append((sound, t))
+        self.sound_queue.append((sound, t, step))
         # if prev_t and prev_t > t:
         #     logger.error(f"{self.name} saw out of order sound queue")
 
     # call provided fn to create sound and add to queue
-    def queue_async(self, generate_sound, t):
+    def queue_async(self, generate_sound, t, step):
         logger.info(f"{self.name} scheduling async sound for {t}")
-        future = self.audio_executor.submit(lambda: self.queue(generate_sound(), t))
+        future = self.audio_executor.submit(lambda: self.queue(generate_sound(), t, step))
 
     def warn_dropped(self, dropped, now):
         if (n := len(dropped)) == 0:
             return
-        _, scheduled = dropped[0]
-        msg = f"{self.name} dropped {n}/{n+len(self.sound_queue)} samples stale by: {1000 * (now - scheduled - self.timeout):10.6}ms"
+        _, scheduled, step = dropped[0]
+        msg = f"{self.name} dropped {n}/{n+len(self.sound_queue)} samples stale by: {1000 * (now - scheduled - self.timeout):10.6}ms for step {step}"
         msg += f" sched. {datetime.fromtimestamp(scheduled)}"
         # for _, scheduled in dropped:
         #     msg += f" {1000 * (now - scheduled - self.timeout):10.6}ms"
@@ -156,7 +156,7 @@ class Sample:
                 self.last_printed = size
                 # print(f"{self.filename} has queue of {size}; {self.channel.get_busy()} {self.channel.get_queue()}")
 
-        _sound, t = self.sound_queue[0]
+        _sound, t, _ = self.sound_queue[0]
 
         dropped = []
         while now > t + self.timeout:
@@ -164,7 +164,7 @@ class Sample:
             if len(self.sound_queue) == 0:
                 self.warn_dropped(dropped, now)
                 return None
-            _sound, t = self.sound_queue[0]
+            _sound, t, _ = self.sound_queue[0]
         self.warn_dropped(dropped, now)
 
         in_play_window = now >= t - self.lookahead
@@ -180,29 +180,33 @@ class Sample:
             return None
 
         if not in_play_window and self.channel and self.channel.get_busy() and self.channel.get_queue() is not None:
-            logger.info(f"{self.name}: channel full")
+            logger.debug(f"{self.name}: channel full")
             return None
 
-        if self.channel and not self.channel.get_busy() and self.channel.get_queue() is not None:
-            logger.warn(f"{self.name} weird state, ghost queue? maybe it will go away on its own")
-            return None
+        if self.channel and not self.channel.get_busy() and (s := self.channel.get_queue()) is not None:
+            logger.warn(f"{self.name} weird state, ghost queue? let's try clear it")
+            self.channel.stop()
+            # return lambda: self.channel.play(s)
 
-        logger.info(f"{self.name} processing {datetime.fromtimestamp(t)}")
-        sound, _ = self.sound_queue.popleft()
+        logger.debug(f"{self.name} processing {datetime.fromtimestamp(t)}")
+        if len(self.sound_queue) == 0:
+            logger.warn(f"{self.name}: queue cleared by other thread?")
+            return None
+        sound, t, step = self.sound_queue.popleft()
         if sound is not _sound:
             logger.error("sound is not sound!")
         if self.channel is None:
             logger.debug(f"{self.name}: played sample on new channel")
-            return lambda: self.play_sound_new_channel(sound)
+            return self.play_step(lambda: self.play_sound_new_channel(sound), step, t)
         if in_play_window:
             if self.channel.get_busy():
                 logger.warn(f"{self.name} interrupted sample")
             logger.debug(f"{self.name}: played sample")
-            return lambda: self.channel.play(sound)
+            return self.play_step(lambda: self.channel.play(sound), step, t)
         if self.channel.get_queue() is None and in_queue_window:
             self.channel.queue(sound)
             logger.debug(f"{self.name}: queued sample")
-            return lambda: self.channel.queue(sound)
+            return self.play_step(lambda: self.channel.queue(sound), step, t)
 
         logger.warn(f"what wrong? {self.name} {now - t} busy:{self.channel.get_busy()} channel.queue: {self.channel.get_queue()} is_queue {in_queue_window} is_play {in_play_window}")
         msg = ""
@@ -210,6 +214,12 @@ class Sample:
             _, t = self.sound_queue[i]
             msg += f"{now - t} "
         logger.warn(f"queue contents: {msg}")
+
+    def play_step(self, sound_player, step, t):
+        def fn():
+            sound_player()
+            return step, t
+        return fn
 
     def play_sound_new_channel(self, sound):
         self.channel = sound.play()
@@ -226,14 +236,15 @@ class Sample:
             slices = self.sound_slices[self.step_repeat_index: self.step_repeat_index + self.step_repeat_length]
             for i, s in enumerate(slices):
                 ts =  t + i * step_interval
+                slice_step = step + i
                 if self.halftime:
                     ts = t + i * step_interval * 2
-                    self.queue_async(lambda: timestretch(s, 0.5), ts)
+                    self.queue_async(lambda: timestretch(s, 0.5), ts, slice_step)
                     logger.warn(f"queueing {s}")
-                elif (p := self.pitch.get()) != 0:
-                    self.queue_async(lambda: self.change_pitch(self.step_repeat_index + i, s, p), ts)
+                elif (p := self.pitch.get(step + i)) != 0:
+                    self.queue_async(lambda: self.change_pitch(self.step_repeat_index + i, s, p), ts, slice_step)
                 else:
-                    self.queue(s, ts)
+                    self.queue(s, ts, slice_step)
         if not self.step_repeating:
             if not self.is_muted() or self.looping:
                 sound = self.sound_slices[step]
@@ -241,12 +252,12 @@ class Sample:
                     if step % 2 != 0:
                         return
                     sound = self.sound_slices[step // 2]
-                    self.queue_async(lambda: timestretch(sound, 0.5), t)
-                elif (p := self.pitch.get()) != 0:
+                    self.queue_async(lambda: timestretch(sound, 0.5), t, step)
+                elif (p := self.pitch.get(step)) != 0:
                     logger.info(f"{self.name} setting pitch to {p}")
-                    self.queue_async(lambda: self.change_pitch(step, sound, p), t)
+                    self.queue_async(lambda: self.change_pitch(step, sound, p), t, step)
                 else:
-                    self.queue(sound, t)
+                    self.queue(sound, t, step)
             return
 
     def change_pitch(self, step, sound, semitones):
@@ -262,11 +273,15 @@ class Sample:
         return pitched_sound
 
     def pitch_mod(self, sequence):
-        self.modulate(sequence, self.pitch, 8, modulation.Lfo.Shape.TRIANGLE, 4)
+        self.modulate(sequence, self.pitch, 16, modulation.Lfo.Shape.TRIANGLE, 8, 8)
 
-    def modulate(self, sequence, param, period, shape, amount):
-        lfo = sequence.make_lfo(period, shape)
-        sequence.modulate(param, lfo, amount)
+    def cancel_pitch_mod(self):
+        pass
+        # self.pitch.lfo = None
+
+    def modulate(self, sequence, param, period, shape, amount, steps):
+        lfo = modulation.Lfo(period, shape)
+        param.modulate(lfo, amount, steps)
 
 
 samples = [Sample(f'{dir_path}/samples/143-2bar-{i:03}.wav') for i in range(12)]
@@ -278,9 +293,20 @@ def play_samples():
     logger.debug("playing samples")
     now = time.time()
     play_hooks = [s.process_queue(now) for s in current_samples()]
-    for hook in play_hooks:
-        if hook is not None:
-            hook()
+    played_steps = [hook() if hook else hook for hook in play_hooks]
+    if any(played_steps):
+        logger.debug(played_steps_string(played_steps))
+
+def played_steps_string(played_steps):
+     s = "\n" * 10 + "============\n"
+     for nt in played_steps:
+         if nt:
+            n,t = nt
+            s += f"{datetime.fromtimestamp(t)} - {n}\n"
+         else:
+            s += "--\n"
+     s += "============\n"
+     return s
 
 def queues_empty():
     return all([len(s.sound_queue) == 0] for s in current_samples())
@@ -370,7 +396,11 @@ def pitch_shift(sound, semitones):
         return sound
     ratio = 1.05946 # 12th root of 2
     rate = ratio ** semitones
-    return change_rate(sound, rate)
+    inverse = ratio ** -semitones
+
+    if semitones > 0:
+        return timestretch(change_rate(sound, rate), inverse)
+    return change_rate(timestretch(sound, inverse), rate)
 
 # unmute first sample
 # current_samples()[0].unmute()

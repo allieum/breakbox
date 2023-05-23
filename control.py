@@ -55,8 +55,18 @@ def pitch_press():
         logger.info(f"activate pitch mod for {s.name}")
         s.pitch_mod(sequence)
 
+def pitch_release():
+    for s in sample.current_samples():
+        if s.pitch.lfo is not None:
+            logger.info(f"deactivate pitch mod for {s.name}")
+            s.cancel_pitch_mod()
+
 press = {
     K_PITCH: pitch_press
+}
+
+release = {
+    K_PITCH: pitch_release
 }
 
 # todo dict of handlers
@@ -211,6 +221,11 @@ def key_released(e):
 
 def process_release(k):
     logger.debug(f"start release handler for {k}")
+
+    if k in release:
+        release[k]()
+        return
+
     for i, key in enumerate(TOGGLE_KEYS):
         if key == k:
             sample.current_samples()[i].step_repeat_stop()
