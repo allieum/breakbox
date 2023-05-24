@@ -37,6 +37,8 @@ CLOSED: [2023-05-11 Thu 15:48]
 
 
 * stuff
+** param dna
+** recording
 ** bug w step repeat then toggle not work
 ** variable bpm
 ** crossfade

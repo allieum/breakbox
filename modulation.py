@@ -53,7 +53,7 @@ class Param:
                 self.start_step = step
             lfo_step = (step - self.start_step) % self.lfo.period
             value += round(self.lfo.value(lfo_step) * self.scale)
-            logger.info(f"LFO {self.lfo} value {value} step {step} lfo_step {lfo_step} start_step {self.start_step}")
+            logger.debug(f"LFO {self.lfo} value {value} step {step} lfo_step {lfo_step} start_step {self.start_step}")
         if self.steps == 0:
              self.lfo.enabled = False
         return value
