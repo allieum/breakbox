@@ -225,9 +225,22 @@ class Sample:
             logger.debug(f"{self.name}: played sample")
             return self.play_step(lambda s: self.play_sound(s), sound, step, t)
         if self.channel.get_queue() is None and in_queue_window:
+            playing = self.channel.get_sound()
+            predicted_finish = time.time() + remaining_time(playing)
+            if (error := predicted_finish - t) > 0.010:
+                logger.warn(f"{self.name} queueing sample would make it late by {error}, putting back on queue")
+                self.sound_queue.appendleft((sound, t, step))
+                return None
+            if error < -0.010:
+                logger.warn(f"queueing sample would make it early by {-error}, putting back on queue")
+                self.sound_queue.appendleft((sound, t, step))
+                return None
+            self.channel.queue(sound)
+            playtime[sound] = predicted_finish
             # self.channel.queue(sound)
             logger.debug(f"{self.name}: queued sample")
-            return self.play_step(lambda s: self.queue_sound(s, t), sound, step, t)
+            return None
+            # return self.play_step(lambda s: self.queue_sound(s, t), sound, step, t)
 
         logger.warn(f"what wrong? {self.name} {now - t} busy:{self.channel.get_busy()} channel.queue: {self.channel.get_queue()} is_queue {in_queue_window} is_play {in_play_window}")
         msg = ""
