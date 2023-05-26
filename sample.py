@@ -25,6 +25,11 @@ pygame.mixer.init(frequency=SAMPLE_RATE, buffer=256, channels=1)
 pygame.mixer.set_num_channels(32)
 logger.info(pygame.mixer.get_init())
 
+playtime = {}
+def remaining_time(sound):
+    if sound.get_num_channels() == 0:
+        logger.error("sound not playing")
+    return max(0, sound.get_length() - (time.time() - playtime[sound]))
 
 def write_wav(soundbytes, filename):
     AudioSegment(
@@ -73,6 +78,8 @@ class Sample:
     def load(self, file):
         logger.debug(f"loading sample {file}")
         self.sound = pygame.mixer.Sound(file)
+        # self.sound.playtime = "test"
+        # self.sound = pygame.mixer.Sound(file)
         self.sound.set_volume(0) # default mute
         wav = self.sound.get_raw()
         slice_size = math.ceil(len(wav) / self.num_slices)
@@ -211,16 +218,16 @@ class Sample:
             logger.error("sound is not sound!")
         if self.channel is None:
             logger.debug(f"{self.name}: played sample on new channel")
-            return self.play_step(lambda: self.play_sound_new_channel(sound), step, t)
+            return self.play_step(lambda s: self.play_sound_new_channel(s), sound, step, t)
         if in_play_window:
             if self.channel.get_busy():
                 logger.warn(f"{self.name} interrupted sample")
             logger.debug(f"{self.name}: played sample")
-            return self.play_step(lambda: self.channel.play(sound), step, t)
+            return self.play_step(lambda s: self.play_sound(s), sound, step, t)
         if self.channel.get_queue() is None and in_queue_window:
-            self.channel.queue(sound)
+            # self.channel.queue(sound)
             logger.debug(f"{self.name}: queued sample")
-            return self.play_step(lambda: self.channel.queue(sound), step, t)
+            return self.play_step(lambda s: self.queue_sound(s, t), sound, step, t)
 
         logger.warn(f"what wrong? {self.name} {now - t} busy:{self.channel.get_busy()} channel.queue: {self.channel.get_queue()} is_queue {in_queue_window} is_play {in_play_window}")
         msg = ""
@@ -229,14 +236,27 @@ class Sample:
             msg += f"{now - t} "
         logger.warn(f"queue contents: {msg}")
 
-    def play_step(self, sound_player, step, t):
+    def queue_sound(self, sound, t):
+        playing = self.channel.get_sound()
+        self.channel.queue(sound)
+        playtime[sound] = time.time() + remaining_time(playing)
+        # todo if we're gonna be late, don't do it!!!
+        if abs(playtime[sound] - t) > 0.005:
+            logger.warn(f"scheduled for {playtime[sound]} vs ideal {t}")
+
+    def play_step(self, sound_player, sound, step, t):
         def fn():
-            sound_player()
+            sound_player(sound)
             return step, t
         return fn
 
+    def play_sound(self, sound):
+        self.channel.play(sound)
+        playtime[sound] = time.time()
+
     def play_sound_new_channel(self, sound):
         self.channel = sound.play()
+        playtime[sound] = time.time()
         channels.add(self.channel)
         print(f"seen {(n := len(channels))} channels")
         pygame.mixer.set_reserved(n)
@@ -275,7 +295,6 @@ class Sample:
             return
 
     def change_pitch(self, step, sound, semitones):
-        # logger.warn(f"{self.name}: step {step} by {semitones} semitones")
         logger.info(f"{self.name}: step {step} by {semitones} semitones")
         # if semitones in (cache := self.cache['pitch'][sound]):
         #     logger.info(f"{self.name}: got from cache step {step} by {semitones} semitones")
@@ -447,6 +466,7 @@ def timestretch(sound, rate, fade_time=0.005):
     write_wav(new_wav, "ts.wav")
 
     logger.info(f"finish stretch ({fade_time})")
+    # return pygame.mixer.Sound(new_wav)
     return pygame.mixer.Sound(new_wav)
 
 # s = current_samples()[0]
