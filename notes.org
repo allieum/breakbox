@@ -38,6 +38,9 @@ CLOSED: [2023-05-11 Thu 15:48]
 
 * stuff
 ** param dna
+** db power amp
+** xfade on step repeat ? not sure
+** can avoid improper sound queueing? maths?
 ** recording
 ** bug w step repeat then toggle not work
 ** variable bpm
@@ -51,6 +54,7 @@ CLOSED: [2023-05-19 Fri 08:59]
 ** bug with sync at beginning when starting all samples at once?
 *** could check queue size and bail to recover from this
 *** also when sample drops should get next one in current call (while instead of if for timeout check)
+
 
 * refactory
 ** state module (current bank, modes, etc)

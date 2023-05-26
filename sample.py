@@ -5,24 +5,35 @@ import os
 import time
 from collections import deque
 import concurrent.futures
+from datetime import datetime
+from pydub import AudioSegment
+from pydub.utils import db_to_float
 
 import modulation
 import utility
-from datetime import datetime
 
 logger = utility.get_logger(__name__)
 # logger.setLevel('WARN')
-
-pygame.mixer.init(frequency=22050, buffer=256, channels=1)
-pygame.mixer.set_num_channels(32)
-logger.info(pygame.mixer.get_init())
-# if actual != 12:
-#     print(f"requested {12} channels, got {actual}")
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 bank = 0
 BANK_SIZE = 6
 NUM_BANKS = 2
+SAMPLE_RATE = 22050
+
+pygame.mixer.init(frequency=SAMPLE_RATE, buffer=256, channels=1)
+pygame.mixer.set_num_channels(32)
+logger.info(pygame.mixer.get_init())
+
+
+def write_wav(soundbytes, filename):
+    AudioSegment(
+        soundbytes,
+        sample_width=2,
+        frame_rate=SAMPLE_RATE,
+        channels=1
+    ).export(filename, format='wav')
+
 
 # copied from sequence.py b/c circular import and unmotivated
 step_interval = 60 / 143 / 4
@@ -242,7 +253,7 @@ class Sample:
                 slice_step = step + i
                 if self.halftime:
                     ts = t + i * step_interval * 2
-                    self.queue_async(lambda: timestretch(s, 0.5), ts, slice_step)
+                    self.queue_async(lambda: timestretch(s, 0.5, stretch_fade), ts, slice_step)
                     logger.debug(f"queueing {s}")
                 elif (p := self.pitch.get(step + i)) != 0:
                     self.queue_async(lambda: self.change_pitch(self.step_repeat_index + i, s, p), ts, slice_step)
@@ -255,7 +266,7 @@ class Sample:
                     if step % 2 != 0:
                         return
                     sound = self.sound_slices[step // 2]
-                    self.queue_async(lambda: timestretch(sound, 0.5), t, step)
+                    self.queue_async(lambda: timestretch(sound, 0.5, stretch_fade), t, step)
                 elif (p := self.pitch.get(step)) != 0:
                     logger.debug(f"{self.name} setting pitch to {p}")
                     self.queue_async(lambda: self.change_pitch(step, sound, p), t, step)
@@ -346,14 +357,18 @@ def make_even(x):
 TS_TIME_DEFAULT = 0.048
 TS_TIME_DELTA = 0.001
 ts_time = TS_TIME_DEFAULT
+stretch_fade = 0.005
 def increase_ts_time():
-    global ts_time
-    ts_time += TS_TIME_DELTA
+    global ts_time, stretch_fade
+    # ts_time += TS_TIME_DELTA
+    stretch_fade += .001
+
 
 def decrease_ts_time():
-    global ts_time
+    global ts_time, stretch_fade
     if ts_time > TS_TIME_DELTA:
-        ts_time -= TS_TIME_DELTA
+        # ts_time -= TS_TIME_DELTA
+        stretch_fade -= .001
     else:
         ts_time /= 2
 
@@ -361,74 +376,88 @@ def reset_ts_time():
     global ts_time
     ts_time = TS_TIME_DEFAULT
 
-def fade_in(soundbytes, fade_time):
-    samples = math.floor(fade_time * 22050)
-    logger.debug("hello?")
-    # for i in range(0, samples * 2, 2):
-    logger.info(len(soundbytes))
-    for i in range(0, len(soundbytes), 2):
+# def fade(soundbytes, start, end, gainfn):
+def fade(soundbytes, start, end, gain_start=0, gain_end=0):
+    # samples = math.floor(fade_time * SAMPLE_RATE)
+    # logger.info(f"")
+    if start == end:
+        return
+    gain_delta = db_to_float(gain_end) - db_to_float(gain_start)
+    gain_step_delta = gain_delta / (end - start)
+    startsize = len(soundbytes)
+    if end - start > len(soundbytes):
+        logger.debug(f"fade length longer than sample ({len(soundbytes)})")
+        return
+    for i in range(start, end, 2):
         val = int.from_bytes(soundbytes[i:i + 2], sys.byteorder, signed=True)
-        # gain = i / (samples * 2)
-        gain = 0.5
-        newval = math.floor(val * gain)
-        # if newval < 0:
-            # 2s complement
-
-        # logger.info(f"\n{val:0>16b} \n{newval:0>16b}")
+        j = i - start
+        # use it
+        # step_gain = gain_step_delta * j + gain_start
+        # newval = math.floor(val * db_to_float(step_gain))
+        step_gain = gain_step_delta * j + db_to_float(gain_start)
+        newval = math.floor(val * step_gain)
         sb = bytes([newval & 0xff, (newval >> 8) & 0xff])
-        # logger.info(f"{val} -> {newval}")
-        # logger.info(f"{soundbytes[i:i + 2]} {sb} {val} -> {newval}")
-        # b = bytes([(newval & 0b11111111 << 8) >> 8, newval & 0b11111111])
-        # bval = int.from_bytes(b, sys.byteorder, signed=False)
-        # logger.info(f"{gain} {soundbytes[i:i + 2]:#x}, {b:#x}, {val}, {bval}") # 0000 0010 0000 0111   1000 1100 0000 0101
-        #                                                                      # 1000 0001 0000 0011   1100 0110 0000 0010
         soundbytes[i:i + 2] = sb
-        # logger.info(f"{gain} * {val} = {newval},")
+        # logger.debug(f"{step_gain}db {db_to_float(step_gain)}")
+    # if len(soundbytes) != startsize:
+    #     logger.error(f"{start} {end} {gainfn} {startsize} grew by {len(soundbytes) - startsize}")
 
-s = current_samples()[0]
-b = bytearray(s.sound.get_raw())
-fade_in(b, 0.5)
-pygame.mixer.Sound(b).play()
+def fade_in(soundbytes, fade_time):
+    samples = math.floor(fade_time * SAMPLE_RATE)
+    fade(soundbytes, 0, samples * 2, gain_start=-120)
 
 def fade_out(soundbytes, fade_time):
-    samples = math.floor(fade_time * 22050)
-    for i in range(len(soundbytes) - samples * 2, len(soundbytes), 2):
-        pass
-        # logger.info("hi?")
-        # val = int.from_bytes(soundbytes[i:i + 2], sys.byteorder, signed=False)
-        # gain = 1 - (i / (samples * 2))
-        # newval = math.floor(val * gain)
-        # logger.info(f"{gain} * {val} = {newval}, {(b := bytes(newval))}")
-        # soundbytes[i:i + 2] = b
-
-def fade(soundbytes, fade_time):
-    logger.info(f"fading by {fade_time} samples {fade_time * 22050}")
-    fade_in(soundbytes, fade_time)
-    # fade_out(soundbytes, fade_time)
+    samples = math.floor(fade_time * SAMPLE_RATE)
+    start = len(soundbytes) - samples * 2
+    fade(soundbytes, start, len(soundbytes), gain_end=-120)
     return soundbytes
 
-def timestretch(sound, rate):
+def fadeinout(soundbytes, fade_time):
+    # logger.debug(f"fading by {fade_time} samples {fade_time * SAMPLE_RATE}")
+    fade_in(soundbytes, fade_time)
+    fade_out(soundbytes, fade_time)
+    return soundbytes
+
+def timestretch(sound, rate, fade_time=0.005):
+    logger.info(f"start stretch ({fade_time})")
     chunk_time = ts_time
     wav = sound.get_raw()
     new_wav = bytearray(math.ceil(len(wav) / rate))
 
-    chunk_size = math.ceil(chunk_time * 22050) * 2 # 2 bytes per sample
+    chunk_size = math.ceil(chunk_time * SAMPLE_RATE) * 2 # 2 bytes per sample
     growth_factor =  1 / rate
 
-    print(f"chunk_time {chunk_time} chunk_size {chunk_size} growth_factor {growth_factor}")
+    # print(f"chunk_time {chunk_time} chunk_size {chunk_size} growth_factor {growth_factor}")
 
-    fade_time = 0.002
     for i in range(0, len(wav), chunk_size):
-        chunks = fade(bytearray(wav[i:i + chunk_size]), fade_time) * math.floor(growth_factor)
+        finout = fadeinout(bytearray(wav[i:i + chunk_size]), fade_time)
+        if i == 0:
+            fout = fade_out(bytearray(wav[i:i + chunk_size]), fade_time)
+            chunks = fout + finout * max(0, math.floor(growth_factor) - 1)
+        else:
+            chunks = finout * math.floor(growth_factor)
         partial_factor = growth_factor - math.floor(growth_factor)
         leftover_chunk_size = make_even(math.floor(chunk_size * partial_factor))
-        leftover_chunk = fade(bytearray(wav[i:i + leftover_chunk_size]), fade_time)
-        stretched_bytes = chunks + leftover_chunk
+        stretched_bytes = chunks
+        if leftover_chunk_size != 0:
+            leftover_chunk = fadeinout(bytearray(wav[i:i + leftover_chunk_size]), fade_time)
+            stretched_bytes += leftover_chunk
         j = make_even(math.floor(i * growth_factor))
         new_wav[j:j + len(stretched_bytes)] = stretched_bytes
+    write_wav(new_wav, "ts.wav")
 
+    logger.info(f"finish stretch ({fade_time})")
     return pygame.mixer.Sound(new_wav)
 
+# s = current_samples()[0]
+# b = bytearray(s.sound.get_raw())
+# fade_out(b, 4)
+# pygame.mixer.Sound(b).play()
+
+# for fs in range(0,10,2):
+#     fs /= 1000
+#     ts = timestretch(s.sound_slices[0], 0.5, fs)
+#     write_wav(ts.get_raw(), f"ts{fs}.wav")
 
 def change_rate(sound, rate):
     wav = sound.get_raw()
@@ -452,9 +481,10 @@ def pitch_shift(sound, semitones):
     rate = ratio ** semitones
     inverse = ratio ** -semitones
 
+    stretch_fade = 0.002
     if semitones > 0:
-        return timestretch(change_rate(sound, rate), inverse)
-    return change_rate(timestretch(sound, inverse), rate)
+        return timestretch(change_rate(sound, rate), inverse, stretch_fade)
+    return change_rate(timestretch(sound, inverse, stretch_fade), rate)
 
 # unmute first sample
 # current_samples()[0].unmute()
@@ -462,10 +492,10 @@ def pitch_shift(sound, semitones):
 # for s in current_samples():
 #     s.unmute()
 # orig = current_samples()[0].sound
-# print(len(orig.get_raw()) / 4 / 22050)
+# print(len(orig.get_raw()) / 4 / SAMPLE_RATE)
 # stretched = timestretch(current_samples()[0].sound, 0.4)
 # pitched = change_rate(current_samples()[0].sound, 0.6)
-# print(len(stretched.get_raw()) / 4 / 22050)
+# print(len(stretched.get_raw()) / 4 / SAMPLE_RATE)
 # print(len(orig.get_raw()) / len(pitched.get_raw()))
 # # stretched.play()
 # pitched.play()
