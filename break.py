@@ -31,14 +31,12 @@ def on_key(e):
         control.key_released(e)
 keyboard.hook(on_key)
 
+sample.load_samples()
 midi.connect()
-
-# audio_thread = Thread(target=sample.play_samples)
-# audio_thread.start()
 
 while True:
     sequence.update(midi.get_status())
-    sample.play_samples()
+    sample.play_samples(sequence.step_duration())
 
     if midi.lost_connection():
         if sequence.midi_started:

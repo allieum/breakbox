@@ -13,10 +13,10 @@ MAX_BEATS = 8
 STEPS_PER_BEAT = 4
 MAX_STEPS = MAX_BEATS * STEPS_PER_BEAT
 
-step_interval = 60 / 143 / 4
 midi_lag_time = 0.039
 lookahead_time = 0.100
 # lookahead_time = 0.100
+
 
 class Sequence:
 
@@ -27,11 +27,20 @@ class Sequence:
         self.step = 0
         self.steps = MAX_STEPS
         self.measure_start = time.time()
+        self.last_midi_beat = time.time()
+        self.midi_bpm = 143
+        self.provisional_midi_bpm = 143
+        self.midi_stable_beats = 0
         self.internal_start_time = None
         self.midi_started = False
         self.played_step = False
         self.last_queued_step = -1
         self.lfos = []
+        self.bpm = 143
+
+    def step_duration(self):
+        bpm = self.midi_bpm if self.midi_started else self.bpm
+        return 60 / bpm / STEPS_PER_BEAT
 
     def start_internal(self):
         self.internal_start_time = time.time()
@@ -53,6 +62,26 @@ class Sequence:
         self.stop_internal()
         self.midi_started = True
         self._start()
+        self.last_midi_beat = time.time()
+
+    def calculate_midi_bpm(self, beat_time):
+        sec_per_beat = beat_time - self.last_midi_beat
+        logger.debug(f"sec per beat {sec_per_beat}")
+        bpm = round(60 / sec_per_beat)
+        return bpm
+
+    def update_midi_bpm(self, t):
+        bpm = self.calculate_midi_bpm(t)
+        if bpm != self.midi_bpm:
+            if bpm == self.provisional_midi_bpm:
+                self.midi_stable_beats += 1
+            else:
+                self.midi_stable_beats = 0
+                self.provisional_midi_bpm = bpm
+            if self.midi_stable_beats > 5:
+                sample.stretch_samples(bpm)
+                self.midi_bpm = bpm
+                logger.info(f"midi bpm changed to {bpm} on step {self.step}")
 
     def stop_midi(self):
         self.midi_started = False
@@ -71,6 +100,7 @@ class Sequence:
         pygame.mixer.stop() # todo only stop own samples
 
     def update(self, midi_status=None):
+        now = time.time()
         if midi_status is not None:
             if midi_status == START:
                 self.start_midi()
@@ -79,21 +109,21 @@ class Sequence:
                 self.stop_midi()
 
             if midi_status == CLOCK and self.midi_started:
-                self.clock_count += 1
+                self.clock_count = (self.clock_count + 1) % 24
                 # print(f"got {self.clock_count} clocks")
-                if self.clock_count > 0 and self.clock_count % (24 / STEPS_PER_BEAT) == 0:
-                    self.step_forward(time.time())
-                if self.clock_count == 24:
-                    self.clock_count = 0
+                if self.clock_count == 0:
+                    self.update_midi_bpm(now)
+                    self.last_midi_beat = now
                     # self.beat = (self.beat + 1) % MAX_BEATS
                     # if self.beat == 0:
-                    #     self.measure_start = time.time()
-        now = time.time()
+                if self.clock_count % (24 / STEPS_PER_BEAT) == 0:
+                    self.step_forward(time.time())
+
         prev = self.last_queued_step
         for i in (self.inc(prev), self.inc(prev, 2), self.inc(prev, 3)):
             if self.is_started and now + lookahead_time >= (t := self.step_time(i)):
                 logger.debug(f"------- queuing step {i} === {t - self.measure_start}")
-                sample.queue_samples(i, t)
+                sample.queue_samples(i, t, self.step_duration())
                 self.last_queued_step = i
 
         next_step_time = self.step_time(self.inc(self.step))
@@ -109,9 +139,9 @@ class Sequence:
         return (step + n) % self.steps
 
     def step_time(self, step):
-        next_step_time = self.measure_start + step_interval * step
+        next_step_time = self.measure_start + self.step_duration() * step
         if step < self.step:
-            next_step_time += step_interval * self.steps
+            next_step_time += self.step_duration() * self.steps
         lag_time = midi_lag_time if self.midi_started else 0
         return next_step_time - lag_time
 

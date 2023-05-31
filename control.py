@@ -61,6 +61,7 @@ def pitch_release():
             logger.info(f"deactivate pitch mod for {s.name}")
             s.cancel_pitch_mod()
 
+# todo dict of handlers, ie move everything into press and release
 press = {
     K_PITCH: pitch_press
 }
@@ -69,7 +70,6 @@ release = {
     K_PITCH: pitch_release
 }
 
-# todo dict of handlers
 def key_pressed(e):
     logger.debug(f"start press handler for {e}")
 
