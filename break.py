@@ -19,6 +19,8 @@ import sample
 import control
 import midi
 import utility
+import display
+import lights
 
 logger = utility.get_logger(__name__)
 current_time = datetime.now().strftime("%H:%M:%S")
@@ -31,6 +33,8 @@ def on_key(e):
         control.key_released(e)
 keyboard.hook(on_key)
 
+display.test()
+lights.init()
 sample.load_samples()
 midi.connect()
 
