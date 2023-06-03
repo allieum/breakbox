@@ -17,6 +17,7 @@ from threading import Thread
 from sequence import sequence
 import sample
 import control
+import keys
 import midi
 import utility
 import display
@@ -28,17 +29,19 @@ logger.debug(f"Start time = {current_time}")
 
 def on_key(e):
     if e.event_type == keyboard.KEY_DOWN:
-        control.key_pressed(e)
+        keys.key_pressed(e)
     elif e.event_type == keyboard.KEY_UP:
-        control.key_released(e)
+        keys.key_released(e)
 keyboard.hook(on_key)
 
 display.test()
 lights.init()
+control.init()
 sample.load_samples()
 midi.connect()
 
 while True:
+    control.update()
     sequence.update(midi.get_status())
     sample.play_samples(sequence.step_duration())
 
