@@ -42,6 +42,9 @@ def remaining_time(sound):
         return 0
     if sound.get_num_channels() == 0:
         logger.error("sound not playing")
+        return 0
+    if sound not in sound_data:
+        return 0
     return max(0, sound.get_length() - (time.time() - sound_data[sound].playtime))
 
 def write_wav(soundbytes, filename):
@@ -508,7 +511,7 @@ def timestretch(sound, rate, fade_time=0.005):
     logger.info(f"start stretch x{rate} ({fade_time} fade)")
     chunk_time = ts_time
     wav = sound.get_raw()
-    new_wav = bytearray(math.ceil(len(wav) / rate))
+    new_wav = bytearray(make_even(math.ceil(len(wav) / rate)))
     logger.debug(f"{len(wav)} {len(new_wav)} vs {len(wav) / rate}")
 
     chunk_size = math.ceil(chunk_time * SAMPLE_RATE) * 2 # 2 bytes per sample
@@ -536,6 +539,9 @@ def timestretch(sound, rate, fade_time=0.005):
             stretched_bytes = fade_out(stretched_bytes[:k - j], fade_time)
         new_wav[j:k] = stretched_bytes
     # write_wav(new_wav, "ts.wav")
+
+    if len(new_wav) % 2 == 1:
+        logger.info(f"odd one out")
 
     new_sound = pygame.mixer.Sound(new_wav)
     logger.debug(f"finish stretch x{rate} ({fade_time} fade) {sound.get_length() / rate} calculated length vs {new_sound.get_length()} actual")

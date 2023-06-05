@@ -1,8 +1,8 @@
 import time
-from collections import defaultdict
 import pygame.mixer
 
 from midi import START, STOP, CLOCK
+import control
 import sample
 import modulation
 import utility
@@ -15,8 +15,6 @@ MAX_STEPS = MAX_BEATS * STEPS_PER_BEAT
 
 midi_lag_time = 0.039
 lookahead_time = 0.100
-# lookahead_time = 0.100
-
 
 class Sequence:
 
@@ -36,10 +34,13 @@ class Sequence:
         self.played_step = False
         self.last_queued_step = -1
         self.lfos = []
-        self.bpm = 143
+        self.bpm = modulation.Param(143)
+
+    def control_bpm(self, encoder):
+        self.bpm.control(encoder, 1, sample.stretch_samples)
 
     def step_duration(self):
-        bpm = self.midi_bpm if self.midi_started else self.bpm
+        bpm = self.midi_bpm if self.midi_started else self.bpm.get()
         return 60 / bpm / STEPS_PER_BEAT
 
     def start_internal(self):

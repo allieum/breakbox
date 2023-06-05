@@ -2,22 +2,31 @@ import adafruit_ssd1306
 import board
 import busio
 import digitalio
+import time
 from PIL import Image, ImageDraw, ImageFont
 
 BORDER = 5
+REFRESH_RATE = 0.5
+last_refresh = time.time()
+last_state = None
 
-# spi = busio.SPI(board.SCK, MOSI=board.MOSI)
-# reset_pin = digitalio.DigitalInOut(board.TX)
-# cs_pin = digitalio.DigitalInOut(board.CE0)
-# dc_pin = digitalio.DigitalInOut(board.RX)
-i2c = busio.I2C(board.SCL, board.SDA)
+oled = None
+def init():
+    global oled
+    i2c = busio.I2C(board.SCL, board.SDA)
+    oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3d)
 
-oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3d)
+def update(state):
+    global last_refresh, last_state
+    if time.time() - last_refresh < REFRESH_RATE:
+        return
+    last_refresh = time.time()
 
-oled.fill(0)
-oled.show()
+    if state == last_state:
+        return
+    last_state = state
+    bpm = state
 
-def test():
     # Create blank image for drawing.
     # Make sure to create image with mode '1' for 1-bit color.
     image = Image.new("1", (oled.width, oled.height))
@@ -36,10 +45,11 @@ def test():
     )
 
     # Load default font.
-    font = ImageFont.load_default()
+    # font = ImageFont.load_default()
+    font = ImageFont.truetype("DejaVuSans.ttf", size=16)
 
     # Draw Some Text
-    text = "break me pls"
+    text = f"{bpm} bpm"
     (font_width, font_height) = font.getsize(text)
     draw.text(
         (oled.width // 2 - font_width // 2, oled.height // 2 - font_height // 2),

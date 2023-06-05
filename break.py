@@ -34,16 +34,20 @@ def on_key(e):
         keys.key_released(e)
 keyboard.hook(on_key)
 
-display.test()
+display.init()
 lights.init()
 control.init()
 sample.load_samples()
 midi.connect()
+sequence.control_bpm(control.encoder)
 
 while True:
     control.update()
     sequence.update(midi.get_status())
     sample.play_samples(sequence.step_duration())
+
+    state = (sequence.bpm.get())
+    display.update(state)
 
     if midi.lost_connection():
         if sequence.midi_started:

@@ -1,5 +1,6 @@
 from enum import Enum
 
+# import control
 import utility
 
 logger = utility.get_logger(__name__)
@@ -36,6 +37,7 @@ class Param:
         self.lfo = None
         self.start_step = None
         self.steps = None
+        self.encoder = None
 
     def modulate(self, lfo, amount, steps=None):
         logger.info(f"modulating param with {lfo} x {amount}")
@@ -43,8 +45,24 @@ class Param:
         self.scale = amount
         self.steps = steps
         self.start_step = None
+        return self
 
-    def get(self, step):
+    def control(self, encoder, scale, on_change=None):
+        self.encoder = encoder
+        self.encoder_scale = scale
+        self.encoder_prev = encoder.value()
+        self.on_change = on_change
+        return self
+
+    def get(self, step = -1):
+        if step == -1:
+            if self.encoder:
+                delta = self.encoder_scale * (self.encoder.value() - self.encoder_prev)
+                self.value += delta
+                self.encoder_prev = self.encoder.value()
+                if delta != 0 and self.on_change is not None:
+                    self.on_change(self.value)
+        
         value = self.value
         if self.steps is not None:
             self.steps -= 1
@@ -60,10 +78,6 @@ class Param:
 
 def triangle(period):
     return lambda x: x / x2 if x <= (x2 := period / 2) else 1 - (x - x2) / x2
-
-for i in range(8):
-    print(round(triangle(8)(i) * 4))
-
 
 def sin(period):
     pass
