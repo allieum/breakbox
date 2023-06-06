@@ -36,7 +36,20 @@ CLOSED: [2023-05-11 Thu 15:48]
 
 
 
+
+
+
+ File "/home/drum/breakbox/break.py", line 32, in on_key
+Jun 06 01:35:59 breakbox python3.11[2044]:     keys.key_pressed(e)
+Jun 06 01:35:59 breakbox python3.11[2044]:   File "/home/drum/breakbox/keys.py", line 114, in key_pressed
+Jun 06 01:35:59 breakbox python3.11[2044]:     sample.current_samples()[i].toggle_mute()
+Jun 06 01:35:59 breakbox python3.11[2044]:     ~~~~~~~~~~~~~~~~~~~~~~~~^^^
+Jun 06 01:35:59 breakbox python3.11[2044]: IndexError: list index out of range
+
+
+
 * stuff
+** preserve original slice sample thru timestretching
 ** param dna
 ** db power amp
 ** xfade on step repeat ? not sure

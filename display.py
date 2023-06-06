@@ -5,6 +5,10 @@ import digitalio
 import time
 from PIL import Image, ImageDraw, ImageFont
 
+import utility
+
+logger = utility.get_logger(__name__)
+
 BORDER = 5
 REFRESH_RATE = 0.5
 last_refresh = time.time()
@@ -14,9 +18,15 @@ oled = None
 def init():
     global oled
     i2c = busio.I2C(board.SCL, board.SDA)
-    oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3d)
+    try:
+        oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3d)
+    except:
+        logger.info("failed to initialize OLED")
 
 def update(state):
+    if oled is None:
+        return
+
     global last_refresh, last_state
     if time.time() - last_refresh < REFRESH_RATE:
         return

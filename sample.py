@@ -66,8 +66,6 @@ def load_samples():
             samples.append(Sample(f"{sample_dir}/{m.group()}", bpm))
         else:
             logger.warn(f"wrong filename format for {f}, not loaded")
-    # samples = [Sample(f'{dir_path}/samples/143-2bar-{i:03}.wav')
-    #             for i in range(BANK_SIZE * NUM_BANKS)]
     print([s.name for s in current_samples()])
 
 def current_samples():
