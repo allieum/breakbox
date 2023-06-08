@@ -35,6 +35,7 @@ class Sequence:
         self.last_queued_step = -1
         self.lfos = []
         self.bpm = modulation.Param(143)
+        self.callback = None
 
     def control_bpm(self, encoder):
         self.bpm.control(encoder, 1, sample.stretch_samples)
@@ -136,6 +137,9 @@ class Sequence:
                 # print(f'internal step {next_step}')
                 self.step_forward(now)
 
+    def on_step(self, callback):
+        self.callback = callback
+
     def inc(self, step, n=1):
         return (step + n) % self.steps
 
@@ -154,6 +158,9 @@ class Sequence:
         self.played_step = False
         if self.step == 0:
             self.measure_start = t
+        logger.debug(f"step {self.step}")
+        if self.callback is not None:
+            self.callback(self.step)
         # for lfo in self.lfos:
         #     lfo.step()
 

@@ -132,14 +132,14 @@ class FT232R(Device, DMXDriver):
             byte_data = self.encoder.encode(data)
         # Break
         self._set_break_on()
-        wait_ms(10)
+        wait_ms(4)
         # Mark after break
         self._set_break_off()
         wait_us(8)
         # Frame body
         Device.write(self, b"\x00" + byte_data)
         # Idle
-        wait_ms(15)
+        # wait_ms(15)
 
     def _set_break_on(self):
         self.ftdi_fn.ftdi_set_line_property2(FT232R._BITS_8, FT232R._STOP_BITS_2,

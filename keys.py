@@ -206,6 +206,7 @@ def key_pressed(e):
                 process_release(k)
 
     if e.name == K_RESET:
+        logger.warn(f"Reset key pressed, restarting program")
         utility.restart_program()
 
     logger.debug(f"finish press handler for {e}")

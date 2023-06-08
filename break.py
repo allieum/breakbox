@@ -20,8 +20,18 @@ import control
 import keys
 import midi
 import utility
+import modulation
 import display
 import lights
+
+from dmx import DMXInterface
+import blink
+
+
+# with DMXInterface() as interface:
+#
+dmx_interface = DMXInterface()
+
 
 logger = utility.get_logger(__name__)
 current_time = datetime.now().strftime("%H:%M:%S")
@@ -41,6 +51,55 @@ sample.load_samples()
 midi.connect()
 sequence.control_bpm(control.encoder)
 
+
+def bounce(step):
+    x = step % 16
+    if x < 8:
+        return x
+    return 7 - (x % 8)
+
+def bounce_lights(step):
+    # tri = modulation.triangle(15)
+    # light = round(tri(step % 16) * 7)
+    light = bounce(step)
+    logger.info(f"light {light}")
+    return lights_for_step(light)
+
+def lights_for_step(step):
+    light_index = step % 8 + 1 + 8
+    mirror_index = -(light_index - 8) + 8 + 1
+    return (light_index, mirror_index)
+# if (now := time.time()) - last_dmx > 0.050: # and last_dmx_step != sequence.step:
+def update_dmx(step):
+    # last_dmx = now
+    # last_dmx_step = sequence.step
+    logger.debug(f"lighting dmx step {step}")
+    color = [0, 0, 0, 0, 0, 0]
+    time.sleep(0.020)
+    blink.Light.scale(0.8)
+    for i, s in enumerate(sample.current_samples()):
+        if s.channel and s.channel.get_busy():
+            source_step = sample.sound_data[s.channel.get_sound()].step
+            if source_step != sequence.step:
+                logger.info(f"source step {source_step}")
+            color[i] = 255
+            for j in bounce_lights(source_step):
+                blink.lights[j].absorb(color)
+
+    # light_index = sequence.step % 8 + 1 + 8
+    # mirror_index = -(light_index - 8) + 8 + 1
+    # if any(color):
+    #     blink.lights[light_index].set(color)
+    #     blink.lights[mirror_index].set(color)
+    dmx_interface.set_frame(list(blink.Light.data))
+    now = time.time()
+    dmx_interface.send_update()
+    # sample.Sample.audio_executor.submit(dmx_interface.send_update)
+    logger.debug(f"dmx frame send took {time.time() - now}s")
+sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
+
+last_dmx = time.time()
+last_dmx_step = None
 while True:
     control.update()
     sequence.update(midi.get_status())
@@ -48,6 +107,8 @@ while True:
 
     state = (sequence.bpm.get())
     display.update(state)
+
+
 
     if midi.lost_connection():
         if sequence.midi_started:

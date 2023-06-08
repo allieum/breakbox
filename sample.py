@@ -10,6 +10,7 @@ from pydub import AudioSegment
 from pydub.utils import db_to_float
 import re
 from dataclasses import dataclass
+from typing import Optional
 
 import modulation
 import utility
@@ -30,6 +31,8 @@ logger.info(pygame.mixer.get_init())
 class SoundData:
     playtime: float
     bpm: int
+    step: int
+    source: Optional['SoundData']
 
     def __init__(self) -> None:
         pass
@@ -113,8 +116,10 @@ class Sample:
         wav = self.sound.get_raw()
         slice_size = math.ceil(len(wav) / self.num_slices)
         self.sound_slices = [pygame.mixer.Sound(wav[i:i + slice_size]) for i in range(0, len(wav), slice_size)]
-        for s in self.sound_slices:
+        for i, s in enumerate(self.sound_slices):
             sound_data[s].bpm = self.bpm
+            sound_data[s].step = i
+            sound_data[s].source = None
 
     def step_repeat_start(self, index, length):
         if not self.step_repeat:
@@ -543,6 +548,8 @@ def timestretch(sound, rate, fade_time=0.005):
 
     new_sound = pygame.mixer.Sound(new_wav)
     logger.debug(f"finish stretch x{rate} ({fade_time} fade) {sound.get_length() / rate} calculated length vs {new_sound.get_length()} actual")
+    sound_data[new_sound].source = sound
+    sound_data[new_sound].step = sound_data[sound].step
     return new_sound
 
 # s = current_samples()[0]
@@ -568,6 +575,9 @@ def change_rate(sound, rate):
         j = convert_sample_index(i)
         new_wav[i:i + 2] = wav[j:j + 2]
 
+    new_sound = pygame.mixer.Sound(new_wav)
+    sound_data[new_sound].source = sound
+    sound_data[new_sound].step = sound_data[sound].step
     return pygame.mixer.Sound(new_wav)
 
 def pitch_shift(sound, semitones):

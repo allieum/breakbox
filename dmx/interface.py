@@ -34,26 +34,25 @@ from typing import List, Optional
 
 from dmx.constants import DMX_MAX_ADDRESS
 from dmx.drivers import DMXDriver, get_drivers
-
+from dmx.drivers.ftdi import ft232r
 
 class DMXInterface:
     """Represents the interface between the DMX device and a frame generation source."""
 
-    def __init__(self, driver_name: str, *args, **kwards):
+    def __init__(self):
         """Initialise the DMX interface."""
         self._device = None  #  type: Optional[DMXDriver]
         self._frame_state = []  # type: List[int]
         self.clear_state()
-        self._set_device_driver(driver_name, *args, **kwards)
+        self._set_device_driver()
 
-    def _set_device_driver(self, driver_name: str, *args, **kwards):
+    def _set_device_driver(self):
         """Set driver to specified driver."""
-        drivers = get_drivers()
-        if driver_name in drivers:
-            driver = drivers[driver_name]
-            self._device = driver(*args, **kwards)
-        else:
-            raise Exception("Unknown driver")
+        # drivers = get_drivers()
+        # if driver_name in drivers:
+            # driver = drivers[driver_name]
+            # self._device = driver(*args, **kwards)
+        self._device = ft232r.FT232R()
 
     def __enter__(self):
         """Open interface, for use with the 'with' statement."""

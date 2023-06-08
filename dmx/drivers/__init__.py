@@ -81,39 +81,12 @@ class DMXDriver(ABC):
 def get_drivers() -> Dict[str, Type[DMXDriver]]:
     """Get a dictionary of driver names to drivers."""
     drivers = {}
+    # We try to import the driver here, just in case it's not actually a driver.
+    driver_module = import_module("ftdi", "dmx.drivers")
 
-    # There are two possible sources of "containers" for drivers, all drivers
-    # that come with PyDMX, and drivers from PyDMX-Drivers-??? packages.
-    driver_containers = [DRIVER_PATH]
-    if DMX_DRIVERS_PRESENT and hasattr(dmx_drivers, "__path__"):
-        for driver_path in dmx_drivers.__path__:
-            driver_containers += [path.join(driver_path, x) for x in listdir(driver_path)]
-
-    # We go through each container, looking for drivers...
-    for driver_container in driver_containers:
-        # Drivers must be in their own files, so we look based on files...
-        for driver_file in listdir(driver_container):
-            container_name = path.basename(driver_container)
-            driver_full_path = path.join(driver_container, driver_file)
-
-            # We make the assumption that all drivers are .py and not in __xxx__ files.
-            if (path.isfile(driver_full_path) and driver_file.endswith(".py")
-                    and not driver_file.startswith("__")):
-                driver_name, *_ = path.splitext(driver_file)
-
-                # We try to import the driver here, just in case it's not actually a driver.
-                try:
-                    from_package = "dmx.drivers"
-                    if container_name != "drivers":
-                        from_package = "dmx_drivers." + container_name
-
-                    driver_module = import_module("." + str(driver_name), from_package)
-                except ImportError:
-                    continue  # there's an error in the driver, continue.
-
-                # If it's actually a driver it will specify a "DRIVER_CLASS" to load.
-                if hasattr(driver_module, "DRIVER_CLASS"):
-                    driver_class = getattr(driver_module, "DRIVER_CLASS")
-                    drivers[driver_class.get_driver_name()] = driver_class
+    # If it's actually a driver it will specify a "DRIVER_CLASS" to load.
+    if hasattr(driver_module, "DRIVER_CLASS"):
+        driver_class = getattr(driver_module, "DRIVER_CLASS")
+        drivers[driver_class.get_driver_name()] = driver_class
 
     return drivers
