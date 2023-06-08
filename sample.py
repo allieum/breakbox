@@ -20,7 +20,7 @@ logger = utility.get_logger(__name__)
 
 bank = 0
 BANK_SIZE = 6
-NUM_BANKS = 3
+NUM_BANKS = 4
 SAMPLE_RATE = 22050
 
 pygame.mixer.init(frequency=SAMPLE_RATE, buffer=256, channels=1)
@@ -63,7 +63,7 @@ samples = []
 def load_samples():
     sample_dir = f'{dir_path}/samples'
     for f in sorted(os.listdir(sample_dir)):
-        if m := re.fullmatch(r"([0-9]{2,3}).+[0-9]{3}.wav", f):
+        if m := re.fullmatch(r"([0-9]{2,3}).+([0-9]{3})?.wav", f):
             print(f)
             bpm = int(m.group(1))
             samples.append(Sample(f"{sample_dir}/{m.group()}", bpm))

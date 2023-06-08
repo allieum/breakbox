@@ -53,22 +53,24 @@ sequence.control_bpm(control.encoder)
 
 
 def bounce(step):
-    x = step % 16
-    if x < 8:
-        return x
-    return 7 - (x % 8)
+    x = step % 32
+    if x < 16:
+        return x + 1
+    return 16 - (x % 16)
 
 def bounce_lights(step):
     # tri = modulation.triangle(15)
     # light = round(tri(step % 16) * 7)
     light = bounce(step)
     logger.debug(f"light {light}")
-    return lights_for_step(light)
+    return (light,)
+    # return lights_for_step(light)
 
 def lights_for_step(step):
     light_index = step % 8 + 1 + 8
     mirror_index = -(light_index - 8) + 8 + 1
     return (light_index, mirror_index)
+
 # if (now := time.time()) - last_dmx > 0.050: # and last_dmx_step != sequence.step:
 def update_dmx(step):
     # last_dmx = now

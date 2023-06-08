@@ -160,6 +160,7 @@ class Sequence:
             self.measure_start = t
         logger.debug(f"step {self.step}")
         if self.callback is not None:
+            # TODO should be async
             self.callback(self.step)
         # for lfo in self.lfos:
         #     lfo.step()
