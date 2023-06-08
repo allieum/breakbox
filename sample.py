@@ -10,7 +10,7 @@ from pydub import AudioSegment
 from pydub.utils import db_to_float
 import re
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 
 import modulation
 import utility
@@ -63,7 +63,7 @@ samples = []
 def load_samples():
     sample_dir = f'{dir_path}/samples'
     for f in sorted(os.listdir(sample_dir)):
-        if m := re.fullmatch(r"([0-9]{2,3})-2bar-[0-9]{3}.wav", f):
+        if m := re.fullmatch(r"([0-9]{2,3}).+[0-9]{3}.wav", f):
             print(f)
             bpm = int(m.group(1))
             samples.append(Sample(f"{sample_dir}/{m.group()}", bpm))
@@ -71,7 +71,7 @@ def load_samples():
             logger.warn(f"wrong filename format for {f}, not loaded")
     print([s.name for s in current_samples()])
 
-def current_samples():
+def current_samples() -> List['Sample']:
    return samples[bank * BANK_SIZE : BANK_SIZE * (bank + 1)]
 
 channels = set()
@@ -113,8 +113,10 @@ class Sample:
         # self.sound.sound_data = "test"
         # self.sound = pygame.mixer.Sound(file)
         self.sound.set_volume(0) # default mute
+        step_time = 60 / self.bpm / 4
         wav = self.sound.get_raw()
-        slice_size = math.ceil(len(wav) / self.num_slices)
+        num_steps = round(self.sound.get_length() / step_time)
+        slice_size = math.ceil(len(wav) / num_steps)
         self.sound_slices = [pygame.mixer.Sound(wav[i:i + slice_size]) for i in range(0, len(wav), slice_size)]
         for i, s in enumerate(self.sound_slices):
             sound_data[s].bpm = self.bpm
@@ -122,6 +124,7 @@ class Sample:
             sound_data[s].source = None
 
     def step_repeat_start(self, index, length):
+        index %= len(self.sound_slices)
         if not self.step_repeat:
             self.step_repeat_was_muted = self.is_muted()
             self.step_repeat_length = length
@@ -333,7 +336,7 @@ class Sample:
 
     def queue_step(self, step, t, step_interval):
         srlength = self.step_repeat_length * 2 if self.halftime else self.step_repeat_length
-        if self.step_repeat and step in range(self.step_repeat_index % srlength, self.num_slices, srlength):
+        if self.step_repeat and step in range(self.step_repeat_index % srlength, len(self.sound_slices), srlength):
             self.step_repeating = True
             # self.mute()
             self.sound_queue.clear()
@@ -351,11 +354,11 @@ class Sample:
                     self.queue(s, ts, slice_step)
         if not self.step_repeating:
             if not self.is_muted() or self.looping:
-                sound = self.sound_slices[step]
+                sound = self.sound_slices[step % len(self.sound_slices)]
                 if self.halftime:
                     if step % 2 != 0:
                         return
-                    sound = self.sound_slices[step // 2]
+                    sound = self.sound_slices[(step // 2) % len(self.sound_slices)]
                     self.queue_async(lambda: timestretch(sound, 0.5, stretch_fade), t, step)
                 elif (p := self.pitch.get(step)) != 0:
                     logger.debug(f"{self.name} setting pitch to {p}")
@@ -578,7 +581,7 @@ def change_rate(sound, rate):
     new_sound = pygame.mixer.Sound(new_wav)
     sound_data[new_sound].source = sound
     sound_data[new_sound].step = sound_data[sound].step
-    return pygame.mixer.Sound(new_wav)
+    return new_sound
 
 def pitch_shift(sound, semitones):
     if semitones == 0:

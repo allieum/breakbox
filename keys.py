@@ -1,3 +1,4 @@
+from codecs import lookup
 from collections import defaultdict
 
 import sample
@@ -9,6 +10,7 @@ logger = utility.get_logger(__name__)
 K_STOP = 'delete'
 K_NEXT_BANK = '#'
 K_RESET = 'tab'
+K_SHIFT = 'shift'
 
 # halftime (0.5 timestretch)
 K_HT = 'enter'
@@ -38,59 +40,101 @@ dactyl_keys =[
 ]
 
 LOOP_KEYS = dactyl_keys[0]
-TOGGLE_KEYS = dactyl_keys[1]
+SAMPLE_KEYS = dactyl_keys[1]
 HOLD_KEYS = dactyl_keys[3]
+
+selected_sample = None
 
 key_held = defaultdict(bool)
 key_frozen = defaultdict(bool)
 def key_active(key):
     return key_held[key] or key_frozen[key]
 
-
 def get_activated_samples():
-    return [sample.current_samples()[i] for i, k in enumerate(TOGGLE_KEYS) if key_active(k)]
+    return [sample.current_samples()[i] for i, k in enumerate(SAMPLE_KEYS) if key_active(k)]
 
-def pitch_press():
+def pitch_press(*_):
     for s in get_activated_samples():
         logger.info(f"activate pitch mod for {s.name}")
         s.pitch_mod(sequence)
 
-def pitch_release():
+def pitch_release(*_):
     for s in sample.current_samples():
         if s.pitch.lfo is not None:
             logger.info(f"deactivate pitch mod for {s.name}")
             s.cancel_pitch_mod()
 
+def sample_press(i, is_repeat):
+    global selected_sample
+    selected_sample = sample.current_samples()[i]
+
+    if is_repeat:
+        return
+
+    if not sequence.is_started:
+        sequence.start_internal()
+
+    if key_held[K_SHIFT]:
+        selected_sample.looping = not selected_sample.looping
+
+    selected_sample.unmute()
+
+    for step_repeat_key, length in SR_KEYS.items():
+        if key_active(step_repeat_key):
+            selected_sample.step_repeat_start(sequence.step, length)
+    if key_active(K_HT):
+        selected_sample.halftime = True
+
+def sample_release(i):
+    s = sample.current_samples()[i]
+    if not s.looping:
+        s.mute()
+        s.step_repeat_stop()
+        s.halftime = False
+
+def step_repeat_press(length, *_):
+    if selected_sample is None:
+        return
+    selected_sample.step_repeat_start(sequence.step, length)
+
+def step_repeat_release(length):
+    if selected_sample is None:
+        return
+    sample.step_repeat_stop(length)
+
+def make_handler(handler, x):
+    def f(*args):
+        handler(x, *args)
+    return f
+
 # todo dict of handlers, ie move everything into press and release
 press = {
-    K_PITCH: pitch_press
+    K_PITCH: pitch_press,
+    **dict(zip(SAMPLE_KEYS, [make_handler(sample_press, i) for i in range(len(SAMPLE_KEYS))])),
+    **dict([(sr_key, make_handler(step_repeat_press, length)) for sr_key, length in SR_KEYS.items()])
 }
 
 release = {
-    K_PITCH: pitch_release
+    K_PITCH: pitch_release,
+    **dict(zip(SAMPLE_KEYS, [make_handler(sample_release, i) for i in range(len(SAMPLE_KEYS))])),
+    **dict([(sr_key, make_handler(step_repeat_release, length)) for sr_key, length in SR_KEYS.items()])
 }
 
 def key_pressed(e):
     logger.debug(f"start press handler for {e}")
 
+    if e.name in press:
+        press[e.name](key_held[e.name])
+        key_held[e.name] = True
+        return
+
     if key_active(e.name):
         logger.debug(f"{e} already active, doing nothing")
         return
 
-    if e.name in press:
-        press[e.name]()
-        key_held[e.name] = True
-        return
-
-    for i, key in enumerate(LOOP_KEYS):
-        if key == e.name:
-            for j, s in enumerate(sample.current_samples()):
-                s.looping = i == j
-                # print(f"sample {j} queued: {sample.queued}")
-
     if e.name == K_HT:
         key_held[K_HT] = True
-        for i, key in enumerate(TOGGLE_KEYS):
+        for i, key in enumerate(SAMPLE_KEYS):
             if key_active(key):
                 sample.current_samples()[i].halftime = True
         if any([key_held[k] for k in HOLD_KEYS]):
@@ -107,50 +151,6 @@ def key_pressed(e):
     if e.name == K_HT_DOWN:
         sample.decrease_ts_time()
 
-    for i, key in enumerate(TOGGLE_KEYS):
-        if key != e.name:
-            continue
-        if not key_held[key] and not key_frozen[key]:
-            sample.current_samples()[i].toggle_mute()
-        if not key_frozen[key]:
-            key_held[key] = True
-        if any([key_held[k] for k in HOLD_KEYS]):
-            # print(f"freezing {key}")
-            key_frozen[key] = True
-        elif key_frozen[key]:
-            # print(f"unfreezing {key}")
-            key_frozen[key] = False
-            process_release(key)
-        # print(f"holding {key}")
-        for step_repeat_key, length in SR_KEYS.items():
-            if key_active(step_repeat_key):
-                sample.current_samples()[i].step_repeat_start(sequence.step, length)
-        if key_active(K_HT):
-            sample.current_samples()[i].halftime = True
-    #
-    # if loop or toggle and sequence not started, start it
-    if not sequence.is_started:
-        for key in LOOP_KEYS + TOGGLE_KEYS:
-            if key == e.name:
-                sequence.start_internal()
-
-    for step_repeat_key, length in SR_KEYS.items():
-        if step_repeat_key != e.name:
-            continue
-        # print(f"holding {step_repeat_key}")
-        if not key_frozen[step_repeat_key]:
-            key_held[step_repeat_key] = True
-        if any([key_held[k] for k in HOLD_KEYS]): # make hold_active fn
-            key_frozen[step_repeat_key] = True
-            # print(f"freezing {step_repeat_key}")
-        elif key_frozen[step_repeat_key]:
-            # print(f"unfreezing {step_repeat_key}")
-            key_frozen[step_repeat_key] = False
-            process_release(step_repeat_key)
-        for i, key in enumerate(TOGGLE_KEYS):
-            if key_active(key):
-                sample.current_samples()[i].step_repeat_start(sequence.step, length)
-
     if K_STOP == e.name:
         # cancel held keys
         for key in key_frozen:
@@ -166,7 +166,7 @@ def key_pressed(e):
         looping_index = None
         old_samples = sample.current_samples()
         for i, s in enumerate(old_samples):
-            if not s.is_muted() and not key_active(TOGGLE_KEYS[i]):
+            if not s.is_muted() and not key_active(SAMPLE_KEYS[i]):
                 looping_index = i
                 # print(f"looping index {i}")
         # cancel held keys
@@ -227,15 +227,6 @@ def process_release(k):
         release[k]()
         return
 
-    for i, key in enumerate(TOGGLE_KEYS):
-        if key == k:
-            sample.current_samples()[i].step_repeat_stop()
-            sample.current_samples()[i].halftime = False
-            sample.current_samples()[i].toggle_mute()
-    for key, length in SR_KEYS.items():
-        if key != k:
-            continue
-        sample.step_repeat_stop(length)
     if K_HT == k:
         sample.stop_halftime()
     logger.debug(f"finish release handler for {k}")

@@ -62,7 +62,7 @@ def bounce_lights(step):
     # tri = modulation.triangle(15)
     # light = round(tri(step % 16) * 7)
     light = bounce(step)
-    logger.info(f"light {light}")
+    logger.debug(f"light {light}")
     return lights_for_step(light)
 
 def lights_for_step(step):
@@ -81,7 +81,7 @@ def update_dmx(step):
         if s.channel and s.channel.get_busy():
             source_step = sample.sound_data[s.channel.get_sound()].step
             if source_step != sequence.step:
-                logger.info(f"source step {source_step}")
+                logger.debug(f"source step {source_step}")
             color[i] = 255
             for j in bounce_lights(source_step):
                 blink.lights[j].absorb(color)
@@ -107,7 +107,6 @@ while True:
 
     state = (sequence.bpm.get())
     display.update(state)
-
 
 
     if midi.lost_connection():
