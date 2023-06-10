@@ -98,6 +98,9 @@ class Sample:
         self.load(file)
         self.last_printed = 0
         self.pitch = modulation.Param(0)
+        self.gate = modulation.Param(1.0)
+        self.gate_period = modulation.Param(1)
+        self.gate_count = 0
         self.cache = {
             'pitch': {
                 **dict.fromkeys(range(self.num_slices), {})
@@ -135,6 +138,24 @@ class Sample:
             self.step_repeat_length = length
         else:
             return
+
+    def gate_increase(self):
+        if self.gate.value == 1:
+            return
+        self.gate.value += 0.1
+
+    def gate_decrease(self):
+        if self.gate.value <= 0.1:
+            return
+        self.gate.value -= 0.1
+
+    def gate_period_increase(self):
+        self.gate_period.value += 1
+
+    def gate_period_decrease(self):
+        if self.gate_period.value <= 1:
+            return
+        self.gate_period.value -= 1
 
     def transform_slices(self, f):
         for i in range(len(self.sound_slices)):
@@ -197,6 +218,9 @@ class Sample:
     def queue(self, sound, t, step):
         logger.debug(f"queued sound in {self.name} for {datetime.fromtimestamp(t)}")
         # _, prev_t = self.sound_queue[len(self.sound_queue) - 1] if len(self.sound_queue) > 0 else None, None
+        if self.gate_count == 0:
+            sound.set_volume(1.0)
+        self.gate_count = (self.gate_count + 1) % self.gate_period.get(step)
         self.sound_queue.append((sound, t, step))
         # if prev_t and prev_t > t:
         #     logger.error(f"{self.name} saw out of order sound queue")
@@ -225,6 +249,12 @@ class Sample:
 
     # returns callable to do the sound making
     def process_queue(self, now, step_duration):
+        if self.channel and (playing := self.channel.get_sound()) is not None:
+            # TODO input step into gate
+            gate_time = self.gate.get() * playing.get_length()
+            if playing in sound_data and now - sound_data[playing].playtime >= gate_time:
+                playing.set_volume(0)
+
         logger.debug(f"{self.name} start process queue")
         if len(self.sound_queue) == 0:
             logger.debug(f"{self.name}: queue empty")
@@ -245,6 +275,7 @@ class Sample:
                 return None
             _sound, t, _ = self.sound_queue[0]
         self.warn_dropped(dropped, now)
+
 
         in_play_window = now >= t - self.lookahead
         in_queue_window = now >= t - self.lookahead - step_duration

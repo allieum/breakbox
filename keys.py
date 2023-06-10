@@ -28,6 +28,10 @@ SR_KEYS = {
     K_SR1: 1
 }
 
+K_GATE_UP = '5'
+K_GATE_DOWN = '4'
+
+
 dactyl_keys =[
     ['esc',   '1', '2',   '3',   '4', '5'],
     ['`',     'q', 'w',   'e',   'r', 't'],
@@ -98,18 +102,39 @@ def step_repeat_press(length, *_):
     selected_sample.step_repeat_start(sequence.step, length)
 
 def step_repeat_release(length):
+    sample.step_repeat_stop(length)
+
+def gate_up_press(*_):
     if selected_sample is None:
         return
-    sample.step_repeat_stop(length)
+    if key_held[K_SHIFT]:
+        selected_sample.gate_period_increase()
+        logger.info(f"set gate period to {selected_sample.gate_period.value} for {selected_sample.name}")
+    else:
+        selected_sample.gate_increase()
+        logger.info(f"set gate to {selected_sample.gate.value} for {selected_sample.name}")
+
+def gate_down_press(*_):
+    if selected_sample is None:
+        return
+    if key_held[K_SHIFT]:
+        selected_sample.gate_period_decrease()
+        logger.info(f"set gate period to {selected_sample.gate_period.value} for {selected_sample.name}")
+    else:
+        selected_sample.gate_decrease()
+        logger.info(f"set gate to {selected_sample.gate.value} for {selected_sample.name}")
 
 def make_handler(handler, x):
     def f(*args):
         handler(x, *args)
     return f
 
+
 # todo dict of handlers, ie move everything into press and release
 press = {
     K_PITCH: pitch_press,
+    K_GATE_DOWN: gate_down_press,
+    K_GATE_UP: gate_up_press,
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_press, i) for i in range(len(SAMPLE_KEYS))])),
     **dict([(sr_key, make_handler(step_repeat_press, length)) for sr_key, length in SR_KEYS.items()])
 }
