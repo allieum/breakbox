@@ -19,23 +19,25 @@ K_HT_DOWN = 'space'
 K_PITCH = 'alt'
 
 # step repeat
-K_SR4 = 's'
-K_SR2 = 'd'
-K_SR1 = 'f'
+K_SR8 = 'x'
+K_SR4 = 'c'
+K_SR2 = 'v'
+K_SR1 = 'b'
 SR_KEYS = {
+    K_SR8: 8,
     K_SR4: 4,
     K_SR2: 2,
     K_SR1: 1
 }
 
 K_GATE_UP = '5'
-K_GATE_DOWN = '4'
+K_GATE_DOWN = 't'
 
 
 dactyl_keys =[
     ['esc',   '1', '2',   '3',   '4', '5'],
     ['`',     'q', 'w',   'e',   'r', 't'],
-    ['tab',   'a', K_SR4, K_SR2, K_SR1, 'g'],
+    ['tab',   'a', 's',   'd',   'f', 'g'],
     ['shift', 'z', 'x',   'c',   'v', 'b'],
                   ['tab', K_NEXT_BANK],
                                  [K_STOP,     'shift'],
@@ -43,19 +45,17 @@ dactyl_keys =[
                                  [K_HT,    K_PITCH],
 ]
 
-LOOP_KEYS = dactyl_keys[0]
-SAMPLE_KEYS = dactyl_keys[1]
-HOLD_KEYS = dactyl_keys[3]
+# LOOP_KEYS = dactyl_keys[0]
+SAMPLE_KEYS = dactyl_keys[2]
+# HOLD_KEYS = dactyl_keys[3]
 
 selected_sample = None
 
 key_held = defaultdict(bool)
-key_frozen = defaultdict(bool)
-def key_active(key):
-    return key_held[key] or key_frozen[key]
+# key_frozen = defaultdict(bool)
 
 def get_activated_samples():
-    return [sample.current_samples()[i] for i, k in enumerate(SAMPLE_KEYS) if key_active(k)]
+    return [sample.current_samples()[i] for i, k in enumerate(SAMPLE_KEYS) if key_held[(k)]]
 
 def pitch_press(*_):
     for s in get_activated_samples():
@@ -84,9 +84,9 @@ def sample_press(i, is_repeat):
     selected_sample.unmute()
 
     for step_repeat_key, length in SR_KEYS.items():
-        if key_active(step_repeat_key):
+        if key_held[(step_repeat_key)]:
             selected_sample.step_repeat_start(sequence.step, length)
-    if key_active(K_HT):
+    if key_held[(K_HT)]:
         selected_sample.halftime = True
 
 def sample_release(i):
@@ -153,22 +153,15 @@ def key_pressed(e):
         key_held[e.name] = True
         return
 
-    if key_active(e.name):
+    if key_held[(e.name)]:
         logger.debug(f"{e} already active, doing nothing")
         return
 
     if e.name == K_HT:
         key_held[K_HT] = True
         for i, key in enumerate(SAMPLE_KEYS):
-            if key_active(key):
+            if key_held[(key)]:
                 sample.current_samples()[i].halftime = True
-        if any([key_held[k] for k in HOLD_KEYS]):
-            # print(f"freezing {key}")
-            key_frozen[K_HT] = True
-        elif key_frozen[K_HT]:
-            # print(f"unfreezing {key}")
-            key_frozen[K_HT] = False
-            process_release(K_HT)
 
     if e.name == K_HT_UP:
         sample.increase_ts_time()
@@ -178,9 +171,6 @@ def key_pressed(e):
 
     if K_STOP == e.name:
         # cancel held keys
-        for key in key_frozen:
-            key_held[key] = False
-            key_frozen[key] = False
         for s in sample.current_samples():
             s.mute()
             s.looping = False
@@ -191,13 +181,10 @@ def key_pressed(e):
         looping_index = None
         old_samples = sample.current_samples()
         for i, s in enumerate(old_samples):
-            if not s.is_muted() and not key_active(SAMPLE_KEYS[i]):
+            if not s.is_muted() and not key_held[(SAMPLE_KEYS[i])]:
                 looping_index = i
                 # print(f"looping index {i}")
         # cancel held keys
-        for key in key_frozen:
-            key_held[key] = False
-            key_frozen[key] = False
         sample.bank = (sample.bank + 1) % sample.NUM_BANKS
         for new_sample, old_sample in zip(sample.current_samples(), old_samples):
             new_sample.swap_channel(old_sample)
@@ -215,20 +202,6 @@ def key_pressed(e):
     #   5) frozen key pressed -> unfreeze
     #
     # freeze key by press down when hold pressed, or press hold when key pressed
-    for key in HOLD_KEYS:
-        if key != e.name:
-            continue
-        key_held[key] = True
-        held_keys = [k for k,held in key_held.items() if held and not k in HOLD_KEYS]
-        for k in held_keys:
-            print(f"freezing {k}")
-            key_frozen[k] = True
-        if len(held_keys) == 0:
-            frozen_keys = [k for k,frozen in key_frozen.items() if frozen]
-            for k in frozen_keys:
-                print(f"unfreezing {k}")
-                key_frozen[k] = False
-                process_release(k)
 
     if e.name == K_RESET:
         logger.warn(f"Reset key pressed, restarting program")
@@ -241,8 +214,6 @@ def key_released(e):
     if not key_held[e.name]:
         return
     key_held[e.name] = False
-    if key_frozen[e.name]:
-        return
     process_release(e.name)
 
 def process_release(k):
