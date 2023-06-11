@@ -38,7 +38,7 @@ class Light:
 
     @staticmethod
     def set_brightness(level):
-       Light.data[0] = level
+        Light.data[0] = level
 
     @staticmethod
     def send_frame(interface):

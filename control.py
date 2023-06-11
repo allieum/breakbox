@@ -1,5 +1,4 @@
 import board
-import time
 import digitalio
 from enum import Enum
 import utility
@@ -62,7 +61,6 @@ class RotaryEncoder:
         return self.counter // 2
 
     def poll(self):
-        action = None
         pos = 0
         if not self.pinA.value:
             pos |= 1
@@ -74,10 +72,8 @@ class RotaryEncoder:
         if clkstate != self.last:
             if dtstate != clkstate:
                 self.counter -= 1
-                action = self.Direction.COUNTERCLOCK
             else:
                 self.counter += 1
-                action = self.Direction.CLOCK
             logger.info(f"encoder: {self.counter}")
         self.last = clkstate
         return self.value()

@@ -1,18 +1,10 @@
-from collections import defaultdict
-import pygame
-import pygame.event
-import pygame.midi
-# from pygame.locals import *
-import pygame.key
 import time
 # import rtmidi
-import os
 import sys
 import keyboard
 # from ctypes import *
 # from contextlib import contextmanager
 from datetime import datetime
-from threading import Thread
 
 from sequence import sequence
 import sample
@@ -20,7 +12,6 @@ import control
 import keys
 import midi
 import utility
-import modulation
 import display
 import lights
 

@@ -38,6 +38,10 @@ class Param:
         self.start_step = None
         self.steps = None
         self.encoder = None
+        self.encoder_scale = None
+        self.encoder_prev = None
+        self.scale = None
+        self.on_change = None
 
     def modulate(self, lfo, amount, steps=None):
         logger.info(f"modulating param with {lfo} x {amount}")
@@ -73,11 +77,8 @@ class Param:
             value += round(self.lfo.value(lfo_step) * self.scale)
             logger.debug(f"LFO {self.lfo} value {value} step {step} lfo_step {lfo_step} start_step {self.start_step}")
         if self.steps == 0:
-             self.lfo.enabled = False
+            self.lfo.enabled = False
         return value
 
 def triangle(period):
     return lambda x: x / x2 if x <= (x2 := period / 2) else 1 - (x - x2) / x2
-
-def sin(period):
-    pass

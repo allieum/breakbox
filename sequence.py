@@ -2,7 +2,6 @@ import time
 import pygame.mixer
 
 from midi import START, STOP, CLOCK
-import control
 import sample
 import modulation
 import utility
@@ -99,7 +98,7 @@ class Sequence:
 
     def _stop(self):
         self.is_started = False
-        pygame.mixer.stop() # todo only stop own samples
+        pygame.mixer.stop()
 
     def update(self, midi_status=None):
         now = time.time()
@@ -112,12 +111,9 @@ class Sequence:
 
             if midi_status == CLOCK and self.midi_started:
                 self.clock_count = (self.clock_count + 1) % 24
-                # print(f"got {self.clock_count} clocks")
                 if self.clock_count == 0:
                     self.update_midi_bpm(now)
                     self.last_midi_beat = now
-                    # self.beat = (self.beat + 1) % MAX_BEATS
-                    # if self.beat == 0:
                 if self.clock_count % (24 / STEPS_PER_BEAT) == 0:
                     self.step_forward(time.time())
 
@@ -131,10 +127,8 @@ class Sequence:
         next_step_time = self.step_time(self.inc(self.step))
         step_predicted = now >= next_step_time and not self.played_step
         if step_predicted and self.is_started:
-            next_step = (self.step + 1) % MAX_STEPS
             self.played_step = True
             if self.is_internal():
-                # print(f'internal step {next_step}')
                 self.step_forward(now)
 
     def on_step(self, callback):
@@ -149,9 +143,6 @@ class Sequence:
             next_step_time += self.step_duration() * self.steps
         lag_time = midi_lag_time if self.midi_started else 0
         return next_step_time - lag_time
-
-    # def modulate(self, param, lfo, amount):
-    #     param.modulate(lfo, amount, self.step)
 
     def step_forward(self, t):
         self.step = self.inc(self.step)

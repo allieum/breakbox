@@ -1,7 +1,6 @@
 import adafruit_ssd1306
 import board
 import busio
-import digitalio
 import time
 from PIL import Image, ImageDraw, ImageFont
 
@@ -20,7 +19,7 @@ def init():
     i2c = busio.I2C(board.SCL, board.SDA)
     try:
         oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3d)
-    except:
+    except ValueError:
         logger.info("failed to initialize OLED")
 
 def update(state):

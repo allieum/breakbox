@@ -1,4 +1,3 @@
-from codecs import lookup
 from collections import defaultdict
 
 import sample
@@ -67,13 +66,13 @@ def get_activated_samples():
 def pitch_press(*_):
     for s in get_activated_samples():
         logger.info(f"activate pitch mod for {s.name}")
-        s.pitch_mod(sequence)
+        s.pitch_mod()
 
 def pitch_release(*_):
     for s in sample.current_samples():
         if s.pitch.lfo is not None:
             logger.info(f"deactivate pitch mod for {s.name}")
-            s.cancel_pitch_mod()
+            # s.cancel_pitch_mod()
 
 def sample_press(i, is_repeat):
     global selected_sample
@@ -107,14 +106,9 @@ def sample_press(i, is_repeat):
         selected_sample.halftime = True
 
 def shift_press(*_):
-    global shifted
     for s in [sample.current_samples()[i] for i,k in enumerate(SAMPLE_KEYS) if key_held[k]]:
         s.looping = not s.looping
         logger.info(f"{s.name} set looping to {s.looping}")
-
-def shift_release(*_):
-    global shifted
-    shifted = False
 
 def sample_release(i):
     s = sample.current_samples()[i]
@@ -197,7 +191,6 @@ def make_handler(handler, x):
         handler(x, *args)
     return f
 
-# todo dict of handlers, ie move everything into press and release
 press = {
     K_TS_UP: sample.increase_ts_time,
     K_TS_DOWN: sample.decrease_ts_time,
@@ -212,16 +205,15 @@ press = {
     K_GATE_FOLLOW: gate_follow_press,
     K_SHIFT: shift_press,
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_press, i) for i in range(len(SAMPLE_KEYS))])),
-    **dict([(sr_key, make_handler(step_repeat_press, length)) for sr_key, length in SR_KEYS.items()])
+    **{sr_key: make_handler(step_repeat_press, length) for sr_key, length in SR_KEYS.items()}
 }
 
 release = {
     K_HT: ht_release,
     K_QT: qt_release,
     K_PITCH: pitch_release,
-    K_SHIFT: shift_release,
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_release, i) for i in range(len(SAMPLE_KEYS))])),
-    **dict([(sr_key, make_handler(step_repeat_release, length)) for sr_key, length in SR_KEYS.items()])
+    **{sr_key: make_handler(step_repeat_release, length) for sr_key, length in SR_KEYS.items()}
 }
 
 def key_pressed(e):
