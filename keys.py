@@ -92,9 +92,8 @@ def sample_press(i, is_repeat):
 
     if key_held[K_GATE_FOLLOW] and prev_selected and prev_selected != selected_sample:
         logger.info(f"set {prev_selected.name} to invert gates of {selected_sample.name}")
-        selected_sample.gate_follower = prev_selected
-        prev_selected.gate_leader = selected_sample
-
+        selected_sample.gate_mirror = prev_selected
+        prev_selected.gate_mirror = selected_sample
 
     if not sequence.is_started:
         sequence.start_internal()
@@ -167,32 +166,31 @@ def gate_follow_press(*_):
     if selected_sample is None:
         return
     if key_held[K_SHIFT]:
-        if selected_sample.gate_leader:
-            selected_sample.gate_leader.gate_follower = None
-            selected_sample.gate_leader = None
-        if selected_sample.gate_follower:
-            selected_sample.gate_follower.gate_leader = None
-            selected_sample.gate_follower = None
+        if mirror := selected_sample.gate_mirror:
+            selected_sample.gate_mirror = None
+            mirror.gate_mirror = None
+            selected_sample.default_gates()
+            mirror.default_gates()
 
 def ht_press(is_repeat):
     if selected_sample is None or is_repeat:
         return
-    selected_sample.rate *= 0.5
+    selected_sample.halftime = True
 
 def qt_press(is_repeat):
     if selected_sample is None or is_repeat:
         return
-    selected_sample.rate *= 0.25
+    selected_sample.quartertime = True
 
 def ht_release(*_):
     if selected_sample is None:
         return
-    selected_sample.rate *= 2
+    selected_sample.halftime = False
 
 def qt_release(*_):
     if selected_sample is None:
         return
-    selected_sample.rate *= 4
+    selected_sample.quartertime = False
 
 def make_handler(handler, x):
     def f(*args):

@@ -35,19 +35,19 @@ CLOSED: [2023-05-11 Thu 15:48]
 *** for volume, pitch, patterns, prob..
 
 
-
-
-
-
- File "/home/drum/breakbox/break.py", line 32, in on_key
-Jun 06 01:35:59 breakbox python3.11[2044]:     keys.key_pressed(e)
-Jun 06 01:35:59 breakbox python3.11[2044]:   File "/home/drum/breakbox/keys.py", line 114, in key_pressed
-Jun 06 01:35:59 breakbox python3.11[2044]:     sample.current_samples()[i].toggle_mute()
-Jun 06 01:35:59 breakbox python3.11[2044]:     ~~~~~~~~~~~~~~~~~~~~~~~~^^^
-Jun 06 01:35:59 breakbox python3.11[2044]: IndexError: list index out of range
-
-
-
+* pride preppers
+** fix step repeat for shorter samples
+** pitch mod buttons
+** combinations of step repeat keys
+** stop fx button (shift + stop)
+** shift to hold fx
+** effect btns as momentary unmutes
+** lower than halftime still halftime
+** spice n dice
+** DONE fix slower
+CLOSED: [2023-06-11 Sun 07:58]
+** normalize volumes, remove click etc
+** instead of invert gates, scramble?
 * stuff
 ** preserve original slice sample thru timestretching
 ** param dna

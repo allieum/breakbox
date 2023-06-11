@@ -95,15 +95,14 @@ class Sample:
         self.sound_queue = deque()
         self.muted = True
         self.halftime = False
+        self.quartertime = False
         self.bpm = bpm
         self.load(file)
         self.last_printed = 0
         self.pitch = modulation.Param(0)
-        self.rate = 1.0
         self.gate = modulation.Param(1.0)
         self.gate_period = modulation.Param(1)
-        self.gate_leader = None
-        self.gate_follower = None
+        self.gate_mirror = None
         self.gates = [1] * len(self.sound_slices)
         self.gate_count = 0
         self.cache = {
@@ -153,6 +152,14 @@ class Sample:
             return -gate
         return [invert(g) for g in self.gates]
 
+    def get_rate(self) -> float:
+        rate = 1.0
+        if self.halftime:
+            rate *= 0.5
+        if self.quartertime:
+            rate *= 0.25
+        return rate
+
     def gate_increase(self):
         if self.gate.value == 1:
             return
@@ -175,6 +182,11 @@ class Sample:
         self.gate_period.value -= 1
         self.update_gates()
 
+    def default_gates(self):
+        self.gate_period.value = 1
+        self.gate.value = 1
+        self.update_gates()
+
     def update_gates(self):
         gates = [0] * len(self.gates)
         step_length = self.sound_slices[0].get_length()
@@ -187,8 +199,8 @@ class Sample:
         for i in range(0, len(gates), period):
             gates[i:i + 1 + whole_steps] = [1] * whole_steps + [step_gate]
         self.gates = gates
-        if self.gate_follower:
-            self.gate_follower.gates = self.invert_gates()
+        if self.gate_mirror:
+            self.gate_mirror.gates = self.invert_gates()
 
     def transform_slices(self, f):
         for i in range(len(self.sound_slices)):
@@ -407,7 +419,7 @@ class Sample:
         pygame.mixer.set_reserved(n)
 
     def queue_step(self, step, t, step_interval):
-        srlength = self.step_repeat_length * 2 if self.rate != 1 else self.step_repeat_length
+        srlength = self.step_repeat_length * 2 if self.get_rate() != 1 else self.step_repeat_length
         if self.step_repeat and step in range(self.step_repeat_index % srlength, len(self.sound_slices), srlength):
             self.step_repeating = True
             # self.mute()
@@ -416,9 +428,9 @@ class Sample:
             for i, s in enumerate(slices):
                 ts =  t + i * step_interval
                 slice_step = step + i
-                if self.rate != 1:
+                if self.get_rate() != 1:
                     ts = t + i * step_interval * 2
-                    self.queue_async(lambda: timestretch(s, self.rate, stretch_fade), ts, slice_step)
+                    self.queue_async(lambda: timestretch(s, self.get_rate(), stretch_fade), ts, slice_step)
                     logger.debug(f"queueing {s}")
                 elif (p := self.pitch.get(step + i)) != 0:
                     self.queue_async(lambda: self.change_pitch(self.step_repeat_index + i, s, p), ts, slice_step)
@@ -427,11 +439,11 @@ class Sample:
         if not self.step_repeating:
             if not self.is_muted() or self.looping:
                 sound = self.sound_slices[step % len(self.sound_slices)]
-                if self.rate != 1:
+                if self.get_rate() != 1:
                     if step % 2 != 0:
                         return
                     sound = self.sound_slices[(step // 2) % len(self.sound_slices)]
-                    self.queue_async(lambda: timestretch(sound, self.rate, stretch_fade), t, step)
+                    self.queue_async(lambda: timestretch(sound, self.get_rate(), stretch_fade), t, step)
                 elif (p := self.pitch.get(step)) != 0:
                     logger.debug(f"{self.name} setting pitch to {p}")
                     self.queue_async(lambda: self.change_pitch(step, sound, p), t, step)
