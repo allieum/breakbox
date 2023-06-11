@@ -81,7 +81,7 @@ def update_dmx(step):
     blink.Light.scale(0.8)
     for i, s in enumerate(sample.current_samples()):
         if s.channel and s.channel.get_busy():
-            source_step = sample.sound_data[s.channel.get_sound()].step
+            source_step = sample.sound_data[s.channel.get_sound()].source_step
             if source_step != sequence.step:
                 logger.debug(f"source step {source_step}")
             color[i] = 255

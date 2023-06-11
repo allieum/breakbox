@@ -9,14 +9,9 @@ logger = utility.get_logger(__name__)
 
 K_STOP = 'delete'
 K_NEXT_BANK = '#'
-K_RESET = 'tab'
+# K_RESET = 'tab'
 K_SHIFT = 'shift'
 
-# halftime (0.5 timestretch)
-K_HT = 'enter'
-K_HT_UP = 'ctrl'
-K_HT_DOWN = 'space'
-K_PITCH = 'alt'
 
 # step repeat
 K_SR8 = 'x'
@@ -33,6 +28,18 @@ SR_KEYS = {
 K_GATE_UP = '5'
 K_GATE_DOWN = 't'
 
+K_GATE_PERIOD_UP = '4'
+K_GATE_PERIOD_DOWN = 'r'
+
+K_GATE_FOLLOW = '3'
+K_GATE_INVERT = 'e'
+
+# halftime (0.5 timestretch) / quartertime
+K_QT = '2'
+K_HT = 'w'
+K_HT_UP = 'ctrl'
+K_HT_DOWN = 'space'
+K_PITCH = 'alt'
 
 dactyl_keys =[
     ['esc',   '1', '2',   '3',   '4', '5'],
@@ -41,8 +48,8 @@ dactyl_keys =[
     ['shift', 'z', 'x',   'c',   'v', 'b'],
                   ['tab', K_NEXT_BANK],
                                  [K_STOP,     'shift'],
-                                 [K_HT_DOWN,  K_HT_UP],
-                                 [K_HT,    K_PITCH],
+                                 ['space',  'ctrl'],
+                                 ['enter',    'alt'],
 ]
 
 # LOOP_KEYS = dactyl_keys[0]
@@ -70,16 +77,27 @@ def pitch_release(*_):
 
 def sample_press(i, is_repeat):
     global selected_sample
+    prev_selected = selected_sample
     selected_sample = sample.current_samples()[i]
 
     if is_repeat:
         return
 
-    if not sequence.is_started:
-        sequence.start_internal()
-
     if key_held[K_SHIFT]:
         selected_sample.looping = not selected_sample.looping
+        logger.info(f"{selected_sample.name} looping set to {selected_sample.looping}")
+    elif selected_sample.looping:
+        selected_sample.looping = False
+        logger.info(f"{selected_sample.name} looping set to {selected_sample.looping}")
+
+    if key_held[K_GATE_FOLLOW] and prev_selected and prev_selected != selected_sample:
+        logger.info(f"set {prev_selected.name} to invert gates of {selected_sample.name}")
+        selected_sample.gate_follower = prev_selected
+        prev_selected.gate_leader = selected_sample
+
+
+    if not sequence.is_started:
+        sequence.start_internal()
 
     selected_sample.unmute()
 
@@ -88,6 +106,16 @@ def sample_press(i, is_repeat):
             selected_sample.step_repeat_start(sequence.step, length)
     if key_held[(K_HT)]:
         selected_sample.halftime = True
+
+def shift_press(*_):
+    global shifted
+    for s in [sample.current_samples()[i] for i,k in enumerate(SAMPLE_KEYS) if key_held[k]]:
+        s.looping = not s.looping
+        logger.info(f"{s.name} set looping to {s.looping}")
+
+def shift_release(*_):
+    global shifted
+    shifted = False
 
 def sample_release(i):
     s = sample.current_samples()[i]
@@ -104,64 +132,108 @@ def step_repeat_press(length, *_):
 def step_repeat_release(length):
     sample.step_repeat_stop(length)
 
+    # follower set logic
+def gate_period_up_press(*_):
+    if selected_sample is None:
+        return
+    selected_sample.gate_period_increase()
+    logger.info(f"set gate period to {selected_sample.gate_period.value} for {selected_sample.name}")
+
+def gate_period_down_press(*_):
+    if selected_sample is None:
+        return
+    selected_sample.gate_period_decrease()
+    logger.info(f"set gate period to {selected_sample.gate_period.value} for {selected_sample.name}")
+
 def gate_up_press(*_):
     if selected_sample is None:
         return
-    if key_held[K_SHIFT]:
-        selected_sample.gate_period_increase()
-        logger.info(f"set gate period to {selected_sample.gate_period.value} for {selected_sample.name}")
-    else:
-        selected_sample.gate_increase()
-        logger.info(f"set gate to {selected_sample.gate.value} for {selected_sample.name}")
+    selected_sample.gate_increase()
+    logger.info(f"set gate to {selected_sample.gate.value} for {selected_sample.name}")
 
 def gate_down_press(*_):
     if selected_sample is None:
         return
+    selected_sample.gate_decrease()
+    logger.info(f"set gate to {selected_sample.gate.value} for {selected_sample.name}")
+
+def gate_invert_press(*_):
+    if selected_sample is None:
+        return
+    selected_sample.gates = selected_sample.invert_gates()
+    logger.info(f"inverted gates for {selected_sample.name}")
+
+def gate_follow_press(*_):
+    if selected_sample is None:
+        return
     if key_held[K_SHIFT]:
-        selected_sample.gate_period_decrease()
-        logger.info(f"set gate period to {selected_sample.gate_period.value} for {selected_sample.name}")
-    else:
-        selected_sample.gate_decrease()
-        logger.info(f"set gate to {selected_sample.gate.value} for {selected_sample.name}")
+        if selected_sample.gate_leader:
+            selected_sample.gate_leader.gate_follower = None
+            selected_sample.gate_leader = None
+        if selected_sample.gate_follower:
+            selected_sample.gate_follower.gate_leader = None
+            selected_sample.gate_follower = None
+
+def ht_press(is_repeat):
+    if selected_sample is None or is_repeat:
+        return
+    selected_sample.rate *= 0.5
+
+def qt_press(is_repeat):
+    if selected_sample is None or is_repeat:
+        return
+    selected_sample.rate *= 0.25
+
+def ht_release(*_):
+    if selected_sample is None:
+        return
+    selected_sample.rate *= 2
+
+def qt_release(*_):
+    if selected_sample is None:
+        return
+    selected_sample.rate *= 4
 
 def make_handler(handler, x):
     def f(*args):
         handler(x, *args)
     return f
 
-
 # todo dict of handlers, ie move everything into press and release
 press = {
+    K_HT: ht_press,
+    K_QT: qt_press,
     K_PITCH: pitch_press,
     K_GATE_DOWN: gate_down_press,
     K_GATE_UP: gate_up_press,
+    K_GATE_PERIOD_DOWN: gate_period_down_press,
+    K_GATE_PERIOD_UP: gate_period_up_press,
+    K_GATE_INVERT: gate_invert_press,
+    K_GATE_FOLLOW: gate_follow_press,
+    K_SHIFT: shift_press,
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_press, i) for i in range(len(SAMPLE_KEYS))])),
     **dict([(sr_key, make_handler(step_repeat_press, length)) for sr_key, length in SR_KEYS.items()])
 }
 
 release = {
+    K_HT: ht_release,
+    K_QT: qt_release,
     K_PITCH: pitch_release,
+    K_SHIFT: shift_release,
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_release, i) for i in range(len(SAMPLE_KEYS))])),
     **dict([(sr_key, make_handler(step_repeat_release, length)) for sr_key, length in SR_KEYS.items()])
 }
 
 def key_pressed(e):
-    logger.debug(f"start press handler for {e}")
+    logger.debug(f"start press handler for {e.name}")
 
     if e.name in press:
         press[e.name](key_held[e.name])
-        key_held[e.name] = True
-        return
 
     if key_held[(e.name)]:
         logger.debug(f"{e} already active, doing nothing")
         return
-
-    if e.name == K_HT:
-        key_held[K_HT] = True
-        for i, key in enumerate(SAMPLE_KEYS):
-            if key_held[(key)]:
-                sample.current_samples()[i].halftime = True
+    key_held[e.name] = True
 
     if e.name == K_HT_UP:
         sample.increase_ts_time()
@@ -203,9 +275,9 @@ def key_pressed(e):
     #
     # freeze key by press down when hold pressed, or press hold when key pressed
 
-    if e.name == K_RESET:
-        logger.warn(f"Reset key pressed, restarting program")
-        utility.restart_program()
+    # if e.name == K_RESET:
+    #     logger.warn(f"Reset key pressed, restarting program")
+    #     utility.restart_program()
 
     logger.debug(f"finish press handler for {e}")
 
