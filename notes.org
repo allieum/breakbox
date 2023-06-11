@@ -36,7 +36,10 @@ CLOSED: [2023-05-11 Thu 15:48]
 
 
 * pride preppers
-** fix step repeat for shorter samples
+** release step repeat key -> others should remain active
+** sample flipping!!
+** DONE fix step repeat for shorter samples
+CLOSED: [2023-06-11 Sun 08:30]
 ** pitch mod buttons
 ** combinations of step repeat keys
 ** stop fx button (shift + stop)
@@ -48,6 +51,7 @@ CLOSED: [2023-05-11 Thu 15:48]
 CLOSED: [2023-06-11 Sun 07:58]
 ** normalize volumes, remove click etc
 ** instead of invert gates, scramble?
+*
 * stuff
 ** preserve original slice sample thru timestretching
 ** param dna

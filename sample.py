@@ -79,7 +79,7 @@ channels = set()
 
 class Sample:
     MAX_VOLUME = 1
-    num_slices = 32
+    loop_slices = 32
     timeout = 0.005
     lookahead = 0.001
     audio_executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
@@ -105,14 +105,14 @@ class Sample:
         self.gate_mirror = None
         self.gates = [1] * len(self.sound_slices)
         self.gate_count = 0
-        self.cache = {
-            'pitch': {
-                **dict.fromkeys(range(self.num_slices), {})
-            },
-            'halftime': {
-                **dict.fromkeys(range(self.num_slices), {})
-            }
-        }
+        # self.cache = {
+        #     'pitch': {
+        #         **dict.fromkeys(range(self.num_slices), {})
+        #     },
+        #     'halftime': {
+        #         **dict.fromkeys(range(self.num_slices), {})
+        #     }
+        # }
 
     def load(self, file):
         logger.debug(f"loading sample {file}")
@@ -419,17 +419,17 @@ class Sample:
         pygame.mixer.set_reserved(n)
 
     def queue_step(self, step, t, step_interval):
-        srlength = self.step_repeat_length * 2 if self.get_rate() != 1 else self.step_repeat_length
-        if self.step_repeat and step in range(self.step_repeat_index % srlength, len(self.sound_slices), srlength):
+        srlength = round(self.step_repeat_length / self.get_rate())
+        if self.step_repeat and step in range(self.step_repeat_index % srlength, self.loop_slices, srlength):
             self.step_repeating = True
             # self.mute()
             self.sound_queue.clear()
             slices = self.sound_slices[self.step_repeat_index: self.step_repeat_index + self.step_repeat_length]
+            logger.info(f"{self.name} has {len(slices)} step repeat slices for sr length {self.step_repeat_length}, index {self.step_repeat_index}")
             for i, s in enumerate(slices):
-                ts =  t + i * step_interval
+                ts =  t + i * step_interval / self.get_rate()
                 slice_step = step + i
                 if self.get_rate() != 1:
-                    ts = t + i * step_interval * 2
                     self.queue_async(lambda: timestretch(s, self.get_rate(), stretch_fade), ts, slice_step)
                     logger.debug(f"queueing {s}")
                 elif (p := self.pitch.get(step + i)) != 0:
@@ -440,9 +440,10 @@ class Sample:
             if not self.is_muted() or self.looping:
                 sound = self.sound_slices[step % len(self.sound_slices)]
                 if self.get_rate() != 1:
-                    if step % 2 != 0:
+                    steps_per_slice = round(1 / self.get_rate())
+                    if step % steps_per_slice != 0:
                         return
-                    sound = self.sound_slices[(step // 2) % len(self.sound_slices)]
+                    sound = self.sound_slices[(step // steps_per_slice) % len(self.sound_slices)]
                     self.queue_async(lambda: timestretch(sound, self.get_rate(), stretch_fade), t, step)
                 elif (p := self.pitch.get(step)) != 0:
                     logger.debug(f"{self.name} setting pitch to {p}")
@@ -537,19 +538,15 @@ TS_TIME_DEFAULT = 0.060
 TS_TIME_DELTA = 0.001
 ts_time = TS_TIME_DEFAULT
 stretch_fade = 0.005
-def increase_ts_time():
+def increase_ts_time(*_):
     global ts_time, stretch_fade
-    # ts_time += TS_TIME_DELTA
-    stretch_fade += .001
+    ts_time += TS_TIME_DELTA
 
 
-def decrease_ts_time():
+def decrease_ts_time(*_):
     global ts_time, stretch_fade
     if ts_time > TS_TIME_DELTA:
-        # ts_time -= TS_TIME_DELTA
-        stretch_fade -= .001
-    else:
-        ts_time /= 2
+        ts_time -= TS_TIME_DELTA
 
 def reset_ts_time():
     global ts_time
@@ -598,7 +595,7 @@ def fadeinout(soundbytes, fade_time):
     return soundbytes
 
 def timestretch(sound, rate, fade_time=0.005):
-    logger.info(f"start stretch x{rate} ({fade_time} fade)")
+    logger.info(f"start stretch x{rate} ({fade_time} fade), {ts_time}ms chunks")
     chunk_time = ts_time
     wav = sound.get_raw()
     new_wav = bytearray(make_even(math.ceil(len(wav) / rate)))

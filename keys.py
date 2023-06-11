@@ -37,8 +37,8 @@ K_GATE_INVERT = 'e'
 # halftime (0.5 timestretch) / quartertime
 K_QT = '2'
 K_HT = 'w'
-K_HT_UP = 'ctrl'
-K_HT_DOWN = 'space'
+K_TS_UP = 'ctrl'
+K_TS_DOWN = 'space'
 K_PITCH = 'alt'
 
 dactyl_keys =[
@@ -199,6 +199,8 @@ def make_handler(handler, x):
 
 # todo dict of handlers, ie move everything into press and release
 press = {
+    K_TS_UP: sample.increase_ts_time,
+    K_TS_DOWN: sample.decrease_ts_time,
     K_HT: ht_press,
     K_QT: qt_press,
     K_PITCH: pitch_press,
@@ -233,11 +235,6 @@ def key_pressed(e):
         return
     key_held[e.name] = True
 
-    if e.name == K_HT_UP:
-        sample.increase_ts_time()
-
-    if e.name == K_HT_DOWN:
-        sample.decrease_ts_time()
 
     if K_STOP == e.name:
         # cancel held keys
