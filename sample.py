@@ -34,6 +34,7 @@ class SoundData:
     bpm: int
     source_step: int
     step: int
+    semitones: int
     source: Optional['SoundData']
 
     def __init__(self) -> None:
@@ -131,13 +132,15 @@ class Sample:
             sound_data[s].bpm = self.bpm
             sound_data[s].source_step = i
             sound_data[s].source = None
+            sound_data[s].semitones = 0
 
     def step_repeat_start(self, index, length):
         index %= len(self.sound_slices)
         if not self.step_repeat:
             self.step_repeat_was_muted = self.is_muted()
             self.step_repeat_length = length
-            self.step_repeat_index = index - index % length
+            quantized_length = 2 if length == 1 else length
+            self.step_repeat_index = index - index % quantized_length
             self.step_repeat = True
             # print(f"starting step repeat at {self.step_repeat_index} with length {length}")
         elif length != self.step_repeat_length:
@@ -214,9 +217,10 @@ class Sample:
         self.sound_slices[i] = f(self.sound_slices[i])
 
     def set_and_queue_slice(self, i, t, sound_generator):
-        self.sound_slices[i] = sound_generator()
-        self.queue(self.sound_slices[i], t, i)
-        return self.sound_slices[i]
+        self.sound_slices[i % len(self.sound_slices)] = sound_generator()
+        slicey = self.sound_slices[i % len(self.sound_slices)]
+        self.queue(slicey, t, i)
+        return slicey
 
     def swap_channel(self, other):
         self.channel, other.channel = other.channel, self.channel
@@ -271,7 +275,6 @@ class Sample:
             sound.set_volume(1.0)
         else:
             sound.set_volume(0)
-        self.gate_count = (self.gate_count + 1) % self.gate_period.get(step)
         self.sound_queue.append((sound, t, step))
         # if prev_t and prev_t > t:
         #     logger.error(f"{self.name} saw out of order sound queue")
@@ -424,10 +427,10 @@ class Sample:
                 ts =  t + i * step_interval / self.get_rate()
                 slice_step = step + i
                 if self.get_rate() != 1:
-                    stretch = functools.partial(timestretch, self.get_rate(), stretch_fade)
+                    stretch = functools.partial(timestretch, s, self.get_rate(), stretch_fade)
                     self.queue_async(stretch, ts, slice_step)
                     logger.debug(f"queueing {s}")
-                elif (p := self.pitch.get(step + i)) != 0:
+                elif (p := self.pitch.get(step + i)) != sound_data[s].semitones:
                     shift = functools.partial(self.change_pitch, self.step_repeat_index + i, s, p)
                     self.queue_async(shift, ts, slice_step)
                 else:
@@ -441,26 +444,28 @@ class Sample:
                         return
                     sound = self.sound_slices[(step // steps_per_slice) % len(self.sound_slices)]
                     self.queue_async(lambda: timestretch(sound, self.get_rate(), stretch_fade), t, step)
-                elif (p := self.pitch.get(step)) != 0:
+                elif (p := self.pitch.get(step)) != sound_data[sound].semitones:
                     logger.debug(f"{self.name} setting pitch to {p}")
-                    self.queue_async(lambda: self.change_pitch(step, sound, p), t, step)
+                    self.queue_and_replace_async(lambda: self.change_pitch(step, self.source_sound(sound), p), t, step)
                 else:
                     if (sound_bpm := sound_data[sound].bpm) != self.bpm:
                         logger.info(f"{self.name} step {step} stretching sample from {sound_bpm} to {self.bpm}")
-                        future = self.queue_and_replace_async(lambda: timestretch(sound, self.bpm / sound_bpm), t, step)
+                        future = self.queue_and_replace_async(lambda: timestretch(self.source_sound(sound), self.bpm / sound_bpm), t, step)
                         future.add_done_callback(lambda f: set_sound_bpm(f.result(), self.bpm))
                     else:
                         self.queue(sound, t, step)
 
+    @staticmethod
+    def source_sound(sound):
+        if sound not in sound_data or sound_data[sound].source == None:
+            return sound
+        return Sample.source_sound(sound_data[sound].source)
+
     def change_pitch(self, step, sound, semitones):
         logger.info(f"{self.name}: step {step} by {semitones} semitones")
-        # if semitones in (cache := self.cache['pitch'][sound]):
-        #     logger.info(f"{self.name}: got from cache step {step} by {semitones} semitones")
-        #     return cache[semitones]
         pitched_sound = pitch_shift(sound, semitones)
-        # cache[semitones] = pitched_sound
-        logger.info(f"{self.name}: caching step {step} by {semitones} semitones")
-        # logger.info(f"cache {cache}")
+        sound_data[pitched_sound].bpm = sound_data[sound].bpm
+        sound_data[pitched_sound].semitones = semitones
         return pitched_sound
 
     def pitch_mod(self):
@@ -471,7 +476,7 @@ class Sample:
         # self.pitch.lfo = None
 
     @staticmethod
-    def modulate(param, period, shape, amount, steps):
+    def modulate(param, period, shape, amount, steps=None):
         lfo = modulation.Lfo(period, shape)
         param.modulate(lfo, amount, steps)
 

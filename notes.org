@@ -1,5 +1,39 @@
 #+title: Notes
 
+* pride preppers
+** DONE lower than halftime still halftime
+CLOSED: [2023-06-11 Sun 10:51]
+** DONE fix step repeat for shorter samples
+CLOSED: [2023-06-11 Sun 08:30]
+** DONE fix slower
+CLOSED: [2023-06-11 Sun 07:58]
+** DONE pitch mod buttons
+CLOSED: [2023-06-11 Sun 17:40]
+** DONE quantize
+CLOSED: [2023-06-11 Sun 17:54]
+** DONE dont daisy chain samples into fx chain casualties
+CLOSED: [2023-06-11 Sun 17:54]
+** DONE pitch mod persistence
+CLOSED: [2023-06-11 Sun 17:55]
+** bugs where selected sample changes before key release handler
+** shift to hold fx
+** stop fx button (shift + stop)
+** gate period powers of 2
+** for gate mirror use presets
+** restrict input range of gate time
+** release step repeat key -> others should remain active
+** effect btns as momentary unmutes
+** instead of invert gates, scramble?
+*
+
+
+
+
+** spice n dice
+** normalize volumes, remove click etc
+** combinations of step repeat keys
+** sample flipping!!
+** error about float / generate sound?
 * MVP
 ** DONE stop audio on start / stop
 CLOSED: [2023-04-28 Fri 15:24]
@@ -35,23 +69,6 @@ CLOSED: [2023-05-11 Thu 15:48]
 *** for volume, pitch, patterns, prob..
 
 
-* pride preppers
-** release step repeat key -> others should remain active
-** sample flipping!!
-** DONE fix step repeat for shorter samples
-CLOSED: [2023-06-11 Sun 08:30]
-** pitch mod buttons
-** combinations of step repeat keys
-** stop fx button (shift + stop)
-** shift to hold fx
-** effect btns as momentary unmutes
-** lower than halftime still halftime
-** spice n dice
-** DONE fix slower
-CLOSED: [2023-06-11 Sun 07:58]
-** normalize volumes, remove click etc
-** instead of invert gates, scramble?
-*
 * stuff
 ** preserve original slice sample thru timestretching
 ** param dna
@@ -116,3 +133,37 @@ CLOSED: [2023-04-28 Fri 06:51]
 **        23  51      119  50
 **                     65  37
 **                     36  64
+
+
+
+* stack tracers
+1[17664]: 2023-06-11 20:34:18,750 - sample - INFO MainThread:queue_step: 143-2bar-000.bak.wav has 1 step repeat slices for sr length 1, index 8
+Jun 11 20:34:18 breakbox python3.11[17664]: 2023-06-11 20:34:18,751 - sample - INFO ThreadPoolExecutor-0_1:timestretch: start stretch x0.005 (0.005 fade), 0.06ms chunks
+Jun 11 20:34:18 breakbox python3.11[17664]: 2023-06-11 20:34:18,751 - concurrent.futures - ERROR ThreadPoolExecutor-0_1:_invoke_callbacks: exception calling callback for <Future at 0x715df2f0 state=finished raised AttributeError>
+Jun 11 20:34:18 breakbox python3.11[17664]: Traceback (most recent call last):
+Jun 11 20:34:18 breakbox python3.11[17664]:   File "/usr/local/lib/python3.11/concurrent/futures/_base.py", line 340, in _invoke_callbacks
+Jun 11 20:34:18 breakbox python3.11[17664]:     callback(self)
+Jun 11 20:34:18 breakbox python3.11[17664]:   File "/home/drum/breakbox/sample.py", line 483, in future_done
+Jun 11 20:34:18 breakbox python3.11[17664]:     raise e
+Jun 11 20:34:18 breakbox python3.11[17664]:   File "/usr/local/lib/python3.11/concurrent/futures/thread.py", line 58, in run
+Jun 11 20:34:18 breakbox python3.11[17664]:     result = self.fn(*self.args, **self.kwargs)
+Jun 11 20:34:18 breakbox python3.11[17664]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Jun 11 20:34:18 breakbox python3.11[17664]:   File "/home/drum/breakbox/sample.py", line 282, in <lambda>
+Jun 11 20:34:18 breakbox python3.11[17664]:     future = self.audio_executor.submit(lambda: self.queue(generate_sound(), t, step))
+Jun 11 20:34:18 breakbox python3.11[17664]:                                                            ^^^^^^^^^^^^^^^^
+Jun 11 20:34:18 breakbox python3.11[17664]:   File "/home/drum/breakbox/sample.py", line 587, in timestretch
+Jun 11 20:34:18 breakbox python3.11[17664]:     wav = sound.get_raw()
+Jun 11 20:34:18 breakbox python3.11[17664]:           ^^^^^^^^^^^^^
+Jun 11 20:34:18 breakbox python3.11[17664]: AttributeError: 'float' object has no attribute 'get_raw'
+
+Jun 11 21:00:46 breakbox python3.11[17807]: Traceback (most recent call last):
+Jun 11 21:00:46 breakbox python3.11[17807]:   File "/home/drum/breakbox/break.py", line 98, in <module>
+Jun 11 21:00:46 breakbox python3.11[17807]:     sequence.update(midi.get_status())
+Jun 11 21:00:46 breakbox python3.11[17807]:   File "/home/drum/breakbox/sequence.py", line 124, in update
+Jun 11 21:00:46 breakbox python3.11[17807]:     sample.queue_samples(i, t, self.step_duration())
+Jun 11 21:00:46 breakbox python3.11[17807]:   File "/home/drum/breakbox/sample.py", line 516, in queue_samples
+Jun 11 21:00:46 breakbox python3.11[17807]:     sample.queue_step(step, t, step_duration)
+Jun 11 21:00:46 breakbox python3.11[17807]:   File "/home/drum/breakbox/sample.py", line 448, in queue_step
+Jun 11 21:00:46 breakbox python3.11[17807]:     if (sound_bpm := sound_data[sound].bpm) != self.bpm:
+Jun 11 21:00:46 breakbox python3.11[17807]:                      ^^^^^^^^^^^^^^^^^^^^^
+Jun 11 21:00:46 breakbox python3.11[17807]: AttributeError: 'SoundData' object has no attribute 'bpm'

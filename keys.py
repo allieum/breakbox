@@ -2,6 +2,7 @@ from collections import defaultdict
 
 import sample
 from sequence import sequence
+from modulation import Lfo
 import utility
 
 logger = utility.get_logger(__name__)
@@ -30,15 +31,16 @@ K_GATE_DOWN = 't'
 K_GATE_PERIOD_UP = '4'
 K_GATE_PERIOD_DOWN = 'r'
 
-K_GATE_FOLLOW = '3'
-K_GATE_INVERT = 'e'
+K_GATE_FOLLOW = 'esc'
+K_GATE_INVERT = '`'
 
 # halftime (0.5 timestretch) / quartertime
 K_QT = '2'
 K_HT = 'w'
 K_TS_UP = 'ctrl'
 K_TS_DOWN = 'space'
-K_PITCH = 'alt'
+K_PITCH_UP = '3'
+K_PITCH_DOWN = 'e'
 
 dactyl_keys =[
     ['esc',   '1', '2',   '3',   '4', '5'],
@@ -58,21 +60,51 @@ SAMPLE_KEYS = dactyl_keys[2]
 selected_sample = None
 
 key_held = defaultdict(bool)
-# key_frozen = defaultdict(bool)
 
 def get_activated_samples():
     return [sample.current_samples()[i] for i, k in enumerate(SAMPLE_KEYS) if key_held[(k)]]
 
-def pitch_press(*_):
-    for s in get_activated_samples():
-        logger.info(f"activate pitch mod for {s.name}")
-        s.pitch_mod()
+def pitch_up_press(is_repeat):
+    if selected_sample is None or is_repeat:
+        return
+    # selected_sample.modulate(selected_sample.pitch, 24, Lfo.Shape.SAW, 1)
+    pitch_up_mod(selected_sample)
+    step_repeat_press(1)
 
-def pitch_release(*_):
-    for s in sample.current_samples():
-        if s.pitch.lfo is not None:
-            logger.info(f"deactivate pitch mod for {s.name}")
-            # s.cancel_pitch_mod()
+def pitch_down_mod(s: sample.Sample):
+    logger.info(f"{s.name} pitch down activated")
+    s.modulate(s.pitch, 1, Lfo.Shape.DEC, 1)
+
+def pitch_up_mod(s):
+    logger.info(f"{s.name} pitch up activated")
+    s.modulate(s.pitch, 1, Lfo.Shape.INC, 1)
+
+def pitch_down_press(is_repeat):
+    if selected_sample is None or is_repeat:
+        return
+    # selected_sample.modulate(selected_sample.pitch, 24, Lfo.Shape.SAW_DESC, 1)
+    pitch_down_mod(selected_sample)
+    step_repeat_press(1)
+
+def pitch_up_release(*_):
+    if selected_sample is None:
+        return
+    if key_held[K_PITCH_DOWN]:
+        pitch_down_mod(selected_sample)
+    else:
+        if selected_sample.pitch.lfo:
+            selected_sample.pitch.lfo.enabled = False
+        step_repeat_release(1)
+
+def pitch_down_release(*_):
+    if selected_sample is None:
+        return
+    if key_held[K_PITCH_UP]:
+        pitch_up_mod(selected_sample)
+    else:
+        if selected_sample.pitch.lfo:
+            selected_sample.pitch.lfo.enabled = False
+        step_repeat_release(1)
 
 def sample_press(i, is_repeat):
     global selected_sample
@@ -196,7 +228,8 @@ press = {
     K_TS_DOWN: sample.decrease_ts_time,
     K_HT: ht_press,
     K_QT: qt_press,
-    K_PITCH: pitch_press,
+    K_PITCH_UP: pitch_up_press,
+    K_PITCH_DOWN: pitch_down_press,
     K_GATE_DOWN: gate_down_press,
     K_GATE_UP: gate_up_press,
     K_GATE_PERIOD_DOWN: gate_period_down_press,
@@ -211,7 +244,8 @@ press = {
 release = {
     K_HT: ht_release,
     K_QT: qt_release,
-    K_PITCH: pitch_release,
+    K_PITCH_UP: pitch_up_release,
+    K_PITCH_DOWN: pitch_down_release,
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_release, i) for i in range(len(SAMPLE_KEYS))])),
     **{sr_key: make_handler(step_repeat_release, length) for sr_key, length in SR_KEYS.items()}
 }
