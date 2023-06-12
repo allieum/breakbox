@@ -53,23 +53,20 @@ dactyl_keys =[
                                  ['enter',    'alt'],
 ]
 
+class Effect:
+    def __init__(self, cancel):
+        self.cancel = cancel
+
 # LOOP_KEYS = dactyl_keys[0]
 SAMPLE_KEYS = dactyl_keys[2]
 # HOLD_KEYS = dactyl_keys[3]
 
 selected_sample = None
-
+selected_effects = []
 key_held = defaultdict(bool)
 
 def get_activated_samples():
     return [sample.current_samples()[i] for i, k in enumerate(SAMPLE_KEYS) if key_held[(k)]]
-
-def pitch_up_press(is_repeat):
-    if selected_sample is None or is_repeat:
-        return
-    # selected_sample.modulate(selected_sample.pitch, 24, Lfo.Shape.SAW, 1)
-    pitch_up_mod(selected_sample)
-    step_repeat_press(1)
 
 def pitch_down_mod(s: sample.Sample):
     logger.info(f"{s.name} pitch down activated")
@@ -79,12 +76,21 @@ def pitch_up_mod(s):
     logger.info(f"{s.name} pitch up activated")
     s.modulate(s.pitch, 1, Lfo.Shape.INC, 1)
 
+def pitch_up_press(is_repeat):
+    if selected_sample is None or is_repeat:
+        return
+    # selected_sample.modulate(selected_sample.pitch, 24, Lfo.Shape.SAW, 1)
+    pitch_up_mod(selected_sample)
+    step_repeat_press(1)
+    selected_effects.append(Effect(pitch_up_release))
+
 def pitch_down_press(is_repeat):
     if selected_sample is None or is_repeat:
         return
     # selected_sample.modulate(selected_sample.pitch, 24, Lfo.Shape.SAW_DESC, 1)
     pitch_down_mod(selected_sample)
     step_repeat_press(1)
+    selected_effects.append(Effect(pitch_down_release))
 
 def pitch_up_release(*_):
     if selected_sample is None:
@@ -108,7 +114,13 @@ def pitch_down_release(*_):
 
 def sample_press(i, is_repeat):
     global selected_sample
+    logger.info(f"pressed sample key {i} {is_repeat} {selected_sample}")
     prev_selected = selected_sample
+    if selected_sample and sample.current_samples()[i] != selected_sample:
+        logger.info(f"{selected_sample.name} clearing active effects, switch to {sample.current_samples()[i].name}")
+        for effect in selected_effects:
+            effect.cancel()
+        selected_effects.clear()
     selected_sample = sample.current_samples()[i]
 
     if is_repeat:
@@ -134,25 +146,34 @@ def sample_press(i, is_repeat):
     for step_repeat_key, length in SR_KEYS.items():
         if key_held[(step_repeat_key)]:
             selected_sample.step_repeat_start(sequence.step, length)
+            selected_effects.append(Effect(selected_sample.step_repeat_stop))
     if key_held[(K_HT)]:
         selected_sample.halftime = True
+        selected_effects.append(Effect(selected_sample.stop_halftime))
+
+    if key_held[(K_QT)]:
+        selected_sample.quartertime = True
+        selected_effects.append(Effect(selected_sample.stop_quartertime))
+
+def sample_release(i):
+    s = sample.current_samples()[i]
+    if s == selected_sample:
+        selected_effects.clear()
+    if not s.looping:
+        s.mute()
+        # s.step_repeat_stop()
+        # s.halftime = False
 
 def shift_press(*_):
     for s in [sample.current_samples()[i] for i,k in enumerate(SAMPLE_KEYS) if key_held[k]]:
         s.looping = not s.looping
         logger.info(f"{s.name} set looping to {s.looping}")
 
-def sample_release(i):
-    s = sample.current_samples()[i]
-    if not s.looping:
-        s.mute()
-        s.step_repeat_stop()
-        s.halftime = False
-
 def step_repeat_press(length, *_):
     if selected_sample is None:
         return
     selected_sample.step_repeat_start(sequence.step, length)
+    selected_effects.append(Effect(selected_sample.step_repeat_stop))
 
 def step_repeat_release(length):
     sample.step_repeat_stop(length)
@@ -202,11 +223,13 @@ def ht_press(is_repeat):
     if selected_sample is None or is_repeat:
         return
     selected_sample.halftime = True
+    selected_effects.append(Effect(selected_sample.stop_halftime))
 
 def qt_press(is_repeat):
     if selected_sample is None or is_repeat:
         return
     selected_sample.quartertime = True
+    selected_effects.append(Effect(selected_sample.stop_quartertime))
 
 def ht_release(*_):
     if selected_sample is None:

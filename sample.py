@@ -134,6 +134,14 @@ class Sample:
             sound_data[s].source = None
             sound_data[s].semitones = 0
 
+    def stop_halftime(self):
+        logger.info(f"{self.name} halftime stopped")
+        self.halftime = False
+
+    def stop_quartertime(self):
+        logger.info(f"{self.name} quartertime stopped")
+        self.quartertime = False
+
     def step_repeat_start(self, index, length):
         index %= len(self.sound_slices)
         if not self.step_repeat:
