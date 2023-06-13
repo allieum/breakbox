@@ -92,6 +92,7 @@ class Sample:
         self.step_repeat = False    # mode active
         self.step_repeating = False # currently repeating steps
         self.step_repeat_length = 0 # in steps
+        self.step_repeat_lengths = []
         self.step_repeat_index = 0  # which step to repeat
         self.channel = None
         self.sound_queue = deque()
@@ -143,18 +144,33 @@ class Sample:
         self.quartertime = False
 
     def step_repeat_start(self, index, length):
-        index %= len(self.sound_slices)
-        if not self.step_repeat:
-            self.step_repeat_was_muted = self.is_muted()
-            self.step_repeat_length = length
-            quantized_length = 2 if length == 1 else length
-            self.step_repeat_index = index - index % quantized_length
-            self.step_repeat = True
-            # print(f"starting step repeat at {self.step_repeat_index} with length {length}")
-        elif length != self.step_repeat_length:
-            self.step_repeat_length = length
-        else:
+        logger.info(f"starting step repeat at {self.step_repeat_index} with length {length}")
+        if length in self.step_repeat_lengths:
             return
+        index %= len(self.sound_slices)
+        self.step_repeat_was_muted = self.is_muted()
+        self.step_repeat_lengths.append(length)
+        self.update_step_repeat(index)
+        self.step_repeat = True
+
+    def update_step_repeat(self, index):
+        self.step_repeat_length = sum(self.step_repeat_lengths)
+        quantized_length = 2 if self.step_repeat_length == 1 else self.step_repeat_length
+        self.step_repeat_index = index - index % quantized_length
+
+    def step_repeat_stop(self, length):
+        if not self.step_repeat:
+            return
+        if length not in self.step_repeat_lengths:
+            return
+        self.step_repeat_lengths.remove(length)
+        logger.info(f"{self.name} removing {length} from step repeats {self.step_repeat_lengths}")
+        self.step_repeating = False
+        if len(self.step_repeat_lengths) == 0:
+            self.step_repeat = False
+            self.sound_queue.clear()
+        else:
+            self.update_step_repeat(self.step_repeat_index)
 
     def invert_gates(self):
         def invert(gate):
@@ -232,16 +248,6 @@ class Sample:
 
     def swap_channel(self, other):
         self.channel, other.channel = other.channel, self.channel
-
-    def step_repeat_stop(self):
-        if not self.step_repeat:
-            return
-        self.step_repeat = False
-        self.step_repeating = False
-        # if self.channel is not None:
-        #     self.channel.fadeout(15)
-        self.sound_queue.clear()
-        # self.set_mute(self.step_repeat_was_muted)
 
     def mute(self):
         logger.debug(f"{self.name} muted {len(self.sound_queue)}") # self.sound.set_volume(0)
@@ -403,7 +409,6 @@ class Sample:
             _, t = self.sound_queue[i]
             msg += f"{now - t} "
         logger.warn(f"queue contents: {msg}")
-
         return None
 
     def play_step(self, sound_player, sound, step, t):
@@ -429,9 +434,13 @@ class Sample:
             self.step_repeating = True
             # self.mute()
             self.sound_queue.clear()
-            slices = self.sound_slices[self.step_repeat_index: self.step_repeat_index + self.step_repeat_length]
-            logger.info(f"{self.name} has {len(slices)} step repeat slices for sr length {self.step_repeat_length}, index {self.step_repeat_index}")
-            for i, s in enumerate(slices):
+            slices = self.sound_slices[self.step_repeat_index: self.step_repeat_index + max(self.step_repeat_lengths)]
+            subslices = [self.sound_slices[self.step_repeat_index: self.step_repeat_index + length] for length in self.step_repeat_lengths]
+            all_slices = []
+            for subs in subslices:
+                all_slices.extend(subs)
+            logger.info(f"{self.name} has {len(all_slices)} step repeat slices for sr length {self.step_repeat_length}, index {self.step_repeat_index}")
+            for i, s in enumerate(all_slices):
                 ts =  t + i * step_interval / self.get_rate()
                 slice_step = step + i
                 if self.get_rate() != 1:
@@ -530,8 +539,8 @@ def queues_to_string():
     return s
 
 def step_repeat_stop(length):
-    for sample in [s for s in current_samples() if s.step_repeat_length == length]:
-        sample.step_repeat_stop()
+    for sample in [s for s in current_samples() if length in s.step_repeat_lengths]:
+        sample.step_repeat_stop(length)
 
 def stop_halftime():
     for s in current_samples():

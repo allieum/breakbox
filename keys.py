@@ -1,4 +1,5 @@
 from collections import defaultdict
+import functools
 
 import sample
 from sequence import sequence
@@ -122,6 +123,7 @@ def pitch_down_press(*_):
     return (Effect(pitch_down_release))
 
 def pitch_up_release(*_):
+    # todo cancel & gretel
     if key_held[K_PITCH_DOWN]:
         pitch_down_mod(selected_sample)
     else:
@@ -213,10 +215,11 @@ def shift_press(*_):
 
 def step_repeat_press(length, *_):
     selected_sample.step_repeat_start(sequence.step, length)
-    return (Effect(selected_sample.step_repeat_stop))
+    return (Effect(functools.partial(selected_sample.step_repeat_stop, length)))
 
 def step_repeat_release(length):
-    sample.step_repeat_stop(length)
+    logger.info(f"releasing {length}")
+    selected_sample.step_repeat_stop(length)
 
 def gate_period_up_press(*_):
     if selected_sample is None:
