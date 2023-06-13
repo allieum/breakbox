@@ -652,6 +652,7 @@ def change_rate(sound, rate):
     return new_sound
 
 def pitch_shift(sound, semitones):
+    start = time.time()
     if semitones == 0:
         return sound
     ratio = 1.05946 # 12th root of 2
@@ -660,8 +661,11 @@ def pitch_shift(sound, semitones):
 
     fade_time = 0.002
     if semitones > 0:
-        return timestretch(change_rate(sound, rate), inverse, fade_time)
-    return change_rate(timestretch(sound, inverse, fade_time), rate)
+        new_sound = timestretch(change_rate(sound, rate), inverse, fade_time)
+    else:
+        new_sound = change_rate(timestretch(sound, inverse, fade_time), rate)
+    logger.info(f"shifting by {semitones} semitones took {time.time() - start}s")
+    return new_sound
 
 def stretch_samples(target_bpm):
     for s in samples:

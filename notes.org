@@ -19,24 +19,28 @@ CLOSED: [2023-06-11 Sun 17:55]
 CLOSED: [2023-06-11 Sun 22:15]
 ** DONE shift to hold fx. if shift => persist fx + loop current sample
 CLOSED: [2023-06-12 Mon 12:18]
-** TODO also do shift first then fx btns
-** stop fx button (shift + stop)
-** gate period powers of 2
-** for gate mirror use presets
-** restrict input range of gate time
+** DONE effect btns as momentary unmutes
+CLOSED: [2023-06-12 Mon 14:50]
+** DONE also do shift first then fx btns..er, vice versa
+CLOSED: [2023-06-12 Mon 17:54]
+** combinations of step repeat keys
+** spice n dice
+** import directory structure
+** TODO bounds for lfo / pitch shift
+:PROPERTIES:
+:CREATED:  [Y-06-12 Mon 16:%]
+:ID:       280e64bc-88c8-4cad-ad39-4f9de9116e4c
+:END:
 ** release step repeat key -> others should remain active
-** effect btns as momentary unmutes
+** gate period powers of 2
+** restrict input range of gate time
+** stop fx button (shift + stop)
+** for gate mirror use presets
 ** instead of invert gates, scramble?
 *
 
-
-
-** spice n dice
-** import directory structure
 ** normalize volumes, remove click etc
-** combinations of step repeat keys
 ** sample flipping!!
-** error about float / generate sound?
 * MVP
 ** DONE stop audio on start / stop
 CLOSED: [2023-04-28 Fri 15:24]

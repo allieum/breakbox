@@ -79,29 +79,33 @@ def pitch_up_mod(s):
     s.modulate(s.pitch, 1, Lfo.Shape.INC, 1)
 
 persist_fx_count = 0
-def momentary_fx_press(handler):
+def momentary_fx_press(handler, shift_persist=True):
     def fxpress(is_repeat, *args):
         global persist_fx_count
         if selected_sample is None or is_repeat:
             return
         selected_sample.unmute()
-        if key_held[K_SHIFT]:
+        if persist := shift_persist and key_held[K_SHIFT]:
             logger.info(f"persisting current effect")
             selected_sample.looping = True
             persist_fx_count += 1
-        handler(*args)
+        fx = handler(*args)
+        if not persist:
+            selected_effects.append(fx)
+        else:
+            selected_effects.clear()
     return fxpress
 
-def momentary_fx_release(handler):
+def momentary_fx_release(handler, shift_persist=True):
     def fxrelease(*args):
         global persist_fx_count
         if selected_sample is None:
             return
-        if persist_fx_count > 0:
+        if shift_persist and persist_fx_count > 0:
+            selected_effects.clear()
             logger.info(f"skipping release so effect is persisted")
             persist_fx_count -= 1
             return
-        logger.info(f"{selected_sample.looping}")
         if not selected_sample.looping and not is_pushed(selected_sample):
             selected_sample.mute()
         handler(*args)
@@ -110,12 +114,12 @@ def momentary_fx_release(handler):
 def pitch_up_press(*_):
     pitch_up_mod(selected_sample)
     step_repeat_press(1)
-    selected_effects.append(Effect(pitch_up_release))
+    return (Effect(pitch_up_release))
 
 def pitch_down_press(*_):
     pitch_down_mod(selected_sample)
     step_repeat_press(1)
-    selected_effects.append(Effect(pitch_down_release))
+    return (Effect(pitch_down_release))
 
 def pitch_up_release(*_):
     if key_held[K_PITCH_DOWN]:
@@ -150,15 +154,17 @@ def sample_press(i, is_repeat):
     prev_selected = selected_sample
     if prev_selected and sample.current_samples()[i] != prev_selected:
         logger.info(f"{prev_selected.name} clearing active effects, switch to {sample.current_samples()[i].name}")
+        logger.info(f"{prev_selected.name} looping = {prev_selected.looping}, {selected_effects}")
         for effect in selected_effects:
-            effect.cancel()
+            if effect is not None:
+                effect.cancel()
         selected_effects.clear()
         if not prev_selected.looping and not is_pushed(prev_selected):
             prev_selected.mute()
     selected_sample = sample.current_samples()[i]
 
     if key_held[K_SHIFT]:
-        selected_sample.looping = not selected_sample.looping
+        selected_sample.looping = True
         logger.info(f"{selected_sample.name} looping set to {selected_sample.looping}")
     elif selected_sample.looping:
         selected_sample.looping = False
@@ -177,15 +183,16 @@ def sample_press(i, is_repeat):
     for step_repeat_key, length in SR_KEYS.items():
         if key_held[(step_repeat_key)]:
             selected_sample.step_repeat_start(sequence.step, length)
-            selected_effects.append(Effect(selected_sample.step_repeat_stop))
+            # todo gotta append these direct like
+            return (Effect(selected_sample.step_repeat_stop))
 
     if key_held[(K_HT)]:
         selected_sample.halftime = True
-        selected_effects.append(Effect(selected_sample.stop_halftime))
+        return (Effect(selected_sample.stop_halftime))
 
     if key_held[(K_QT)]:
         selected_sample.quartertime = True
-        selected_effects.append(Effect(selected_sample.stop_quartertime))
+        return (Effect(selected_sample.stop_quartertime))
 
 def sample_release(i):
     s = sample.current_samples()[i]
@@ -195,13 +202,18 @@ def sample_release(i):
         s.mute()
 
 def shift_press(*_):
+    global persist_fx_count
+    fx_keys_pressed = sum([1 for k in FX_KEYS if key_held[k]])
+    persist_fx_count += fx_keys_pressed
+    if persist_fx_count > 0 and selected_sample is not None:
+        selected_sample.looping = True
     for s in [sample.current_samples()[i] for i,k in enumerate(SAMPLE_KEYS) if key_held[k]]:
         s.looping = not s.looping
         logger.info(f"{s.name} set looping to {s.looping}")
 
 def step_repeat_press(length, *_):
     selected_sample.step_repeat_start(sequence.step, length)
-    selected_effects.append(Effect(selected_sample.step_repeat_stop))
+    return (Effect(selected_sample.step_repeat_stop))
 
 def step_repeat_release(length):
     sample.step_repeat_stop(length)
@@ -248,11 +260,11 @@ def gate_follow_press(*_):
 
 def ht_press():
     selected_sample.halftime = True
-    selected_effects.append(Effect(selected_sample.stop_halftime))
+    return (Effect(selected_sample.stop_halftime))
 
 def qt_press():
     selected_sample.quartertime = True
-    selected_effects.append(Effect(selected_sample.stop_quartertime))
+    return (Effect(selected_sample.stop_quartertime))
 
 def ht_release():
     selected_sample.halftime = False
@@ -270,8 +282,8 @@ press = {
     K_TS_DOWN: sample.decrease_ts_time,
     K_HT: momentary_fx_press(ht_press),
     K_QT: momentary_fx_press(qt_press),
-    K_PITCH_UP: momentary_fx_press(pitch_up_press),
-    K_PITCH_DOWN: momentary_fx_press(pitch_down_press),
+    K_PITCH_UP: momentary_fx_press(pitch_up_press, shift_persist=False),
+    K_PITCH_DOWN: momentary_fx_press(pitch_down_press, shift_persist=False),
     K_GATE_DOWN: gate_down_press,
     K_GATE_UP: gate_up_press,
     K_GATE_PERIOD_DOWN: gate_period_down_press,
@@ -286,8 +298,8 @@ press = {
 release = {
     K_HT: momentary_fx_release(ht_release),
     K_QT: momentary_fx_release(qt_release),
-    K_PITCH_UP: momentary_fx_release(pitch_up_release),
-    K_PITCH_DOWN: momentary_fx_release(pitch_down_release),
+    K_PITCH_UP: momentary_fx_release(pitch_up_release, shift_persist=False),
+    K_PITCH_DOWN: momentary_fx_release(pitch_down_release, shift_persist=False),
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_release, i) for i in range(len(SAMPLE_KEYS))])),
     **{sr_key: momentary_fx_release(make_handler(step_repeat_release, length)) for sr_key, length in SR_KEYS.items()}
 }
