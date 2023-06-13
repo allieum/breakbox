@@ -25,7 +25,10 @@ CLOSED: [2023-06-12 Mon 14:50]
 CLOSED: [2023-06-12 Mon 17:54]
 ** DONE combinations of step repeat keys
 CLOSED: [2023-06-13 Tue 00:12]
-** when sample has step repeat held, pressing its key should still unloop the sample
+** DONE release step repeat key -> others should remain active
+CLOSED: [2023-06-13 Tue 07:09]
+** DONE when sample has step repeat held, pressing its key should still unloop the sample
+CLOSED: [2023-06-13 Tue 07:58]
 ** spice n dice
 ** import directory structure
 ** TODO bounds for lfo / pitch shift
@@ -33,7 +36,6 @@ CLOSED: [2023-06-13 Tue 00:12]
 :CREATED:  [Y-06-12 Mon 16:%]
 :ID:       280e64bc-88c8-4cad-ad39-4f9de9116e4c
 :END:
-** release step repeat key -> others should remain active
 ** gate period powers of 2
 ** restrict input range of gate time
 ** stop fx button (shift + stop)

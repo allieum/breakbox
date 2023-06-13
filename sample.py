@@ -430,9 +430,9 @@ class Sample:
 
     def queue_step(self, step, t, step_interval):
         srlength = round(self.step_repeat_length / self.get_rate())
-        if self.step_repeat and step in range(self.step_repeat_index % srlength, self.loop_slices, srlength):
+        do_step_repeat = self.step_repeat and (self.looping or not self.is_muted())
+        if do_step_repeat and step in range(self.step_repeat_index % srlength, self.loop_slices, srlength):
             self.step_repeating = True
-            # self.mute()
             self.sound_queue.clear()
             slices = self.sound_slices[self.step_repeat_index: self.step_repeat_index + max(self.step_repeat_lengths)]
             subslices = [self.sound_slices[self.step_repeat_index: self.step_repeat_index + length] for length in self.step_repeat_lengths]
