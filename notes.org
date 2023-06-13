@@ -23,7 +23,9 @@ CLOSED: [2023-06-12 Mon 12:18]
 CLOSED: [2023-06-12 Mon 14:50]
 ** DONE also do shift first then fx btns..er, vice versa
 CLOSED: [2023-06-12 Mon 17:54]
-** combinations of step repeat keys
+** DONE combinations of step repeat keys
+CLOSED: [2023-06-13 Tue 00:12]
+** when sample has step repeat held, pressing its key should still unloop the sample
 ** spice n dice
 ** import directory structure
 ** TODO bounds for lfo / pitch shift

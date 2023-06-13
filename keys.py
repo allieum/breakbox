@@ -50,11 +50,12 @@ dactyl_keys =[
     ['`',     'q', 'w',   'e',   'r', 't'],
     ['tab',   'a', 's',   'd',   'f', 'g'],
     ['shift', 'z', 'x',   'c',   'v', 'b'],
-                  ['tab', K_NEXT_BANK],
-                                 [K_STOP,     'shift'],
+                  ['tab', '#'],
+                                 ['delete',     'shift'],
                                  ['space',  'ctrl'],
                                  ['enter',    'alt'],
 ]
+RESET_KEYS = ['tab', '#', 'shift']
 
 class Effect:
     def __init__(self, cancel):
@@ -318,6 +319,9 @@ def key_pressed(e):
         return
     key_held[e.name] = True
 
+    if all([key_held[k] for k in RESET_KEYS]):
+        logger.warning("restarting program!!!")
+        utility.restart_program()
 
     if K_STOP == e.name:
         # cancel held keys
