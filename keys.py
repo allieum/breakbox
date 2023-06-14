@@ -32,8 +32,8 @@ K_GATE_DOWN = 't'
 K_GATE_PERIOD_UP = '4'
 K_GATE_PERIOD_DOWN = 'r'
 
-K_GATE_FOLLOW = 'esc'
-K_GATE_INVERT = '`'
+K_DICE_UP = 'esc'
+K_DICE_DOWN = '`'
 
 # halftime (0.5 timestretch) / quartertime
 K_QT = '2'
@@ -43,7 +43,12 @@ K_TS_DOWN = 'space'
 K_PITCH_UP = '3'
 K_PITCH_DOWN = 'e'
 
-FX_KEYS = set((K_QT, K_HT, K_PITCH_DOWN, K_PITCH_UP, *SR_KEYS.keys()))
+K_SPICE_UP = '1'
+K_SPICE_DOWN = 'q'
+
+FX_KEYS = set((
+    K_SPICE_UP, K_SPICE_DOWN, K_QT, K_HT, K_PITCH_DOWN, K_PITCH_UP, *SR_KEYS.keys()
+))
 
 dactyl_keys =[
     ['esc',   '1', '2',   '3',   '4', '5'],
@@ -91,14 +96,14 @@ def momentary_fx_press(handler, shift_persist=True):
             logger.info(f"persisting current effect")
             selected_sample.looping = True
             persist_fx_count += 1
-        fx = handler(*args)
+        fx = handler(selected_sample, *args)
         if not persist:
             selected_effects.append(fx)
         else:
             selected_effects.clear()
     return fxpress
 
-def momentary_fx_release(handler, shift_persist=True):
+def momentary_fx_release(handler = None, shift_persist=True):
     def fxrelease(*args):
         global persist_fx_count
         if selected_sample is None:
@@ -110,35 +115,44 @@ def momentary_fx_release(handler, shift_persist=True):
             return
         if not selected_sample.looping and not is_pushed(selected_sample):
             selected_sample.mute()
-        handler(*args)
+        if handler:
+            handler(selected_sample, *args)
     return fxrelease
 
-def pitch_up_press(*_):
-    pitch_up_mod(selected_sample)
-    step_repeat_press(1)
+def spice_up_press(selected):
+    selected.spice_level.set(selected.spice_level.value + 0.1)
+    logger.info(f"{selected.name} set spice to {selected.spice_level.value}")
+
+def spice_down_press(selected):
+    selected.spice_level.set(selected.spice_level.value - 0.1)
+    logger.info(f"{selected.name} set spice to {selected.spice_level.value}")
+
+def pitch_up_press(selected):
+    pitch_up_mod(selected)
+    step_repeat_press(1, selected)
     return (Effect(pitch_up_release))
 
-def pitch_down_press(*_):
-    pitch_down_mod(selected_sample)
-    step_repeat_press(1)
+def pitch_down_press(selected):
+    pitch_down_mod(selected)
+    step_repeat_press(1, selected)
     return (Effect(pitch_down_release))
 
-def pitch_up_release(*_):
+def pitch_up_release(selected):
     # todo cancel & gretel
     if key_held[K_PITCH_DOWN]:
-        pitch_down_mod(selected_sample)
+        pitch_down_mod(selected)
     else:
-        if selected_sample.pitch.lfo:
-            selected_sample.pitch.lfo.enabled = False
-        step_repeat_release(1)
+        if selected.pitch.lfo:
+            selected.pitch.lfo.enabled = False
+        step_repeat_release(1, selected)
 
-def pitch_down_release(*_):
+def pitch_down_release(selected):
     if key_held[K_PITCH_UP]:
-        pitch_up_mod(selected_sample)
+        pitch_up_mod(selected)
     else:
-        if selected_sample.pitch.lfo:
-            selected_sample.pitch.lfo.enabled = False
-        step_repeat_release(1)
+        if selected.pitch.lfo:
+            selected.pitch.lfo.enabled = False
+        step_repeat_release(1, selected)
 
 def is_pushed(s: sample.Sample):
     try:
@@ -173,10 +187,10 @@ def sample_press(i, is_repeat):
         selected_sample.looping = False
         logger.info(f"{selected_sample.name} looping set to {selected_sample.looping}")
 
-    if key_held[K_GATE_FOLLOW] and prev_selected and prev_selected != selected_sample:
-        logger.info(f"set {prev_selected.name} to invert gates of {selected_sample.name}")
-        selected_sample.gate_mirror = prev_selected
-        prev_selected.gate_mirror = selected_sample
+    # if key_held[K_GATE_FOLLOW] and prev_selected and prev_selected != selected_sample:
+    #     logger.info(f"set {prev_selected.name} to invert gates of {selected_sample.name}")
+    #     selected_sample.gate_mirror = prev_selected
+    #     prev_selected.gate_mirror = selected_sample
 
     if not sequence.is_started:
         sequence.start_internal()
@@ -214,13 +228,13 @@ def shift_press(*_):
         s.looping = not s.looping
         logger.info(f"{s.name} set looping to {s.looping}")
 
-def step_repeat_press(length, *_):
-    selected_sample.step_repeat_start(sequence.step, length)
-    return (Effect(functools.partial(selected_sample.step_repeat_stop, length)))
+def step_repeat_press(length, selected):
+    selected.step_repeat_start(sequence.step, length)
+    return (Effect(functools.partial(selected.step_repeat_stop, length)))
 
-def step_repeat_release(length):
+def step_repeat_release(length, selected):
     logger.info(f"releasing {length}")
-    selected_sample.step_repeat_stop(length)
+    selected.step_repeat_stop(length)
 
 def gate_period_up_press(*_):
     if selected_sample is None:
@@ -262,19 +276,24 @@ def gate_follow_press(*_):
             selected_sample.default_gates()
             mirror.default_gates()
 
-def ht_press():
-    selected_sample.halftime = True
-    return (Effect(selected_sample.stop_halftime))
+def ht_press(selected):
+    selected.halftime = True
+    return (Effect(selected.stop_halftime))
 
-def qt_press():
-    selected_sample.quartertime = True
-    return (Effect(selected_sample.stop_quartertime))
+def qt_press(selected):
+    selected.quartertime = True
+    return (Effect(selected.stop_quartertime))
 
-def ht_release():
-    selected_sample.halftime = False
+def ht_release(selected):
+    selected.halftime = False
 
-def qt_release():
-    selected_sample.quartertime = False
+def qt_release(selected):
+    selected.quartertime = False
+
+def dice_press(repeat):
+    if selected_sample is None or repeat:
+        return
+    selected_sample.dice()
 
 def make_handler(handler, x):
     def f(*args):
@@ -284,6 +303,8 @@ def make_handler(handler, x):
 press = {
     K_TS_UP: sample.increase_ts_time,
     K_TS_DOWN: sample.decrease_ts_time,
+    K_SPICE_UP: momentary_fx_press(spice_up_press, shift_persist=False),
+    K_SPICE_DOWN: momentary_fx_press(spice_down_press, shift_persist=False),
     K_HT: momentary_fx_press(ht_press),
     K_QT: momentary_fx_press(qt_press),
     K_PITCH_UP: momentary_fx_press(pitch_up_press, shift_persist=False),
@@ -292,8 +313,10 @@ press = {
     K_GATE_UP: gate_up_press,
     K_GATE_PERIOD_DOWN: gate_period_down_press,
     K_GATE_PERIOD_UP: gate_period_up_press,
-    K_GATE_INVERT: gate_invert_press,
-    K_GATE_FOLLOW: gate_follow_press,
+    K_DICE_DOWN: dice_press,
+    K_DICE_UP: dice_press,
+    # K_GATE_INVERT: gate_invert_press,
+    # K_GATE_FOLLOW: gate_follow_press,
     K_SHIFT: shift_press,
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_press, i) for i in range(len(SAMPLE_KEYS))])),
     **{sr_key: momentary_fx_press(make_handler(step_repeat_press, length)) for sr_key, length in SR_KEYS.items()}
@@ -302,6 +325,8 @@ press = {
 release = {
     K_HT: momentary_fx_release(ht_release),
     K_QT: momentary_fx_release(qt_release),
+    K_SPICE_UP: momentary_fx_release(),
+    K_SPICE_DOWN: momentary_fx_release(),
     K_PITCH_UP: momentary_fx_release(pitch_up_release, shift_persist=False),
     K_PITCH_DOWN: momentary_fx_release(pitch_down_release, shift_persist=False),
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_release, i) for i in range(len(SAMPLE_KEYS))])),

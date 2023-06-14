@@ -1,6 +1,6 @@
+from dataclasses import dataclass
 from enum import Enum
-
-# import control
+from random import random
 import utility
 
 logger = utility.get_logger(__name__)
@@ -56,6 +56,12 @@ class Param:
         self.last_value = None
         self.min_value = min_value
         self.max_value = max_value
+        self.spice_params: None | SpiceParams = None
+        # self.spiced_param = None
+
+    def spice(self, spice_params):
+        self.spice_params = spice_params
+        return self
 
     def modulate(self, lfo, amount, steps=None):
         logger.info(f"modulating param with {lfo} x {amount}")
@@ -92,7 +98,7 @@ class Param:
             lfo_step = (step - self.start_step) % self.lfo.period
             value += round(self.lfo.value(lfo_step) * self.scale)
             logger.debug(f"LFO {self.lfo} value {value} step {step} lfo_step {lfo_step} start_step {self.start_step}")
-        if self.steps == 0:
+        if self.steps == 0 and self.lfo:
             self.lfo.enabled = False
         if self.lfo and not self.lfo.enabled and self.last_value is not None:
             value = self.last_value
@@ -100,8 +106,54 @@ class Param:
             value = max(value, self.min_value)
         if self.max_value is not None:
             value = min(value, self.max_value)
+        if value != self.last_value and self.on_change is not None:
+            self.on_change(value)
         self.last_value = value
+        if self.spice_params is not None and step >= 0:
+            value = self.spice_params.value(value, step)
         return value
+
+    def set(self, value):
+        if value != self.value and self.on_change is not None:
+            self.on_change(value)
+        if self.min_value is not None:
+            value = max(value, self.min_value)
+        if self.max_value is not None:
+            value = min(value, self.max_value)
+        self.value = value
+
+@dataclass
+class SpiceParams:
+    max_chance: float
+    max_delta: float | int
+    spice: Param
+    step_data: None | list
+
+    def toss(self, step):
+        if self.step_data is None:
+            return False
+        if step > len(self.step_data):
+            # TODO why this happen
+            logger.debug(f"step {step} and step_data {self.step_data}")
+        _, step_chance = self.step_data[step % len(self.step_data)]
+        chance = self.spice.value * self.max_chance
+        return step_chance < chance
+
+    def value(self, original, step):
+        if self.step_data is None:
+            return original
+        if step > len(self.step_data):
+            logger.debug(f"step {step} and step_data {self.step_data}")
+        step_intensity, step_chance = self.step_data[step % len(self.step_data)]
+        val = original
+        chance = self.spice.value * self.max_chance
+        delta = 2 * self.max_delta * step_intensity - self.max_delta
+        if step_chance < chance:
+            val += delta
+        return val
+
+    def dice(self, step_data):
+        self.step_data = step_data
 
 class Counter:
     def __init__(self, value, delta=1):
