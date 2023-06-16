@@ -39,7 +39,7 @@ class SoundData:
     source: Optional['SoundData']
 
     def __init__(self) -> None:
-        pass
+        self.bpm = 143
 
 playtime = {}
 sound_data = defaultdict(SoundData)
@@ -107,8 +107,8 @@ class Sample:
         self.bpm = bpm
         self.load(file)
         self.last_printed = 0
-        self.gate = modulation.Param(1.0)
-        self.gate_period = modulation.Param(1)
+        self.gate = modulation.Param(1.0, min_value=0.25, max_value=1)
+        self.gate_period = modulation.Param(2, min_value=1, max_value=32)
         self.gate_mirror = None
         self.gates = [1] * len(self.sound_slices)
         self.unspiced_gates = self.gates
@@ -116,14 +116,14 @@ class Sample:
         self.spice_level.on_change = self.spice_gates
         self.spices_param = self.SpiceParams(
             skip_gate = modulation.SpiceParams(max_chance=0.3, max_delta=0, spice=self.spice_level, step_data=None),
-            extra_gate = modulation.SpiceParams(max_chance=0.3, max_delta=0, spice=self.spice_level, step_data=None),
+            extra_gate = modulation.SpiceParams(max_chance=0.7, max_delta=0, spice=self.spice_level, step_data=None),
             stretch_chance = modulation.SpiceParams(max_chance=0.2, max_delta=0, spice=self.spice_level, step_data=None),
             gate_length = modulation.SpiceParams(max_chance=0.8, max_delta=0.25, spice=self.spice_level, step_data=None),
             volume = modulation.SpiceParams(max_chance=0.4, max_delta=0.5, spice=self.spice_level, step_data=None),
             pitch = modulation.SpiceParams(max_chance=0.2, max_delta=12, spice=self.spice_level, step_data=None)
         )
-        self.volume = modulation.Param(1).spice(self.spices_param.volume)
-        self.pitch = modulation.Param(0).spice(self.spices_param.pitch)
+        self.volume = modulation.Param(1, min_value=0, max_value=1).spice(self.spices_param.volume)
+        self.pitch = modulation.Param(0, min_value=-12, max_value=12).spice(self.spices_param.pitch)
         self.dice()
         # things for spice:
         #   -gates, pitch, rate, volume, step repeat
@@ -159,8 +159,6 @@ class Sample:
         for param in self.spices_param:
             param.dice([(random(), random()) for _ in range(self.slices_per_loop)])
         self.spice_gates()
-        # do ts, pitch
-        #
 
     def spice_gates(self, _=None):
         spiced_gates = []
@@ -175,11 +173,11 @@ class Sample:
             spiced_gates.append(spicy_gate)
         self.gates = spiced_gates
 
-    def stop_halftime(self):
+    def stop_halftime(self, *_):
         logger.info(f"{self.name} halftime stopped")
         self.halftime = False
 
-    def stop_quartertime(self):
+    def stop_quartertime(self, *_):
         logger.info(f"{self.name} quartertime stopped")
         self.quartertime = False
 
@@ -198,19 +196,33 @@ class Sample:
         quantized_length = 2 if self.step_repeat_length == 1 else self.step_repeat_length
         self.step_repeat_index = index - index % quantized_length
 
-    def step_repeat_stop(self, length):
+    def step_repeat_stop(self, length=None):
         if not self.step_repeat:
             return
-        if length not in self.step_repeat_lengths:
+        if length == None:
+            self.step_repeat_lengths.clear()
+        elif length not in self.step_repeat_lengths:
             return
-        self.step_repeat_lengths.remove(length)
-        logger.info(f"{self.name} removing {length} from step repeats {self.step_repeat_lengths}")
+        else:
+            self.step_repeat_lengths.remove(length)
+        logger.debug(f"{self.name} removing {length} from step repeats {self.step_repeat_lengths}")
         self.step_repeating = False
         if len(self.step_repeat_lengths) == 0:
             self.step_repeat = False
             self.sound_queue.clear()
         else:
             self.update_step_repeat(self.step_repeat_index)
+
+    def cancel_fx(self):
+        logger.info(f"{self.name} cancelling sample fx")
+        self.step_repeat_stop()
+        self.pitch.restore_default()
+        self.spice_level.restore_default()
+        self.volume.restore_default()
+        self.default_gates()
+        self.stop_stretch()
+        for i, sound in enumerate(self.sound_slices):
+            self.sound_slices[i] = self.source_sound(sound, ignore_bpm_changes=True)
 
     def invert_gates(self):
         def invert(gate):
@@ -230,30 +242,26 @@ class Sample:
         return rate
 
     def gate_increase(self):
-        if self.gate.value == 1:
-            return
-        self.gate.value += 0.1
+        self.gate.set(delta=0.25)
         self.update_gates()
 
     def gate_decrease(self):
-        if self.gate.value <= 0.1:
-            return
-        self.gate.value -= 0.1
+        self.gate.set(delta=-0.25)
         self.update_gates()
 
     def gate_period_increase(self):
-        self.gate_period.value += 1
+        if self.gate_period.set(self.gate_period.value * 2) and self.gate.get() == 1:
+            self.gate.set(0.5)
         self.update_gates()
 
     def gate_period_decrease(self):
-        if self.gate_period.value <= 1:
-            return
-        self.gate_period.value -= 1
+        if self.gate_period.set(self.gate_period.value // 2) and self.gate.get() == 1:
+            self.gate.set(0.5)
         self.update_gates()
 
     def default_gates(self):
-        self.gate_period.value = 1
-        self.gate.value = 1
+        self.gate_period.restore_default()
+        self.gate.restore_default()
         self.update_gates()
 
     def update_gates(self):
@@ -271,6 +279,12 @@ class Sample:
         self.spice_gates()
         if self.gate_mirror:
             self.gate_mirror.gates = self.invert_gates()
+
+    def stop_stretch(self):
+        if self.halftime or self.quartertime:
+            self.sound_queue.clear()
+            self.halftime = False
+            self.quartertime = False
 
     def transform_slices(self, f):
         for i in range(len(self.sound_slices)):
@@ -327,7 +341,7 @@ class Sample:
         sound_data[sound].step = step
         step_gate = self.gates[step % len(self.gates)]
         if step_gate > 0:
-            sound.set_volume(1.0)
+            sound.set_volume(self.volume.get(step))
         else:
             sound.set_volume(0)
         self.sound_queue.append((sound, t, step))
@@ -359,12 +373,13 @@ class Sample:
     # returns callable to do the sound making
     def process_queue(self, now, step_duration):
         if self.channel and (playing := self.channel.get_sound()) is not None:
-            step_gate = self.gates[sound_data[playing].step % len(self.gates)]
+            playing_step = self.gates[sound_data[playing].step % len(self.gates)]
+            step_gate = playing_step % len(self.gates)
             if (inverted := step_gate < 0):
                 step_gate *= -1
             gate_time = step_gate * playing.get_length()
             if step_gate != 0 and playing in sound_data and now - sound_data[playing].playtime >= gate_time:
-                volume = 1 if inverted else 0
+                volume = self.volume.get(playing_step) if inverted else 0
                 playing.set_volume(volume)
 
         logger.debug(f"{self.name} start process queue")
@@ -521,10 +536,12 @@ class Sample:
                         self.queue(sound, t, step)
 
     @staticmethod
-    def source_sound(sound):
-        if sound not in sound_data or sound_data[sound].source == None:
+    def source_sound(sound, ignore_bpm_changes=False):
+        if sound not in sound_data or (src := sound_data[sound].source) is None:
             return sound
-        return Sample.source_sound(sound_data[sound].source)
+        # if ignore_bpm_changes and src in sound_data and sound_data[src].bpm != sound_data[sound].bpm:
+        #     return sound
+        return Sample.source_sound(src)
 
     def change_pitch(self, step, sound, semitones):
         logger.info(f"{self.name}: step {step} by {semitones} semitones")
@@ -591,9 +608,7 @@ def step_repeat_stop(length):
 
 def stop_halftime():
     for s in current_samples():
-        if s.halftime:
-            s.sound_queue.clear()
-            s.halftime = False
+        s.stop_stretch()
 
 def make_even(x):
     if x % 2 == 1:

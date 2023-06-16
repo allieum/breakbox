@@ -46,6 +46,8 @@ K_PITCH_DOWN = 'e'
 K_SPICE_UP = '1'
 K_SPICE_DOWN = 'q'
 
+K_FX_CANCEL = 'z'
+
 FX_KEYS = set((
     K_SPICE_UP, K_SPICE_DOWN, K_QT, K_HT, K_PITCH_DOWN, K_PITCH_UP, *SR_KEYS.keys()
 ))
@@ -174,7 +176,7 @@ def sample_press(i, is_repeat):
         logger.info(f"{prev_selected.name} looping = {prev_selected.looping}, {selected_effects}")
         for effect in selected_effects:
             if effect is not None:
-                effect.cancel()
+                effect.cancel(prev_selected)
         selected_effects.clear()
         if not prev_selected.looping and not is_pushed(prev_selected):
             prev_selected.mute()
@@ -218,15 +220,19 @@ def sample_release(i):
     if not s.looping and not (is_current and any([key_held[k] for k in FX_KEYS])):
         s.mute()
 
-def shift_press(*_):
+def shift_press(repeat):
+    if repeat:
+        return
     global persist_fx_count
     fx_keys_pressed = sum([1 for k in FX_KEYS if key_held[k]])
     persist_fx_count += fx_keys_pressed
     if persist_fx_count > 0 and selected_sample is not None:
         selected_sample.looping = True
     for s in [sample.current_samples()[i] for i,k in enumerate(SAMPLE_KEYS) if key_held[k]]:
-        s.looping = not s.looping
+        s.looping = True
         logger.info(f"{s.name} set looping to {s.looping}")
+    if key_held[K_FX_CANCEL]:
+        fx_cancel_press(False, shift=True)
 
 def step_repeat_press(length, selected):
     selected.step_repeat_start(sequence.step, length)
@@ -295,6 +301,19 @@ def dice_press(repeat):
         return
     selected_sample.dice()
 
+def fx_cancel_press(repeat, shift=None):
+    if shift is None:
+        shift = key_held[K_SHIFT]
+    if repeat:
+        return
+    if shift:
+        for s in sample.current_samples():
+            s.cancel_fx()
+    elif selected_sample is not None:
+        selected_sample.cancel_fx()
+    selected_effects.clear()
+
+
 def make_handler(handler, x):
     def f(*args):
         handler(x, *args)
@@ -318,6 +337,7 @@ press = {
     # K_GATE_INVERT: gate_invert_press,
     # K_GATE_FOLLOW: gate_follow_press,
     K_SHIFT: shift_press,
+    K_FX_CANCEL: fx_cancel_press,
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_press, i) for i in range(len(SAMPLE_KEYS))])),
     **{sr_key: momentary_fx_press(make_handler(step_repeat_press, length)) for sr_key, length in SR_KEYS.items()}
 }
@@ -402,6 +422,4 @@ def process_release(k):
         release[k]()
         return
 
-    if K_HT == k:
-        sample.stop_halftime()
     logger.debug(f"finish release handler for {k}")

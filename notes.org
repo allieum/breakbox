@@ -29,21 +29,36 @@ CLOSED: [2023-06-13 Tue 00:12]
 CLOSED: [2023-06-13 Tue 07:09]
 ** DONE when sample has step repeat held, pressing its key should still unloop the sample
 CLOSED: [2023-06-13 Tue 07:58]
-** spice n dice
-** import directory structure
-** TODO bounds for lfo / pitch shift
+** DONE spice n dice
+CLOSED: [2023-06-15 Thu 09:06]
+** NOPE instead of invert gates, scramble?
+CLOSED: [2023-06-15 Thu 09:06]
+*
+
+** NOPE for gate mirror use presets
+CLOSED: [2023-06-15 Thu 09:06]
+** DONE use volume param
+CLOSED: [2023-06-15 Thu 10:32]
+** DONE gate period powers of 2
+CLOSED: [2023-06-15 Thu 10:32]
+** DONE restrict input range of gate time
+CLOSED: [2023-06-15 Thu 10:32]
+** DONE bounds for lfo / pitch shift
+CLOSED: [2023-06-15 Thu 10:32]
 :PROPERTIES:
 :CREATED:  [Y-06-12 Mon 16:%]
 :ID:       280e64bc-88c8-4cad-ad39-4f9de9116e4c
 :END:
-** gate period powers of 2
-** restrict input range of gate time
-** stop fx button (shift + stop)
-** for gate mirror use presets
-** instead of invert gates, scramble?
-*
-
+** DONE stop fx button (shift + stop)
+CLOSED: [2023-06-15 Thu 11:44]
+** DONE pitch cancel fix
+CLOSED: [2023-06-15 Thu 13:57]
+** import directory structure
+** step repeat override off gates?
 ** normalize volumes, remove click etc
+** pitch mod should revert to 0 on release, unless shift held
+** stretching should use pitched sound
+** volume keys
 ** sample flipping!!
 * MVP
 ** DONE stop audio on start / stop

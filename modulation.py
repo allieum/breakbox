@@ -45,6 +45,7 @@ class Lfo:
 class Param:
     def __init__(self, value, min_value=None, max_value=None) -> None:
         self.value = value
+        self.default_value = value
         self.lfo = None
         self.start_step = None
         self.steps = None
@@ -57,7 +58,10 @@ class Param:
         self.min_value = min_value
         self.max_value = max_value
         self.spice_params: None | SpiceParams = None
-        # self.spiced_param = None
+
+    def restore_default(self):
+        self.value = self.default_value
+        self.last_value = None
 
     def spice(self, spice_params):
         self.spice_params = spice_params
@@ -113,14 +117,22 @@ class Param:
             value = self.spice_params.value(value, step)
         return value
 
-    def set(self, value):
-        if value != self.value and self.on_change is not None:
-            self.on_change(value)
-        if self.min_value is not None:
+    def set(self, value=None, delta=None):
+        if (value is None and delta is None) or (value is not None and delta is not None):
+            logger.error(f"must specify just 1 of value and delta")
+            return
+        if delta is None:
+            delta = 0
+        if value is None:
+            value = self.value + delta
+        if self.min_value is not None and value is not None:
             value = max(value, self.min_value)
-        if self.max_value is not None:
+        if self.max_value is not None and value is not None:
             value = min(value, self.max_value)
+        if (changed := value != self.value) and self.on_change is not None:
+            self.on_change(value)
         self.value = value
+        return changed
 
 @dataclass
 class SpiceParams:
