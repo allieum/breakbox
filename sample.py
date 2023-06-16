@@ -63,20 +63,25 @@ def write_wav(soundbytes, filename):
     ).export(filename, format='wav')
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-samples = []
+sample_banks = []
 def load_samples():
-    sample_dir = f'{dir_path}/samples'
-    for f in sorted(os.listdir(sample_dir)):
-        if m := re.fullmatch(r"([0-9]{2,3}).+([0-9]{3})?.wav", f):
-            print(f)
-            bpm = int(m.group(1))
-            samples.append(Sample(f"{sample_dir}/{m.group()}", bpm))
-        else:
-            logger.warn(f"wrong filename format for {f}, not loaded")
-    print([s.name for s in current_samples()])
+    for i in range(1, NUM_BANKS + 1):
+        sample_dir = f'{dir_path}/samples/{i}'
+        sample_banks.append(bnk := [])
+        for f in sorted(os.listdir(sample_dir)):
+            if m := re.fullmatch(r"([0-9]{2,3}).+.wav", f):
+                # print(f)
+                bpm = int(m.group(1))
+                bnk.append(Sample(f"{sample_dir}/{m.group()}", bpm))
+            else:
+                logger.warn(f"wrong filename format for {f}, not loaded")
+        logger.info([s.name for s in bnk])
 
 def current_samples() -> List['Sample']:
-    return samples[bank * BANK_SIZE : BANK_SIZE * (bank + 1)]
+    return sample_banks[bank]
+
+def all_samples() -> List['Sample']:
+    return functools.reduce(lambda a, b: a + b, sample_banks)
 
 channels = set()
 
@@ -122,7 +127,7 @@ class Sample:
             volume = modulation.SpiceParams(max_chance=0.4, max_delta=0.5, spice=self.spice_level, step_data=None),
             pitch = modulation.SpiceParams(max_chance=0.2, max_delta=12, spice=self.spice_level, step_data=None)
         )
-        self.volume = modulation.Param(1, min_value=0, max_value=1).spice(self.spices_param.volume)
+        self.volume= modulation.Param(1, min_value=0, max_value=1).spice(self.spices_param.volume)
         self.pitch = modulation.Param(0, min_value=-12, max_value=12).spice(self.spices_param.pitch)
         self.dice()
         # things for spice:
@@ -739,6 +744,6 @@ def pitch_shift(sound, semitones):
     return new_sound
 
 def stretch_samples(target_bpm):
-    for s in samples:
+    for s in all_samples():
         s.bpm = target_bpm
 
