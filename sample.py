@@ -123,8 +123,8 @@ class Sample:
             extra_gate = modulation.SpiceParams(max_chance=0.7, max_delta=0, spice=self.spice_level, step_data=None),
             stretch_chance = modulation.SpiceParams(max_chance=0.2, max_delta=0, spice=self.spice_level, step_data=None),
             gate_length = modulation.SpiceParams(max_chance=0.8, max_delta=0.25, spice=self.spice_level, step_data=None),
-            volume = modulation.SpiceParams(max_chance=0.4, max_delta=0.5, spice=self.spice_level, step_data=None),
-            pitch = modulation.SpiceParams(max_chance=0.2, max_delta=12, spice=self.spice_level, step_data=None)
+            volume = modulation.SpiceParams(max_chance=0.3, max_delta=0.25, spice=self.spice_level, step_data=None),
+            pitch = modulation.SpiceParams(max_chance=0.2, max_delta=6, spice=self.spice_level, step_data=None)
         )
         self.volume= modulation.Param(1, min_value=0, max_value=1).spice(self.spices_param.volume)
         self.pitch = modulation.Param(0, min_value=-12, max_value=12).spice(self.spices_param.pitch)
@@ -156,7 +156,14 @@ class Sample:
 
     def dice(self):
         for param in self.spices_param:
-            param.dice([(random(), random()) for _ in range(self.slices_per_loop)])
+            data = []
+            while len(data) < self.slices_per_loop:
+                flip = random() > 0.5
+                grain_size = 2 if flip else 4
+                if self.spices_param.skip_gate is param:
+                    grain_size = 2
+                data.extend([(random(), random())] * grain_size)
+            param.dice(data[:self.slices_per_loop])
         self.spice_gates()
 
     def spice_gates(self, _=None):
@@ -494,6 +501,9 @@ class Sample:
     def queue_step(self, step, t, step_interval):
         srlength = round(self.step_repeat_length / self.get_rate())
         do_step_repeat = self.step_repeat and (self.looping or not self.is_muted())
+        if step % 2 == 1 and self.spices_param.stretch_chance.toss(step - 1 % self.slices_per_loop):
+            # last step is stretched 2x, skip this one to give it time to finish
+            return
         if do_step_repeat and step in range(self.step_repeat_index % srlength, self.slices_per_loop, srlength):
             self.step_repeating = True
             self.sound_queue.clear()
