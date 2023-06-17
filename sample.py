@@ -18,11 +18,10 @@ import modulation
 import utility
 
 logger = utility.get_logger(__name__)
-# logger.setLevel('WARN')
-
+# logger.setLevel('DEBUG')
 bank = 0
 BANK_SIZE = 6
-NUM_BANKS = 4
+NUM_BANKS = 6
 SAMPLE_RATE = 22050
 
 pygame.mixer.init(frequency=SAMPLE_RATE, buffer=256, channels=1)
@@ -76,6 +75,7 @@ def load_samples():
             else:
                 logger.warn(f"wrong filename format for {f}, not loaded")
         logger.info([s.name for s in bnk])
+    logger.info(f"{sample_banks[1][5].name}")
 
 def current_samples() -> List['Sample']:
     return sample_banks[bank]
@@ -87,7 +87,7 @@ channels = set()
 
 class Sample:
     MAX_VOLUME = 1
-    slices_per_loop = 32
+    slices_per_loop = 64
     timeout = 0.005
     lookahead = 0.001
     audio_executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
@@ -148,12 +148,12 @@ class Sample:
         self.sound = pygame.mixer.Sound(file)
         # self.sound.sound_data = "test"
         # self.sound = pygame.mixer.Sound(file)
-        self.sound.set_volume(0) # default mute
+        # self.sound.set_volume(0) # default mute
         step_time = 60 / self.bpm / 4
         wav = self.sound.get_raw()
         num_steps = round(self.sound.get_length() / step_time)
         slice_size = math.ceil(len(wav) / num_steps)
-        self.sound_slices = [pygame.mixer.Sound(wav[i:i + slice_size]) for i in range(0, len(wav), slice_size)]
+        self.sound_slices = [pygame.mixer.Sound(buffer=wav[i:i + slice_size]) for i in range(0, len(wav), slice_size)]
         for i, s in enumerate(self.sound_slices):
             sound_data[s].bpm = self.bpm
             sound_data[s].source_step = i
@@ -383,7 +383,7 @@ class Sample:
             if (inverted := step_gate < 0):
                 step_gate *= -1
             gate_time = step_gate * playing.get_length()
-            if step_gate != 0 and playing in sound_data and now - sound_data[playing].playtime >= gate_time:
+            if step_gate != 0 and step_gate != 1 and playing in sound_data and now - sound_data[playing].playtime >= gate_time:
                 volume = self.volume.get(playing_step) if inverted else 0
                 playing.set_volume(volume)
 
@@ -460,7 +460,8 @@ class Sample:
             self.channel.queue(sound)
             sound_data[sound].playtime = predicted_finish
             # self.channel.queue(sound)
-            logger.debug(f"{self.name}: queued sample")
+            logger.info(f"{self.name}: queued sample")
+            self.source_sound(sound)
             return None
             # return self.play_step(lambda s: self.queue_sound(s, t), sound, step, t)
 
@@ -542,6 +543,7 @@ class Sample:
 
     @staticmethod
     def source_sound(sound, ignore_bpm_changes=False):
+        logger.info(f"getting source for {sound}")
         if sound not in sound_data or (src := sound_data[sound].source) is None:
             return sound
         # if ignore_bpm_changes and src in sound_data and sound_data[src].bpm != sound_data[sound].bpm:

@@ -8,7 +8,7 @@ import utility
 
 logger = utility.get_logger(__name__)
 
-MAX_BEATS = 8
+MAX_BEATS = 16
 STEPS_PER_BEAT = 4
 MAX_STEPS = MAX_BEATS * STEPS_PER_BEAT
 
