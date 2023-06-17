@@ -75,7 +75,6 @@ def load_samples():
             else:
                 logger.warn(f"wrong filename format for {f}, not loaded")
         logger.info([s.name for s in bnk])
-    logger.info(f"{sample_banks[1][5].name}")
 
 def current_samples() -> List['Sample']:
     return sample_banks[bank]
@@ -130,9 +129,6 @@ class Sample:
         self.volume= modulation.Param(1, min_value=0, max_value=1).spice(self.spices_param.volume)
         self.pitch = modulation.Param(0, min_value=-12, max_value=12).spice(self.spices_param.pitch)
         self.dice()
-        # things for spice:
-        #   -gates, pitch, rate, volume, step repeat
-        #
         #
         # self.cache = {
         #     'pitch': {
@@ -146,12 +142,10 @@ class Sample:
     def load(self, file):
         logger.debug(f"loading sample {file}")
         self.sound = pygame.mixer.Sound(file)
-        # self.sound.sound_data = "test"
-        # self.sound = pygame.mixer.Sound(file)
-        # self.sound.set_volume(0) # default mute
         step_time = 60 / self.bpm / 4
-        wav = self.sound.get_raw()
+        samples_per_step = round(step_time * SAMPLE_RATE)
         num_steps = round(self.sound.get_length() / step_time)
+        wav = self.sound.get_raw()[:2 * samples_per_step * num_steps]
         slice_size = math.ceil(len(wav) / num_steps)
         self.sound_slices = [pygame.mixer.Sound(buffer=wav[i:i + slice_size]) for i in range(0, len(wav), slice_size)]
         for i, s in enumerate(self.sound_slices):

@@ -62,7 +62,7 @@ dactyl_keys =[
                                  ['space',  'ctrl'],
                                  ['enter',    'alt'],
 ]
-RESET_KEYS = ['tab', '#', 'shift']
+RESET_KEYS = ['space', 'ctrl', 'enter', 'alt']
 
 class Effect:
     def __init__(self, cancel):
@@ -356,6 +356,10 @@ release = {
 def key_pressed(e):
     logger.debug(f"start press handler for {e.name}")
 
+    if all([key_held[k] for k in RESET_KEYS]):
+        logger.warning("restarting program!!!")
+        utility.restart_program()
+
     if e.name in press:
         press[e.name](key_held[e.name])
 
@@ -363,10 +367,6 @@ def key_pressed(e):
         logger.debug(f"{e} already active, doing nothing")
         return
     key_held[e.name] = True
-
-    if all([key_held[k] for k in RESET_KEYS]):
-        logger.warning("restarting program!!!")
-        utility.restart_program()
 
     if K_STOP == e.name:
         # cancel held keys
