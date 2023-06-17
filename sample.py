@@ -341,6 +341,8 @@ class Sample:
         # _, prev_t = self.sound_queue[len(self.sound_queue) - 1] if len(self.sound_queue) > 0 else None, None
         sound_data[sound].step = step
         step_gate = self.gates[step % len(self.gates)]
+        if self.step_repeating and step_gate == 0:
+            step_gate = 0.5
         if step_gate > 0:
             sound.set_volume(self.volume.get(step))
         else:
@@ -378,6 +380,8 @@ class Sample:
             step_gate = playing_step % len(self.gates)
             if (inverted := step_gate < 0):
                 step_gate *= -1
+            if self.step_repeating and step_gate == 0:
+                step_gate = 0.5
             gate_time = step_gate * playing.get_length()
             if step_gate != 0 and step_gate != 1 and playing in sound_data and now - sound_data[playing].playtime >= gate_time:
                 volume = self.volume.get(playing_step) if inverted else 0
@@ -456,8 +460,7 @@ class Sample:
             self.channel.queue(sound)
             sound_data[sound].playtime = predicted_finish
             # self.channel.queue(sound)
-            logger.info(f"{self.name}: queued sample")
-            self.source_sound(sound)
+            logger.debug(f"{self.name}: queued sample")
             return None
             # return self.play_step(lambda s: self.queue_sound(s, t), sound, step, t)
 

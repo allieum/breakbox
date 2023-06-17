@@ -123,11 +123,11 @@ def momentary_fx_release(handler = None, shift_persist=True):
     return fxrelease
 
 def spice_up_press(selected):
-    selected.spice_level.set(selected.spice_level.value + 0.1)
+    selected.spice_level.set(delta=0.1)
     logger.info(f"{selected.name} set spice to {selected.spice_level.value}")
 
 def spice_down_press(selected):
-    selected.spice_level.set(selected.spice_level.value - 0.1)
+    selected.spice_level.set(delta=-0.1)
     logger.info(f"{selected.name} set spice to {selected.spice_level.value}")
 
 def pitch_up_press(selected):
@@ -147,6 +147,8 @@ def pitch_up_release(selected):
     else:
         if selected.pitch.lfo:
             selected.pitch.lfo.enabled = False
+        if not key_held[K_SHIFT]:
+            selected.pitch.restore_default()
         step_repeat_release(1, selected)
 
 def pitch_down_release(selected):
@@ -155,6 +157,8 @@ def pitch_down_release(selected):
     else:
         if selected.pitch.lfo:
             selected.pitch.lfo.enabled = False
+        if not key_held[K_SHIFT]:
+            selected.pitch.restore_default()
         step_repeat_release(1, selected)
 
 def is_pushed(s: sample.Sample):
