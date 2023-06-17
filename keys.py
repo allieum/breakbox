@@ -115,7 +115,8 @@ def momentary_fx_release(handler = None, shift_persist=True):
             logger.info(f"skipping release so effect is persisted")
             persist_fx_count -= 1
             return
-        if not selected_sample.looping and not is_pushed(selected_sample):
+        sample_activated = is_pushed(selected_sample) or any([key_held[k] for k in FX_KEYS])
+        if not selected_sample.looping and not sample_activated:
             selected_sample.mute()
         if handler:
             handler(selected_sample, *args)
@@ -384,7 +385,8 @@ def key_pressed(e):
                 looping_index = i
                 # print(f"looping index {i}")
         # cancel held keys
-        sample.bank = (sample.bank + 1) % sample.NUM_BANKS
+        delta = -1 if key_held[K_SHIFT] else 1
+        sample.bank = (sample.bank + delta) % sample.NUM_BANKS
         for new_sample, old_sample in zip(sample.current_samples(), old_samples):
             new_sample.swap_channel(old_sample)
         if looping_index is not None:

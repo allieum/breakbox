@@ -200,15 +200,17 @@ class Sample:
             return
         if length == None:
             self.step_repeat_lengths.clear()
+            logger.info(f"{self.name} removing all lengths from step repeat")
         elif length not in self.step_repeat_lengths:
             return
         else:
             self.step_repeat_lengths.remove(length)
-        logger.debug(f"{self.name} removing {length} from step repeats {self.step_repeat_lengths}")
+            logger.info(f"{self.name} removing {length} from step repeats {self.step_repeat_lengths}")
         self.step_repeating = False
         if len(self.step_repeat_lengths) == 0:
             self.step_repeat = False
             self.sound_queue.clear()
+            logger.info(f"{self.name} step repeat off")
         else:
             self.update_step_repeat(self.step_repeat_index)
 
@@ -513,7 +515,7 @@ class Sample:
                 else:
                     self.queue(s, ts, slice_step)
         if not self.step_repeating:
-            if not self.is_muted() or self.looping:
+            if not self.is_muted() or self.looping or self.step_repeat:
                 # TODO unify this loop with below, create fn
                 sound = self.sound_slices[step % len(self.sound_slices)]
                 spice_factor = 2 if self.spices_param.stretch_chance.toss(step) else 1
