@@ -329,7 +329,6 @@ class Sample:
             self.unmute()
 
     def is_muted(self):
-        # return self.sound.get_volume() == 0
         return self.muted
 
     def toggle_mute(self):
@@ -337,11 +336,6 @@ class Sample:
             self.unmute()
         else:
             self.mute()
-
-    def play(self):
-        pass
-        # self.sound.stop()
-        # self.sound.play()
 
     def queue(self, sound, t, step):
         logger.debug(f"queued sound in {self.name} for {datetime.fromtimestamp(t)}")
@@ -355,8 +349,6 @@ class Sample:
         else:
             sound.set_volume(0)
         self.sound_queue.append((sound, t, step))
-        # if prev_t and prev_t > t:
-        #     logger.error(f"{self.name} saw out of order sound queue")
 
     # call provided fn to create sound and add to queue
     def queue_async(self, generate_sound, t, step):
@@ -376,9 +368,7 @@ class Sample:
         _, scheduled, step = dropped[0]
         msg = f"{self.name} dropped {n}/{n+len(self.sound_queue)} samples stale by: {1000 * (now - scheduled - self.timeout):10.6}ms for step {step}"
         msg += f" sched. {datetime.fromtimestamp(scheduled)}"
-        # for _, scheduled in dropped:
-        #     msg += f" {1000 * (now - scheduled - self.timeout):10.6}ms"
-        logger.warn(msg)
+        logger.debug(msg)
 
     # returns callable to do the sound making
     def process_queue(self, now, step_duration):
