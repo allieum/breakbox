@@ -107,7 +107,7 @@ class Sample:
         self.step_repeat_length = 0 # in steps
         self.step_repeat_lengths = []
         self.step_repeat_index = 0  # which step to repeat
-        self.channel = None
+        self.channel: pygame.mixer.Channel | None = None
         self.sound_queue: PriorityQueue[QueuedSound] = PriorityQueue()
         self.muted = True
         self.step_repeat_was_muted = False
@@ -343,6 +343,11 @@ class Sample:
         else:
             self.mute()
 
+    # Is sound happening?
+    def is_playing(self):
+        return self.channel and (s := self.channel.get_sound()) and s.get_volume() > 0
+        # return not self.is_muted() or self.looping
+
     def clear_sound_queue(self):
         while not self.sound_queue.empty():
             self.sound_queue.get()
@@ -402,11 +407,11 @@ class Sample:
                 volume = ratio * self.volume.get(playing_step)
                 if playing.get_volume() != volume:
                     playing.set_volume(volume)
-                    logger.info(f"{self.name} volume to {volume}, {ratio}% faded")
+                    logger.debug(f"{self.name} volume to {volume}, {ratio}% faded")
             elif start_fade and playing.get_volume() != self.volume.get(playing_step):
                 ratio = min(1, time_playing / self.gate_fade)
                 playing.set_volume(volume := self.volume.get(playing_step) * ratio)
-                logger.info(f"{self.name} volume to {volume}, {ratio}% faded in")
+                logger.debug(f"{self.name} volume to {volume}, {ratio}% faded in")
 
 
 

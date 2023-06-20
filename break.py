@@ -68,6 +68,7 @@ def lights_for_step(step):
     return (light_index, mirror_index)
 
 # if (now := time.time()) - last_dmx > 0.050: # and last_dmx_step != sequence.step:
+# TODO move into own file
 def update_dmx(step):
     if dmx_interface is None:
         return
@@ -96,18 +97,23 @@ def update_dmx(step):
     dmx_interface.send_update()
     # sample.Sample.audio_executor.submit(dmx_interface.send_update)
     logger.debug(f"dmx frame send took {time.time() - now}s")
-sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
+# sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
 
 last_dmx = time.time()
 last_dmx_step = None
 while True:
-    control.update()
+    # control.update()
     sequence.update(midi.get_status())
     sample.play_samples(sequence.step_duration())
+    samples_on = list(map(sample.Sample.is_playing, sample.current_samples()))
+    # if lights.refresh_ready(samples_on):
+        # lights.refreshing = True
+    lights.update(samples_on)
+        # f = sample.Sample.audio_executor.submit(lights.update, samples_on)
+        # f.add_done_callback(lambda _: lights.refresh_done())
 
-    state = (sequence.bpm.get())
-    display.update(state)
-
+    # state = (sequence.bpm.get())
+    # display.update(state)
 
     if midi.lost_connection():
         if sequence.midi_started:
@@ -115,6 +121,6 @@ while True:
             sequence.stop_midi()
         midi.reconnect(suppress_output = True)
 
-    sys.stdout.flush()
-    sys.stderr.flush()
+    # sys.stdout.flush()
+    # sys.stderr.flush()
     time.sleep(0.0005)
