@@ -21,12 +21,17 @@ import blink
 
 # with DMXInterface() as interface:
 #
-dmx_interface = DMXInterface()
 
 
 logger = utility.get_logger(__name__)
 current_time = datetime.now().strftime("%H:%M:%S")
 logger.debug(f"Start time = {current_time}")
+
+dmx_interface = None
+try:
+    dmx_interface = DMXInterface()
+except:
+    pass
 
 def on_key(e):
     if e.event_type == keyboard.KEY_DOWN:
@@ -64,6 +69,8 @@ def lights_for_step(step):
 
 # if (now := time.time()) - last_dmx > 0.050: # and last_dmx_step != sequence.step:
 def update_dmx(step):
+    if dmx_interface is None:
+        return
     # last_dmx = now
     # last_dmx_step = sequence.step
     logger.debug(f"lighting dmx step {step}")

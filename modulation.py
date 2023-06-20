@@ -43,7 +43,7 @@ class Lfo:
         return self.fn(x)
 
 class Param:
-    def __init__(self, value, min_value=None, max_value=None) -> None:
+    def __init__(self, value, min_value=None, max_value=None, round=False) -> None:
         self.value = value
         self.default_value = value
         self.lfo = None
@@ -57,6 +57,7 @@ class Param:
         self.last_value = None
         self.min_value = min_value
         self.max_value = max_value
+        self.round = round
         self.spice_params: None | SpiceParams = None
 
     def restore_default(self):
@@ -100,7 +101,9 @@ class Param:
             if self.start_step is None:
                 self.start_step = step
             lfo_step = (step - self.start_step) % self.lfo.period
-            value += round(self.lfo.value(lfo_step) * self.scale)
+            value += self.lfo.value(lfo_step) * self.scale
+            if self.round:
+                value = round(value)
             logger.debug(f"LFO {self.lfo} value {value} step {step} lfo_step {lfo_step} start_step {self.start_step}")
         if self.steps == 0 and self.lfo:
             self.lfo.enabled = False
@@ -110,11 +113,15 @@ class Param:
             value = max(value, self.min_value)
         if self.max_value is not None:
             value = min(value, self.max_value)
+        if self.round:
+            value = round(value)
         if value != self.last_value and self.on_change is not None:
             self.on_change(value)
         self.last_value = value
         if self.spice_params is not None and step >= 0:
             value = self.spice_params.value(value, step)
+            if self.round:
+                value = round(value)
         return value
 
     def set(self, value=None, delta=None):

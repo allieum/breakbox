@@ -60,6 +60,21 @@ CLOSED: [2023-06-15 Thu 13:57]
 ** stretching should use pitched sound
 ** volume keys
 ** sample flipping!!
+* post-euphoria
+** make sound q priority
+** gate fades
+** recording
+** volume ctrl
+** case
+** clone brbx
+*** zero hat
+*** key input strat
+*** case
+*** samples
+*** deploy strat
+**** makefile?
+** lights
+** hdmi monitor
 * MVP
 ** DONE stop audio on start / stop
 CLOSED: [2023-04-28 Fri 15:24]

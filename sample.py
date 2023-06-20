@@ -1,5 +1,6 @@
 import functools
 import math
+from queue import PriorityQueue
 import sys
 import pygame.mixer
 import os
@@ -11,7 +12,7 @@ from pydub import AudioSegment
 from pydub.utils import db_to_float
 from random import random
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, List
 
 import modulation
@@ -39,9 +40,13 @@ class SoundData:
 
     def __init__(self) -> None:
         self.bpm = 143
-
-playtime = {}
 sound_data = defaultdict(SoundData)
+
+@dataclass(order=True)
+class QueuedSound:
+    t: float
+    step: int = field(compare=False)
+    sound: pygame.mixer.Sound = field(compare=False)
 
 def remaining_time(sound):
     if sound is None:
@@ -103,7 +108,7 @@ class Sample:
         self.step_repeat_lengths = []
         self.step_repeat_index = 0  # which step to repeat
         self.channel = None
-        self.sound_queue = deque()
+        self.sound_queue: PriorityQueue[QueuedSound] = PriorityQueue()
         self.muted = True
         self.step_repeat_was_muted = False
         self.halftime = False
@@ -115,19 +120,20 @@ class Sample:
         self.gate_period = modulation.Param(2, min_value=1, max_value=32)
         self.gate_mirror = None
         self.gates = [1] * len(self.sound_slices)
+        self.gate_fade = 0.020
         self.unspiced_gates = self.gates
         self.spice_level = modulation.Param(0, min_value=0, max_value=1)
         self.spice_level.on_change = self.spice_gates
         self.spices_param = self.SpiceParams(
-            skip_gate = modulation.SpiceParams(max_chance=0.3, max_delta=0, spice=self.spice_level, step_data=None),
+            skip_gate = modulation.SpiceParams(max_chance=0.05, max_delta=0, spice=self.spice_level, step_data=None),
             extra_gate = modulation.SpiceParams(max_chance=0.7, max_delta=0, spice=self.spice_level, step_data=None),
             stretch_chance = modulation.SpiceParams(max_chance=0.2, max_delta=0, spice=self.spice_level, step_data=None),
-            gate_length = modulation.SpiceParams(max_chance=0.8, max_delta=0.25, spice=self.spice_level, step_data=None),
+            gate_length = modulation.SpiceParams(max_chance=0.5, max_delta=0.25, spice=self.spice_level, step_data=None),
             volume = modulation.SpiceParams(max_chance=0.3, max_delta=0.25, spice=self.spice_level, step_data=None),
-            pitch = modulation.SpiceParams(max_chance=0.2, max_delta=6, spice=self.spice_level, step_data=None)
+            pitch = modulation.SpiceParams(max_chance=0.1, max_delta=3, spice=self.spice_level, step_data=None)
         )
         self.volume= modulation.Param(1, min_value=0, max_value=1).spice(self.spices_param.volume)
-        self.pitch = modulation.Param(0, min_value=-12, max_value=12).spice(self.spices_param.pitch)
+        self.pitch = modulation.Param(0, min_value=-12, max_value=12, round=True).spice(self.spices_param.pitch)
         self.dice()
         #
         # self.cache = {
@@ -216,7 +222,7 @@ class Sample:
         self.step_repeating = False
         if len(self.step_repeat_lengths) == 0:
             self.step_repeat = False
-            self.sound_queue.clear()
+            self.clear_sound_queue()
             logger.info(f"{self.name} step repeat off")
         else:
             self.update_step_repeat(self.step_repeat_index)
@@ -290,7 +296,7 @@ class Sample:
 
     def stop_stretch(self):
         if self.halftime or self.quartertime:
-            self.sound_queue.clear()
+            self.clear_sound_queue()
             self.halftime = False
             self.quartertime = False
 
@@ -313,12 +319,12 @@ class Sample:
         self.channel, other.channel = other.channel, self.channel
 
     def mute(self):
-        logger.debug(f"{self.name} muted {len(self.sound_queue)}") # self.sound.set_volume(0)
+        logger.debug(f"{self.name} muted") # self.sound.set_volume(0)
         self.muted = True
         # self.sound_queue = []
 
     def unmute(self):
-        logger.debug(f"{self.name} unmuted {len(self.sound_queue)}")
+        logger.debug(f"{self.name} unmuted")
         # self.sound.set_volume(Sample.MAX_VOLUME)
         self.muted = False
 
@@ -337,18 +343,23 @@ class Sample:
         else:
             self.mute()
 
+    def clear_sound_queue(self):
+        while not self.sound_queue.empty():
+            self.sound_queue.get()
+
     def queue(self, sound, t, step):
         logger.debug(f"queued sound in {self.name} for {datetime.fromtimestamp(t)}")
         # _, prev_t = self.sound_queue[len(self.sound_queue) - 1] if len(self.sound_queue) > 0 else None, None
         sound_data[sound].step = step
         step_gate = self.gates[step % len(self.gates)]
+        prev_step_gate = self.gates[(step - 1) % len(self.gates)]
         if self.step_repeating and step_gate == 0:
             step_gate = 0.5
-        if step_gate > 0:
+        if step_gate > 0 and prev_step_gate == 1:
             sound.set_volume(self.volume.get(step))
         else:
             sound.set_volume(0)
-        self.sound_queue.append((sound, t, step))
+        self.sound_queue.put(QueuedSound(t, step, sound))
 
     # call provided fn to create sound and add to queue
     def queue_async(self, generate_sound, t, step):
@@ -365,108 +376,110 @@ class Sample:
     def warn_dropped(self, dropped, now):
         if (n := len(dropped)) == 0:
             return
-        _, scheduled, step = dropped[0]
-        msg = f"{self.name} dropped {n}/{n+len(self.sound_queue)} samples stale by: {1000 * (now - scheduled - self.timeout):10.6}ms for step {step}"
-        msg += f" sched. {datetime.fromtimestamp(scheduled)}"
+        dropped = dropped[0]
+        msg = f"{self.name} dropped {n}/{n+self.sound_queue.qsize()} samples stale by: {1000 * (now - dropped.t - self.timeout):10.6}ms for step {dropped.step}"
+        msg += f" sched. {datetime.fromtimestamp(dropped.t)}"
         logger.debug(msg)
 
     # returns callable to do the sound making
     def process_queue(self, now, step_duration):
-        if self.channel and (playing := self.channel.get_sound()) is not None:
-            playing_step = self.gates[sound_data[playing].step % len(self.gates)]
-            step_gate = playing_step % len(self.gates)
+        if self.channel and (playing := self.channel.get_sound()) in sound_data:
+            playing_step = sound_data[playing].step
+            step_gate = self.gates[playing_step % len(self.gates)]
             if (inverted := step_gate < 0):
                 step_gate *= -1
             if self.step_repeating and step_gate == 0:
                 step_gate = 0.5
             gate_time = step_gate * playing.get_length()
-            if step_gate != 0 and step_gate != 1 and playing in sound_data and now - sound_data[playing].playtime >= gate_time:
-                volume = self.volume.get(playing_step) if inverted else 0
-                playing.set_volume(volume)
+            time_playing =  time.time() - sound_data[playing].playtime
+            time_fading = time_playing - gate_time
+            prev_step_gate = self.gates[(playing_step - 1) % len(self.gates)]
+            start_fade = step_gate > 0 and prev_step_gate != 1
+            if step_gate != 0 and step_gate != 1 and time_playing > gate_time:
+                ratio = max(0, min(1, time_fading / self.gate_fade))
+                if not inverted:
+                    ratio = 1 - ratio
+                volume = ratio * self.volume.get(playing_step)
+                if playing.get_volume() != volume:
+                    playing.set_volume(volume)
+                    logger.info(f"{self.name} volume to {volume}, {ratio}% faded")
+            elif start_fade and playing.get_volume() != self.volume.get(playing_step):
+                ratio = min(1, time_playing / self.gate_fade)
+                playing.set_volume(volume := self.volume.get(playing_step) * ratio)
+                logger.info(f"{self.name} volume to {volume}, {ratio}% faded in")
+
+
 
         logger.debug(f"{self.name} start process queue")
-        if len(self.sound_queue) == 0:
+        if self.sound_queue.empty():
             logger.debug(f"{self.name}: queue empty")
             return None
 
-        if (size := len(self.sound_queue)) > 1:
-            if not self.last_printed == size and not self.step_repeat:
-                self.last_printed = size
-                # print(f"{self.filename} has queue of {size}; {self.channel.get_busy()} {self.channel.get_queue()}")
-
-        _sound, t, _ = self.sound_queue[0]
+        qsound = self.sound_queue.get()
 
         dropped = []
-        while now > t + self.timeout:
-            dropped.append(self.sound_queue.popleft())
-            if len(self.sound_queue) == 0:
+        while now > qsound.t + self.timeout:
+            dropped.append(qsound)
+            if self.sound_queue.empty():
                 self.warn_dropped(dropped, now)
                 return None
-            _sound, t, _ = self.sound_queue[0]
+            qsound = self.sound_queue.get()
         self.warn_dropped(dropped, now)
 
 
-        in_play_window = now >= t - self.lookahead
-        in_queue_window = now >= t - self.lookahead - step_duration
+        in_play_window = now >= qsound.t - self.lookahead
+        in_queue_window = now >= qsound.t - self.lookahead - step_duration
         if not in_queue_window:
             logger.debug(f"{self.name}: too early for queue her")
+            self.sound_queue.put(qsound)
             return None
         if not in_play_window and self.channel is None:
             logger.debug(f"{self.name}: too early for channel her")
+            self.sound_queue.put(qsound)
             return None
 
         if self.channel and not self.channel.get_busy() and not in_play_window: # and in_queue_window:
+            self.sound_queue.put(qsound)
             return None
 
         if not in_play_window and self.channel and self.channel.get_busy() and self.channel.get_queue() is not None:
             logger.debug(f"{self.name}: channel full")
+            self.sound_queue.put(qsound)
             return None
 
         if self.channel and not self.channel.get_busy() and self.channel.get_queue() is not None:
             logger.warn(f"{self.name} weird state, ghost queue? let's try clear it")
             self.channel.stop()
 
-        logger.debug(f"{self.name} processing {datetime.fromtimestamp(t)}")
-        if len(self.sound_queue) == 0:
-            logger.warn(f"{self.name}: queue cleared by other thread?")
-            return None
-        sound, t, step = self.sound_queue.popleft()
-        if sound is not _sound:
-            logger.error("sound is not sound!")
+        logger.debug(f"{self.name} processing {datetime.fromtimestamp(qsound.t)}")
         if self.channel is None:
             logger.debug(f"{self.name}: played sample on new channel")
-            return self.play_step(self.play_sound_new_channel, sound, step, t)
+            return self.play_step(self.play_sound_new_channel, qsound.sound, qsound.step, qsound.t)
         if in_play_window:
             if self.channel.get_busy():
                 playing = self.channel.get_sound()
                 logger.warn(f"{self.name} interrupted sample with {remaining_time(playing)}s left")
                 logger.warn(f"sample length {playing.get_length()} vs step length {step_duration}")
             logger.debug(f"{self.name}: played sample")
-            return self.play_step(self.play_sound, sound, step, t)
+            return self.play_step(self.play_sound, qsound.sound, qsound.step, qsound.t)
         if self.channel.get_queue() is None and in_queue_window:
             playing = self.channel.get_sound()
             predicted_finish = time.time() + remaining_time(playing)
-            if (error := predicted_finish - t) > 0.015:
+            if (error := predicted_finish - qsound.t) > 0.015:
                 logger.debug(f"{self.name} queueing sample would make it late by {error}, putting back on queue")
-                self.sound_queue.appendleft((sound, t, step))
+                self.sound_queue.put(qsound)
                 return None
             if error < -0.015:
                 logger.debug(f"{self.name} queueing sample would make it early by {-error}, putting back on queue")
-                self.sound_queue.appendleft((sound, t, step))
+                self.sound_queue.put(qsound)
                 return None
-            self.channel.queue(sound)
-            sound_data[sound].playtime = predicted_finish
+            self.channel.queue(qsound.sound)
+            sound_data[qsound.sound].playtime = predicted_finish
             # self.channel.queue(sound)
             logger.debug(f"{self.name}: queued sample")
             return None
             # return self.play_step(lambda s: self.queue_sound(s, t), sound, step, t)
 
-        logger.warn(f"what wrong? {self.name} {now - t} busy:{self.channel.get_busy()} channel.queue: {self.channel.get_queue()} is_queue {in_queue_window} is_play {in_play_window}")
-        msg = ""
-        for i in range(len(self.sound_queue) - 1, -1, -1):
-            _, t = self.sound_queue[i]
-            msg += f"{now - t} "
-        logger.warn(f"queue contents: {msg}")
         return None
 
     def play_step(self, sound_player, sound, step, t):
@@ -496,7 +509,7 @@ class Sample:
             return
         if do_step_repeat and step in range(self.step_repeat_index % srlength, self.slices_per_loop, srlength):
             self.step_repeating = True
-            self.sound_queue.clear()
+            self.clear_sound_queue()
             # slices = self.sound_slices[self.step_repeat_index: self.step_repeat_index + max(self.step_repeat_lengths)]
             subslices = [self.sound_slices[self.step_repeat_index: self.step_repeat_index + length] for length in self.step_repeat_lengths]
             all_slices = []
@@ -595,7 +608,7 @@ def played_steps_string(played_steps):
     return s
 
 def queues_empty():
-    return all([len(s.sound_queue) == 0] for s in current_samples())
+    return all([s.sound_queue.qsize() == 0] for s in current_samples())
 
 def queue_samples(step, t, step_duration):
     for sample in current_samples():
@@ -604,7 +617,7 @@ def queue_samples(step, t, step_duration):
 def queues_to_string():
     s = "\n============\n"
     for sample in current_samples():
-        s += " " + "o" * len(sample.sound_queue) + "\n"
+        s += " " + "o" * sample.sound_queue.qsize() + "\n"
         s += "============\n"
     return s
 
