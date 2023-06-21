@@ -61,6 +61,7 @@ CLOSED: [2023-06-15 Thu 13:57]
 ** volume keys
 ** sample flipping!!
 * post-euphoria
+** disable shell
 ** make sound q priority
 ** gate fades
 ** recording

@@ -1,3 +1,6 @@
+from concurrent.futures import thread
+from multiprocessing import Process, Queue
+from threading import Thread
 import time
 # import rtmidi
 import sys
@@ -99,6 +102,11 @@ def update_dmx(step):
     logger.debug(f"dmx frame send took {time.time() - now}s")
 # sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
 
+lq = Queue(1)
+# Thread(target=lights.run).run()
+p = Process(target=lights.run, args=(lq,))
+p.start()
+
 last_dmx = time.time()
 last_dmx_step = None
 while True:
@@ -108,7 +116,12 @@ while True:
     samples_on = list(map(sample.Sample.is_playing, sample.current_samples()))
     # if lights.refresh_ready(samples_on):
         # lights.refreshing = True
-    lights.update(samples_on)
+    # lights.update(samples_on)
+    try:
+        lq.put(samples_on, block=False)
+    except:
+        pass
+    # logger.info(f"putting {samples_on} in queue")
         # f = sample.Sample.audio_executor.submit(lights.update, samples_on)
         # f.add_done_callback(lambda _: lights.refresh_done())
 
@@ -123,4 +136,6 @@ while True:
 
     # sys.stdout.flush()
     # sys.stderr.flush()
+    # import keyboard
+    # keyboard.hook(on_key)
     time.sleep(0.0005)
