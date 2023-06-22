@@ -35,8 +35,8 @@ class SoundData:
     bpm: int
     source_step: int
     step: int
-    semitones: int
-    source: Optional['SoundData']
+    semitones: int = field(default=0)
+    source: Optional['SoundData'] = None
 
     def __init__(self) -> None:
         self.bpm = 143
@@ -76,7 +76,7 @@ def load_samples():
             if m := re.fullmatch(r"([0-9]{2,3}).+.wav", f):
                 # print(f)
                 bpm = int(m.group(1))
-                bnk.append(Sample(f"{sample_dir}/{m.group()}", bpm))
+                bnk.append(Sample(f"{sample_dir}/{m.group()}", bpm, i - 1))
             else:
                 logger.warn(f"wrong filename format for {f}, not loaded")
         logger.info([s.name for s in bnk])
@@ -99,8 +99,9 @@ class Sample:
         'skip_gate', 'extra_gate', 'stretch_chance', 'gate_length', 'volume', 'pitch'
     ])
 
-    def __init__(self, file, bpm):
+    def __init__(self, file, bpm, bank):
         self.name = file.split("samples/")[1]
+        self.bank = bank
         self.looping = False
         self.step_repeat = False    # mode active
         self.step_repeating = False # currently repeating steps
@@ -345,7 +346,7 @@ class Sample:
 
     # Is sound happening?
     def is_playing(self):
-        return self.channel and (s := self.channel.get_sound()) and s.get_volume() > 0
+        return self.channel is not None and (s := self.channel.get_sound()) and s.get_volume() > 0
         # return not self.is_muted() or self.looping
 
     def clear_sound_queue(self):

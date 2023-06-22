@@ -113,12 +113,12 @@ while True:
     # control.update()
     sequence.update(midi.get_status())
     sample.play_samples(sequence.step_duration())
-    samples_on = list(map(sample.Sample.is_playing, sample.current_samples()))
+    sample_states = list(map(lights.SampleState.of, sample.current_samples()))
     # if lights.refresh_ready(samples_on):
         # lights.refreshing = True
     # lights.update(samples_on)
     try:
-        lq.put(samples_on, block=False)
+        lq.put(sample_states, block=False)
     except:
         pass
     # logger.info(f"putting {samples_on} in queue")
