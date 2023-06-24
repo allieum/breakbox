@@ -22,7 +22,7 @@ logger = utility.get_logger(__name__)
 # logger.setLevel('DEBUG')
 bank = 0
 BANK_SIZE = 6
-NUM_BANKS = 6
+NUM_BANKS = 10
 SAMPLE_RATE = 22050
 
 pygame.mixer.init(frequency=SAMPLE_RATE, buffer=256, channels=1)

@@ -77,15 +77,21 @@ def to_tuple(color):
 
 @dataclass
 class SampleState:
-    playing: bool
-    bank: int
+    playing: bool = field(default=False)
+    bank: int = field(default=0)
+    selected: bool = field(default=False)
     step: int | None = field(compare=False, default=None)
 
     @staticmethod
-    def of(sample: Sample):
-        state = SampleState(sample.is_playing(), sample.bank)
-        if sample.channel and (playing := sample.channel.get_sound()) in sound_data:
-            state.step = sound_data[playing].step
+    def of(sample: Sample, selected_sample: Sample, step):
+        selected = selected_sample == sample
+        # if selected:
+        #     logger.info(f"{selected_sample} vs {sample} {selected}")
+        state = SampleState(sample.is_playing(), sample.bank, selected, step)
+        # grab step from sequencer
+        # if sample.channel and (playing := sample.channel.get_sound()) in sound_data:
+        #     state.step = sound_data[playing].step
+        # state.step = step
         return state
 
 @dataclass
@@ -129,27 +135,38 @@ def init():
 def run(lights_q: Queue):
     # global last_update, last_state, refreshing
     logger.info(f"lights baby")
-    odata = board.D5
-    oclock = board.D6
-    numleds = 7
-    bright = 0.75
+    # odata = board.D5
+    # oclock = board.D6
+    odata = board.MOSI
+    oclock = board.SCK
+    numleds = 6
+    bright = 0.5
     leds = adafruit_ws2801.WS2801(oclock, odata, numleds, brightness=bright, auto_write=False)
     leds.fill(0)
     leds.show()
-    sample_lights_offset = 1
-    led_states = [LedState(j + sample_lights_offset, leds) for j in range(numleds - 1)]
+    sample_lights_offset = 0
+    led_states = [LedState(j + sample_lights_offset, leds) for j in range(numleds)]
     min_refresh = 2
     max_refresh = 0.025
     last_update = time.time()
-    prev_samples = None
+    sample_states = [SampleState()] * 6
     while True:
         # make a copy
+        prev_samples = list(map(dataclasses.replace, sample_states))
         last_state = list(map(dataclasses.replace, led_states))
         sample_states = lights_q.get()
         logger.debug(f"got {sample_states} from queue")
-        for sample, led in zip(sample_states, led_states):
-            led.fade(palette[sample.bank] if sample.playing else OFF)
+        bank_changed = any(((new_bank := sample.bank) != prev.bank for sample, prev in zip(sample_states, prev_samples)))
+        for sample, led, prev in zip(sample_states, led_states, prev_samples):
+            if sample.selected and prev.step != sample.step and sample.step % 4 == 0:
+                logger.debug(f"selected")
+                led.fade(0x00ff00)
+            else:
+                led.fade(palette[sample.bank % len(palette)] if sample.playing else OFF)
+            if bank_changed and led.i != new_bank % 6:
+                led.fade(palette[new_bank % len(palette)])
             led.update()
+
         elapsed = time.time() - last_update
         updating = led_states != last_state and elapsed > max_refresh
         if updating or elapsed > min_refresh:
@@ -157,18 +174,19 @@ def run(lights_q: Queue):
             for led in led_states:
                 led.write()
             leds.show()
+            # logger.info(f"{selected_sample} vs ")
             # logger.info(f"updating lights")
         else:
             led_states = last_state
+            sample_states = prev_samples
             # logger.info(f"updating lights to {led_states}")
-        if prev_samples != sample_states:
-            prev_samples = sample_states
-            logger.info(f"sample state changed")
+        # if prev_samples != sample_states:
+        #     prev_samples = sample_states
+        #     logger.info(f"sample state changed")
         # if updating:
         #     logger.info(f"updating lights")
         time.sleep(0.005)
 
-# last_update = time.time()
 # last_state = None
 # refreshing = False
 # REFRESH_INTERVAL = 0.010
