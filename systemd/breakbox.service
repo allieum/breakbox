@@ -4,7 +4,7 @@ Description=breakbox service
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/home/drum/breakbox
+WorkingDirectory=/home/pi/breakbox
 ExecStart=python3.11 break.py
 Restart=always
 

@@ -15,7 +15,7 @@ import control
 import keys
 import midi
 import utility
-import display
+# import display
 import lights
 
 from dmx import DMXInterface
@@ -43,7 +43,7 @@ def on_key(e):
         keys.key_released(e)
 keyboard.hook(on_key)
 
-display.init()
+# display.init()
 lights.init()
 control.init()
 sample.load_samples()
