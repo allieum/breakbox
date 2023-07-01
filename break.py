@@ -16,9 +16,9 @@ import keys
 import midi
 import utility
 # import display
-import lights
+# import lights
 
-from dmx import DMXInterface
+# from dmx import DMXInterface
 import blink
 
 
@@ -31,12 +31,13 @@ current_time = datetime.now().strftime("%H:%M:%S")
 logger.debug(f"Start time = {current_time}")
 
 dmx_interface = None
-try:
-    dmx_interface = DMXInterface()
-except:
-    pass
+# try:
+#     dmx_interface = DMXInterface()
+# except:
+#     pass
 
 def on_key(e):
+    logger.info(f"{e.name} {e.event_type}")
     if e.event_type == keyboard.KEY_DOWN:
         keys.key_pressed(e)
     elif e.event_type == keyboard.KEY_UP:
@@ -44,7 +45,7 @@ def on_key(e):
 keyboard.hook(on_key)
 
 # display.init()
-lights.init()
+# lights.init()
 control.init()
 sample.load_samples()
 midi.connect()
@@ -104,8 +105,8 @@ def update_dmx(step):
 
 lq = Queue(1)
 # Thread(target=lights.run).run()
-p = Process(target=lights.run, args=(lq,))
-p.start()
+# p = Process(target=lights.run, args=(lq,))
+# p.start()
 
 last_dmx = time.time()
 last_dmx_step = None
@@ -113,14 +114,14 @@ while True:
     # control.update()
     sequence.update(midi.get_status())
     sample.play_samples(sequence.step_duration())
-    sample_states = [lights.SampleState.of(s, keys.selected_sample, sequence.step) for s in sample.current_samples()]
+    # sample_states = [lights.SampleState.of(s, keys.selected_sample, sequence.step) for s in sample.current_samples()]
     # if lights.refresh_ready(samples_on):
         # lights.refreshing = True
     # lights.update(samples_on)
-    try:
-        lq.put(sample_states, block=False)
-    except:
-        pass
+    # try:
+    #     lq.put(sample_states, block=False)
+    # except:
+    #     pass
     # logger.info(f"putting {samples_on} in queue")
         # f = sample.Sample.audio_executor.submit(lights.update, samples_on)
         # f.add_done_callback(lambda _: lights.refresh_done())

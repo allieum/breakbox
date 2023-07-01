@@ -80,6 +80,7 @@ def load_samples():
             else:
                 logger.warn(f"wrong filename format for {f}, not loaded")
         logger.info([s.name for s in bnk])
+    sample_banks[0][0].sound.play()
 
 def current_samples() -> List['Sample']:
     return sample_banks[bank]

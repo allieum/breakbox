@@ -378,7 +378,7 @@ release = {
 }
 
 def key_pressed(e):
-    logger.debug(f"start press handler for {e.name}")
+    logger.info(f"start press handler for {e.name}")
 
     if all([key_held[k] for k in RESET_KEYS]):
         logger.warning("restarting program!!!")
