@@ -36,12 +36,15 @@ dmx_interface = None
 # except:
 #     pass
 
+
 def on_key(e):
     logger.info(f"{e.name} {e.event_type}")
     if e.event_type == keyboard.KEY_DOWN:
         keys.key_pressed(e)
     elif e.event_type == keyboard.KEY_UP:
         keys.key_released(e)
+
+
 keyboard.hook(on_key)
 
 # display.init()
@@ -49,7 +52,7 @@ keyboard.hook(on_key)
 control.init()
 sample.load_samples()
 midi.connect()
-sequence.control_bpm(control.encoder)
+# sequence.control_bpm(control.encoder)
 
 
 def bounce(step):
@@ -57,6 +60,7 @@ def bounce(step):
     if x < 16:
         return x + 1
     return 16 - (x % 16)
+
 
 def bounce_lights(step):
     # tri = modulation.triangle(15)
@@ -66,6 +70,7 @@ def bounce_lights(step):
     return (light,)
     # return lights_for_step(light)
 
+
 def lights_for_step(step):
     light_index = step % 8 + 1 + 8
     mirror_index = -(light_index - 8) + 8 + 1
@@ -73,6 +78,8 @@ def lights_for_step(step):
 
 # if (now := time.time()) - last_dmx > 0.050: # and last_dmx_step != sequence.step:
 # TODO move into own file
+
+
 def update_dmx(step):
     if dmx_interface is None:
         return
@@ -103,6 +110,7 @@ def update_dmx(step):
     logger.debug(f"dmx frame send took {time.time() - now}s")
 # sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
 
+
 lq = Queue(1)
 # Thread(target=lights.run).run()
 # p = Process(target=lights.run, args=(lq,))
@@ -116,15 +124,15 @@ while True:
     sample.play_samples(sequence.step_duration())
     # sample_states = [lights.SampleState.of(s, keys.selected_sample, sequence.step) for s in sample.current_samples()]
     # if lights.refresh_ready(samples_on):
-        # lights.refreshing = True
+    # lights.refreshing = True
     # lights.update(samples_on)
     # try:
     #     lq.put(sample_states, block=False)
     # except:
     #     pass
     # logger.info(f"putting {samples_on} in queue")
-        # f = sample.Sample.audio_executor.submit(lights.update, samples_on)
-        # f.add_done_callback(lambda _: lights.refresh_done())
+    # f = sample.Sample.audio_executor.submit(lights.update, samples_on)
+    # f.add_done_callback(lambda _: lights.refresh_done())
 
     # state = (sequence.bpm.get())
     # display.update(state)
@@ -133,7 +141,7 @@ while True:
         if sequence.midi_started:
             print("lost midi connection")
             sequence.stop_midi()
-        midi.reconnect(suppress_output = True)
+        midi.reconnect(suppress_output=True)
 
     # sys.stdout.flush()
     # sys.stderr.flush()
