@@ -48,8 +48,11 @@ K_SPICE_DOWN = 'q'
 
 K_FX_CANCEL = 'z'
 
+K_RECORD = 'enter'
+K_ERASE = 'alt'
+
 FX_KEYS = set((
-    K_SPICE_UP, K_SPICE_DOWN, K_QT, K_HT, K_PITCH_DOWN, K_PITCH_UP, *SR_KEYS.keys()
+    K_RECORD, K_SPICE_UP, K_SPICE_DOWN, K_QT, K_HT, K_PITCH_DOWN, K_PITCH_UP, *SR_KEYS.keys()
 ))
 
 dactyl_keys =[
@@ -133,12 +136,12 @@ def spice_down_press(selected):
 def pitch_up_press(selected):
     pitch_up_mod(selected)
     step_repeat_press(1, selected)
-    return (Effect(pitch_up_release))
+    return (Effect(functools.partial(pitch_up_release, selected)))
 
 def pitch_down_press(selected):
     pitch_down_mod(selected)
     step_repeat_press(1, selected)
-    return (Effect(pitch_down_release))
+    return (Effect(functools.partial(pitch_down_release, selected)))
 
 def pitch_up_release(selected):
     # todo cancel & gretel
@@ -181,7 +184,7 @@ def sample_press(i, is_repeat):
         logger.info(f"{prev_selected.name} looping = {prev_selected.looping}, {selected_effects}")
         for effect in selected_effects:
             if effect is not None:
-                effect.cancel(prev_selected)
+                effect.cancel()
         selected_effects.clear()
         if not prev_selected.looping and not is_pushed(prev_selected):
             prev_selected.mute()
@@ -318,6 +321,19 @@ def fx_cancel_press(repeat, shift=None):
         selected_sample.cancel_fx()
     selected_effects.clear()
 
+def record_press(selected):
+    selected.recording = True
+    return Effect(functools.partial(setattr, selected, 'recording', False))
+
+def record_release(selected):
+    selected.recording = False
+
+def erase_press(_):
+    if selected_sample is None:
+        return
+    selected_sample.recorded_steps[s := sequence.step % len(selected_sample.recorded_steps)] = None
+    logger.info(f"{selected_sample.name} erasing step {s}")
+
 
 def make_handler(handler, x):
     def f(*args):
@@ -342,6 +358,8 @@ press = {
     # K_GATE_INVERT: gate_invert_press,
     # K_GATE_FOLLOW: gate_follow_press,
     K_SHIFT: shift_press,
+    K_RECORD: momentary_fx_press(record_press),
+    K_ERASE: erase_press,
     K_FX_CANCEL: fx_cancel_press,
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_press, i) for i in range(len(SAMPLE_KEYS))])),
     **{sr_key: momentary_fx_press(make_handler(step_repeat_press, length)) for sr_key, length in SR_KEYS.items()}
@@ -354,6 +372,7 @@ release = {
     K_SPICE_DOWN: momentary_fx_release(),
     K_PITCH_UP: momentary_fx_release(pitch_up_release, shift_persist=False),
     K_PITCH_DOWN: momentary_fx_release(pitch_down_release, shift_persist=False),
+    K_RECORD: momentary_fx_release(record_release),
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_release, i) for i in range(len(SAMPLE_KEYS))])),
     **{sr_key: momentary_fx_release(make_handler(step_repeat_release, length)) for sr_key, length in SR_KEYS.items()}
 }

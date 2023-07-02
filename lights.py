@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import math
 import dataclasses
 from multiprocessing import Queue
 import time
@@ -59,7 +60,7 @@ OFF = 0x0
 
 def average(a, b, b_weight=0.5):
     a_weight = 1 - b_weight
-    return round(a * a_weight + b * b_weight)
+    return math.floor(a * a_weight + b * b_weight)
 
 def to_tuple(color):
     if type(color) is tuple:
@@ -75,6 +76,7 @@ class SampleState:
     playing: bool = field(default=False)
     bank: int = field(default=0)
     selected: bool = field(default=False)
+    recording: bool = field(default=False)
     step: int | None = field(compare=False, default=None)
 
     @staticmethod
@@ -82,7 +84,7 @@ class SampleState:
         selected = selected_sample == sample
         # if selected:
         #     logger.info(f"{selected_sample} vs {sample} {selected}")
-        state = SampleState(sample.is_playing(), sample.bank, selected, step)
+        state = SampleState(sample.is_playing(), sample.bank, selected, sample.recording, step)
         # grab step from sequencer
         # if sample.channel and (playing := sample.channel.get_sound()) in sound_data:
         #     state.step = sound_data[playing].step
@@ -94,27 +96,27 @@ class LedState:
     i: int = field(compare=False)
     leds: adafruit_ws2801.WS2801 = field(compare=False)
     color: tuple[int, int, int] = field(default=(0, 0, 0))
-    fade_goal: tuple[int, int, int] | None = field(compare=False, default=None)
+    fade_goals: list[tuple[tuple[int, int, int], float, float]] = field(compare=False, default_factory=list)
 
     def update(self):
         color = self.color
-        if self.fade_goal:
-            self.mix(self.fade_goal)
-        if self.fade_goal == self.color:
-            self.fade_goal = None
-        # if changed := self.color != color:
-        #     self.leds[self.i] = self.color
-        # return changed
+        for item in self.fade_goals:
+            fade_color, start, duration = item
+            if time.time() - start > duration:
+                self.fade_goals.remove(item)
+            self.mix(fade_color)
+        self.mix(0x0, 0.08)
+
     def write(self):
-        # logger.info(f"{self.i} setting to {self.color}")
+        logger.debug(f"{self.i} setting to {self.color}")
         self.leds[self.i] = self.color
 
-    def fade(self, color):
-        self.fade_goal = to_tuple(color)
+    def fade(self, color, duration):
+        self.fade_goals.append((to_tuple(color), time.time(), duration))
 
-    def mix(self, color):
+    def mix(self, color, strength=0.25):
         color = to_tuple(color)
-        self.color = tuple(map(lambda ab: average(*ab), zip(self.color, color)))
+        self.color = tuple(map(lambda ab: average(*ab, strength), zip(self.color, color)))
 
 def init():
     # TODO conditional import / init
@@ -142,7 +144,7 @@ def run(lights_q: Queue):
     sample_lights_offset = 0
     led_states = [LedState(j + sample_lights_offset, leds) for j in range(numleds)]
     min_refresh = 2
-    max_refresh = 0.025
+    max_refresh = 0.010
     last_update = time.time()
     sample_states = [SampleState()] * 6
     while True:
@@ -153,13 +155,15 @@ def run(lights_q: Queue):
         logger.debug(f"got {sample_states} from queue")
         bank_changed = any(((new_bank := sample.bank) != prev.bank for sample, prev in zip(sample_states, prev_samples)))
         for sample, led, prev in zip(sample_states, led_states, prev_samples):
-            if sample.selected and prev.step != sample.step and sample.step % 4 == 0:
-                logger.debug(f"selected")
-                led.fade(0x00ff00)
-            else:
-                led.fade(palette[sample.bank % len(palette)] if sample.playing else OFF)
+            if sample.selected and prev.step != sample.step and sample.step % 16 == 8:
+                color = 0xff0000 if sample.recording else 0x00ff00
+                led.fade(color, 0.3)
+            # pulse on sample loop
+            if sample.playing and prev.step != sample.step and sample.step % 16 == 0:
+                led.fade(palette[sample.bank % len(palette)], 1)
+            # if not sample.selected and not sample.recording:
             if bank_changed and led.i != new_bank % 6:
-                led.fade(palette[new_bank % len(palette)])
+                led.fade(palette[new_bank % len(palette)], 2)
             led.update()
 
         elapsed = time.time() - last_update
