@@ -331,7 +331,7 @@ def record_release(selected):
 def erase_press(_):
     if selected_sample is None:
         return
-    selected_sample.recorded_steps[s := sequence.step % len(selected_sample.recorded_steps)] = None
+    selected_sample.recorded_steps[s := (sequence.step + 2) % len(selected_sample.recorded_steps)] = None
     logger.info(f"{selected_sample.name} erasing step {s}")
 
 

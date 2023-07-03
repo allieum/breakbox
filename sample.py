@@ -96,7 +96,7 @@ class Sample:
     lookahead = 0.001
     audio_executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
     SpiceParams = namedtuple('SpicedParams', [
-        'skip_gate', 'extra_gate', 'stretch_chance', 'gate_length', 'volume', 'pitch'
+        'skip_gate', 'extra_gate', 'stretch_chance', 'gate_length', 'volume', 'pitch', 'scatter'
     ])
 
     def __init__(self, file, bpm, bank):
@@ -133,10 +133,12 @@ class Sample:
             stretch_chance = modulation.SpiceParams(max_chance=0.2, max_delta=0, spice=self.spice_level, step_data=None),
             gate_length = modulation.SpiceParams(max_chance=0.5, max_delta=0.25, spice=self.spice_level, step_data=None),
             volume = modulation.SpiceParams(max_chance=0.3, max_delta=0.25, spice=self.spice_level, step_data=None),
-            pitch = modulation.SpiceParams(max_chance=0.1, max_delta=3, spice=self.spice_level, step_data=None)
+            pitch = modulation.SpiceParams(max_chance=0.1, max_delta=3, spice=self.spice_level, step_data=None),
+            scatter = modulation.SpiceParams(max_chance=0.2, max_delta=16, spice=self.spice_level, step_data=None, integer=True)
         )
         self.volume= modulation.Param(1, min_value=0, max_value=1).spice(self.spices_param.volume)
         self.pitch = modulation.Param(0, min_value=-12, max_value=12, round=True).spice(self.spices_param.pitch)
+
         self.dice()
         #
         # self.cache = {
@@ -517,7 +519,16 @@ class Sample:
         pygame.mixer.set_reserved(n)
 
     def get_sound_slices(self):
-        return [s if rec is None else rec for s, rec in zip(self.sound_slices, self.recorded_steps)]
+        slices = [s if rec is None else rec for s, rec in zip(self.sound_slices, self.recorded_steps)]
+        for i in range(0, len(slices) - 2, 2):
+            scatter_offset = (val := self.spices_param.scatter.value(0, i)) - val % 4
+            scatter_offset %= len(slices)
+            j = i + scatter_offset
+            j %= len(slices)
+            # if scatter_offset != 0:
+            #     logger.info(f"scatter offset {scatter_offset}")
+            slices[j:j + 4] = slices[i:i + 4]
+        return slices
 
     def queue_step(self, step, t, step_interval):
         srlength = round(self.step_repeat_length / self.get_rate())

@@ -63,7 +63,7 @@ def bounce_lights(step):
     light = bounce(step)
     logger.debug(f"light {light}")
     return (light,)
-    # return lights_for_step(light)
+# return lights_for_step(light)
 
 def lights_for_step(step):
     light_index = step % 8 + 1 + 8
@@ -100,7 +100,7 @@ def update_dmx(step):
     dmx_interface.send_update()
     # sample.Sample.audio_executor.submit(dmx_interface.send_update)
     logger.debug(f"dmx frame send took {time.time() - now}s")
-# sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
+sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
 
 lq = Queue(1)
 # Thread(target=lights.run).run()

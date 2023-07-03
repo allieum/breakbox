@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from random import random
 import utility
@@ -147,6 +147,7 @@ class SpiceParams:
     max_delta: float | int
     spice: Param
     step_data: None | list
+    integer: bool = field(default=False)
 
     def toss(self, step):
         if self.step_data is None:
@@ -169,6 +170,8 @@ class SpiceParams:
         delta = 2 * self.max_delta * step_intensity - self.max_delta
         if step_chance < chance:
             val += delta
+        if self.integer:
+            val = round(val)
         return val
 
     def dice(self, step_data):
