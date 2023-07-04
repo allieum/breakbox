@@ -2,11 +2,8 @@ from concurrent.futures import thread
 from multiprocessing import Process, Queue
 from threading import Thread
 import time
-# import rtmidi
 import sys
 import keyboard
-# from ctypes import *
-# from contextlib import contextmanager
 from datetime import datetime
 
 from sequence import sequence
@@ -17,24 +14,14 @@ import midi
 import utility
 import display
 import lights
+from light_patterns import BouncePattern
 
-from dmx import DMXInterface
 import blink
-
-
-# with DMXInterface() as interface:
-#
-
 
 logger = utility.get_logger(__name__)
 current_time = datetime.now().strftime("%H:%M:%S")
 logger.debug(f"Start time = {current_time}")
 
-dmx_interface = None
-try:
-    dmx_interface = DMXInterface()
-except:
-    pass
 
 def on_key(e):
     if e.event_type == keyboard.KEY_DOWN:
@@ -50,60 +37,22 @@ sample.load_samples()
 midi.connect()
 sequence.control_bpm(control.encoder)
 
+light_manager = blink.LightManager()
+light_manager.add_pattern(BouncePattern([255, 0, 0, 0 ,0 ,0]))
 
-def bounce(step):
-    x = step % 32
-    if x < 16:
-        return x + 1
-    return 16 - (x % 16)
+def update_lights(step):
+    light_manager.step(step)
+sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_lights, s))
 
-def bounce_lights(step):
-    # tri = modulation.triangle(15)
-    # light = round(tri(step % 16) * 7)
-    light = bounce(step)
-    logger.debug(f"light {light}")
-    return (light,)
-    # return lights_for_step(light)
+def dmx_updater():
+    while True:
+        light_manager.send_dmx()
+        time.sleep(0.03) #TODO: tune? adjust for drift?
 
-def lights_for_step(step):
-    light_index = step % 8 + 1 + 8
-    mirror_index = -(light_index - 8) + 8 + 1
-    return (light_index, mirror_index)
-
-# if (now := time.time()) - last_dmx > 0.050: # and last_dmx_step != sequence.step:
-# TODO move into own file
-def update_dmx(step):
-    if dmx_interface is None:
-        return
-    # last_dmx = now
-    # last_dmx_step = sequence.step
-    logger.debug(f"lighting dmx step {step}")
-    color = [0, 0, 0, 0, 0, 0]
-    time.sleep(0.020)
-    blink.Light.scale(0.8)
-    for i, s in enumerate(sample.current_samples()):
-        if s.channel and s.channel.get_busy():
-            source_step = sample.sound_data[s.channel.get_sound()].source_step
-            if source_step != sequence.step:
-                logger.debug(f"source step {source_step}")
-            color[i] = 255
-            for j in bounce_lights(source_step):
-                blink.lights[j].absorb(color)
-
-    # light_index = sequence.step % 8 + 1 + 8
-    # mirror_index = -(light_index - 8) + 8 + 1
-    # if any(color):
-    #     blink.lights[light_index].set(color)
-    #     blink.lights[mirror_index].set(color)
-    dmx_interface.set_frame(list(blink.Light.data))
-    now = time.time()
-    dmx_interface.send_update()
-    # sample.Sample.audio_executor.submit(dmx_interface.send_update)
-    logger.debug(f"dmx frame send took {time.time() - now}s")
-# sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
+thread = Thread(target=dmx_updater, daemon=True)
+thread.start()
 
 lq = Queue(1)
-# Thread(target=lights.run).run()
 p = Process(target=lights.run, args=(lq,))
 p.start()
 
