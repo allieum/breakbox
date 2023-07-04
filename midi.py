@@ -5,11 +5,16 @@ import time
 CLOCK = 0b11111000
 START = 0b11111010
 STOP = 0b11111100
+
 TIMEOUT = 6
 
 time_prev_midi_message = time.time()
 midi_input = None
 last_connect_attempt = None
+
+def is_note_on(status):
+    return status is not None and 0b11110000 & status == 0b10010000
+
 
 def connect(block = False, suppress_output = False):
     global time_prev_midi_message, midi_input
@@ -41,15 +46,19 @@ def reconnect(block = False, suppress_output = False):
     pygame.midi.quit()
     midi_input = connect(block, suppress_output)
 
+note_q = []
 def get_status():
     global time_prev_midi_message
     if midi_input is None:
         return None
     events = midi_input.read(1)
-    status = events[0][0][0] if len(events) == 1 else None
-    if status is not None:
+    msg = events[0][0] if len(events) == 1 else None
+    if msg is not None:
         time_prev_midi_message = time.time()
-    return status
+        if is_note_on(status := msg[0]):
+            note_q.append(msg[1])
+        return msg[0], msg[1:]
+    return None, None
 
 def lost_connection():
     if midi_input is None:
