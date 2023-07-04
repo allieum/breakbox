@@ -1,48 +1,62 @@
 import array
 import utility
+import time
+
+from dmx import DMXInterface
 
 logger = utility.get_logger(__name__)
 
 class Light:
-    data = array.array('B', [0] * 119)
     start_channel = 12
     brightness = 255
 
-    def __init__(self, i):
-        self.i = i
-        self.start_index = self.start_channel - 1 + self.i * 6
-        self.set_brightness(self.brightness)
-
-    def set(self, color):
-        for j, value in enumerate(color):
-            self.data[self.start_index + j] = value
+    def __init__(self):
+        self.color = [0, 0, 0, 0, 0, 0]
 
     def absorb(self, color):
         for j, value in enumerate(color):
-            old = self.data[self.start_index + j]
-            if old == round(0.8 * value) and old != 0:
-                logger.info(f"setting light {self.i} to same color, toggling off")
-                value = 0
-            elif value != 0:
-                value = (old + value) // 2
-            self.data[self.start_index + j] = value
+            self.color[j] = (self.color[j] + value) // 2
 
-    @staticmethod
-    def scale(factor):
-        for i in range(Light.start_channel - 1, len(Light.data)):
-            Light.data[i] = round(Light.data[i] * factor)
 
-    @staticmethod
-    def all_off():
-        Light.data[Light.start_channel - 1:] = array.array('B', [0] * (119 - (Light.start_channel - 1)))
+class LightManager:
+    start_channel = 12
+    def __init__(self):
+        self.patterns = []
+        self.lights = [Light() for i in range(18)]
+        self.brightness = 255
+        self.dmx_interface = None
+        try:
+            self.dmx_interface = DMXInterface()
+        except:
+            pass
 
-    @staticmethod
-    def set_brightness(level):
-        Light.data[0] = level
+    def add_pattern(self, pattern):
+        self.patterns.append(pattern)
+    
+    def step(self, step):
+        for pattern in self.patterns:
+            pattern.update()
 
-    @staticmethod
-    def send_frame(interface):
-        interface.set_frame(list(Light.data))
-        interface.send_update()
+            for i, light in self.lights:
+                light.absorb(pattern.lights[i].color)
+    
+    def send_dmx(self):
+        if not self.dmx_interface:
+            return
 
-lights = [Light(i) for i in range(18)]
+        self.dmx_interface.set_frame(self.get_light_data())
+        now = time.time()
+        self.dmx_interface.send_update()
+        logger.debug(f"dmx frame send took {time.time() - now}s")
+
+    def get_light_data(self):
+        data = array.array('B', [0] * 119)
+        data[0] = self.brightness
+        for i, light in self.lights:
+            start_idx = self.start_channel - 1
+            light_idx = i * 6
+            for color_idx, color in light.color:
+                data[start_idx + light_idx + color_idx] = color
+        return list(data)
+
+
