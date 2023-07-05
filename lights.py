@@ -217,7 +217,7 @@ def run(lights_q: Queue):
                 led.write()
             leds.show()
             # logger.info(f"{selected_sample} vs ")
-            logger.info(f"updating lights")
+            # logger.info(f"updating lights")
         else:
             led_states = last_state
             sample_states = prev_samples

@@ -50,7 +50,7 @@ note_q = []
 def get_status():
     global time_prev_midi_message
     if midi_input is None:
-        return None
+        return None, None
     events = midi_input.read(1)
     msg = events[0][0] if len(events) == 1 else None
     if msg is not None:

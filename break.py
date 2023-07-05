@@ -96,7 +96,7 @@ def update_dmx(step, note_number=None):
     for note_number in midi.note_q:
         if note_number == 0:
             for light in blink.lights:
-                logger.info(f"bass flash {step} {note_number}")
+                # logger.info(f"bass flash {step} {note_number}")
                 light.absorb([255, 0, 0, 255, 255, 255])
     midi.note_q.clear()
 
@@ -109,21 +109,20 @@ def update_dmx(step, note_number=None):
     now = time.time()
     dmx_interface.send_update()
     # sample.Sample.audio_executor.submit(dmx_interface.send_update)
-    logger.info(f"dmx frame send took {time.time() - now}s")
-# sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
+    # logger.info(f"dmx frame send took {time.time() - now}s")
+sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
 
 lq = Queue(1)
-# Thread(target=lights.run).run()
 p = Process(target=lights.run, args=(lq,))
 p.start()
 
-blink.Light.set_brightness(50)
+# blink.Light.set_brightness(50)
 last_dmx = time.time()
 last_dmx_step = None
 while True:
     # control.update()
     status, data = midi.get_status()
-    sequence.update()
+    sequence.update(status)
     sample.play_samples(sequence.step_duration())
     sample_states = [lights.SampleState.of(s, keys.selected_sample, sequence.step) for s in sample.current_samples()]
     # if lights.refresh_ready(samples_on):

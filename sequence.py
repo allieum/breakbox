@@ -12,7 +12,8 @@ MAX_BEATS = 16
 STEPS_PER_BEAT = 4
 MAX_STEPS = MAX_BEATS * STEPS_PER_BEAT
 
-midi_lag_time = 0.039
+# midi_lag_time = 0.039
+midi_lag_time = 0.050
 lookahead_time = 0.100
 
 class Sequence:
