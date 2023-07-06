@@ -12,7 +12,6 @@ MAX_BEATS = 16
 STEPS_PER_BEAT = 4
 MAX_STEPS = MAX_BEATS * STEPS_PER_BEAT
 
-# midi_lag_time = 0.039
 midi_lag_time = 0.050
 lookahead_time = 0.100
 
@@ -47,7 +46,6 @@ class Sequence:
     def start_internal(self):
         self.internal_start_time = time.time()
         self._start()
-        # sample.queue_samples(0, self.internal_start_time)
         print("starting internal clock")
 
     def stop_internal(self):
