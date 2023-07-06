@@ -2,24 +2,30 @@ from concurrent.futures import thread
 from multiprocessing import Process, Queue
 from threading import Thread
 import time
-# import rtmidi
 import sys
 import keyboard
-# from ctypes import *
-# from contextlib import contextmanager
 from datetime import datetime
-
 from sequence import sequence
 import sample
 import control
 import keys
 import midi
 import utility
+import blink
+import pkg_resources
+
+# dists = [str(d).replace(" ", "==") for d in pkg_resources.working_set]
+# for i in dists:
+# print(i)
+
+# import rtmidi
+# from ctypes import *
+# from contextlib import contextmanager
+
 # import display
 # import lights
 
 # from dmx import DMXInterface
-import blink
 
 
 # with DMXInterface() as interface:

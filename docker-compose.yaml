@@ -1,0 +1,19 @@
+version: "3"
+services:
+  breakbox:
+    container_name: breakbox
+    privileged: true
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - "8080:8080"
+    command:
+      [
+        "python",
+        "-m",
+        "break.py",
+        "--host=0.0.0.0",
+        "--device=/dev/ttyACM0",
+        "--reload"
+      ]
