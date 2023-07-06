@@ -10,11 +10,6 @@ import utility
 
 logger = utility.get_logger(__name__)
 
-# odata = board.D5
-# oclock = board.D6
-# numleds = 25
-# bright = 1.0
-# leds = adafruit_ws2801.WS2801(oclock, odata, numleds, brightness=bright, auto_write=False)
 
 AMARANTH = 0x9f2b68
 AMARANTH = (0x9f, 0x2b, 0x68)
