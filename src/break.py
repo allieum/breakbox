@@ -48,8 +48,8 @@ lights.init()
 control.init()
 sample.load_samples()
 midi.connect()
+midi.load_midi_files()
 sequence.control_bpm(control.encoder)
-
 
 def bounce(step):
     x = step % 32
@@ -63,7 +63,6 @@ def bounce_lights(step):
     light = bounce(step)
     logger.debug(f"light {light}")
     return (light,)
-# return lights_for_step(light)
 
 def lights_for_step(step):
     light_index = step % 8 + 1 + 8

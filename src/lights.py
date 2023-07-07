@@ -175,7 +175,11 @@ def run(lights_q: Queue):
     oclock = board.SCK
     numleds = 6
     bright = 0.5
-    leds = adafruit_ws2801.WS2801(oclock, odata, numleds, brightness=bright, auto_write=False)
+    try:
+        leds = adafruit_ws2801.WS2801(oclock, odata, numleds, brightness=bright, auto_write=False)
+    except:
+        logger.info("failed to initialize lights")
+        return
     leds.fill(0)
     leds.show()
     sample_lights_offset = 0

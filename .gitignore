@@ -1,3 +1,5 @@
 # *.wav
 /.dir-locals.el
 *.reapeaks
+src/nested-tuplets/*
+src/nested-tuplets

@@ -66,7 +66,7 @@ def write_wav(soundbytes, filename):
         channels=1
     ).export(filename, format='wav')
 
-dir_path = os.path.pardir
+dir_path = os.path.dirname(os.path.realpath(__file__))
 sample_banks = []
 def load_samples():
     for i in range(1, NUM_BANKS + 1):
