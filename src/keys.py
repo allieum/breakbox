@@ -38,7 +38,9 @@ K_DICE_DOWN = '`'
 # halftime (0.5 timestretch) / quartertime
 K_QT = '2'
 K_HT = 'w'
-K_TS_UP = 'ctrl'
+# K_TS_UP = 'ctrl'
+K_TS_UP = 'ctrl.blah'
+K_ONESHOT = 'ctrl'
 K_TS_DOWN = 'space'
 K_PITCH_UP = '3'
 K_PITCH_DOWN = 'e'
@@ -328,6 +330,12 @@ def record_press(selected):
 def record_release(selected):
     selected.recording = False
 
+def oneshot_press(selected):
+    selected.trigger_oneshot(sequence.step)
+
+def oneshot_release(selected):
+    selected.stop_oneshot()
+
 def erase_press(_):
     if selected_sample is None:
         return
@@ -359,6 +367,7 @@ press = {
     # K_GATE_FOLLOW: gate_follow_press,
     K_SHIFT: shift_press,
     K_RECORD: momentary_fx_press(record_press),
+    K_ONESHOT: momentary_fx_press(oneshot_press),
     K_ERASE: erase_press,
     K_FX_CANCEL: fx_cancel_press,
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_press, i) for i in range(len(SAMPLE_KEYS))])),
@@ -373,6 +382,7 @@ release = {
     K_PITCH_UP: momentary_fx_release(pitch_up_release, shift_persist=False),
     K_PITCH_DOWN: momentary_fx_release(pitch_down_release, shift_persist=False),
     K_RECORD: momentary_fx_release(record_release),
+    K_ONESHOT: momentary_fx_release(oneshot_release),
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_release, i) for i in range(len(SAMPLE_KEYS))])),
     **{sr_key: momentary_fx_release(make_handler(step_repeat_release, length)) for sr_key, length in SR_KEYS.items()}
 }

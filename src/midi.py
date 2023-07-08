@@ -100,7 +100,7 @@ def connect(block = False, suppress_output = False):
             if not block:
                 return midi_input, midi_output
             time.sleep(0.5)
-        return midi_input, midi_output
+    return midi_input, midi_output
 
 def reconnect(block = False, suppress_output = False):
     global midi_input, midi_output

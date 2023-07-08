@@ -111,6 +111,7 @@ class Sample:
         self.channel: pygame.mixer.Channel | None = None
         self.sound_queue: PriorityQueue[QueuedSound] = PriorityQueue()
         self.muted = True
+        self.step_offset = 0
         self.step_repeat_was_muted = False
         self.halftime = False
         self.quartertime = False
@@ -164,6 +165,14 @@ class Sample:
             sound_data[s].source_step = i
             sound_data[s].source = None
             sound_data[s].semitones = 0
+
+    def trigger_oneshot(self, step):
+        self.step_offset = step
+        # TODO doesnt do pitch etc. make method to get sound for step
+        self.queue(self.get_sound_slices()[0], time.time(), step)
+
+    def stop_oneshot(self):
+        self.step_offset = 0
 
     def dice(self):
         for param in self.spices_param:
@@ -531,6 +540,8 @@ class Sample:
         return slices
 
     def queue_step(self, step, t, step_interval):
+        # TODO magic
+        step = (step - self.step_offset) % 64
         srlength = round(self.step_repeat_length / self.get_rate())
         do_step_repeat = self.step_repeat and (self.looping or not self.is_muted())
         if step % 2 == 1 and self.spices_param.stretch_chance.toss(step - 1 % self.slices_per_loop):
