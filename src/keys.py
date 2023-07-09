@@ -1,5 +1,6 @@
 from collections import defaultdict
 import functools
+import time
 
 import sample
 from sequence import sequence
@@ -331,7 +332,9 @@ def record_release(selected):
     selected.recording = False
 
 def oneshot_press(selected):
-    selected.trigger_oneshot(sequence.step)
+    selected.clear_sound_queue()
+    sequence.last_queued_step -= 1
+    selected.trigger_oneshot(sequence.step, time.time() - sequence.step_time(sequence.step))
 
 def oneshot_release(selected):
     selected.stop_oneshot()

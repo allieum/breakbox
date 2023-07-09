@@ -111,7 +111,8 @@ class Sample:
         self.channel: pygame.mixer.Channel | None = None
         self.sound_queue: PriorityQueue[QueuedSound] = PriorityQueue()
         self.muted = True
-        self.step_offset = 0
+        self.oneshot_start_step = 0
+        self.oneshot_offset = 0.0
         self.step_repeat_was_muted = False
         self.halftime = False
         self.quartertime = False
@@ -166,13 +167,15 @@ class Sample:
             sound_data[s].source = None
             sound_data[s].semitones = 0
 
-    def trigger_oneshot(self, step):
-        self.step_offset = step
+    def trigger_oneshot(self, step, offset):
         # TODO doesnt do pitch etc. make method to get sound for step
-        self.queue(self.get_sound_slices()[0], time.time(), step)
+        self.queue(self.get_sound_slices()[0], time.time(), 0)
+        self.oneshot_start_step = step
+        self.oneshot_offset = offset
 
     def stop_oneshot(self):
-        self.step_offset = 0
+        self.oneshot_start_step = 0
+        self.oneshot_offset = 0
 
     def dice(self):
         for param in self.spices_param:
@@ -367,7 +370,8 @@ class Sample:
             self.sound_queue.get()
 
     def queue(self, sound, t, step):
-        logger.debug(f"queued sound in {self.name} for {datetime.fromtimestamp(t)}")
+        t += self.oneshot_offset
+        logger.info(f"queued sound in {self.name} for step {step} {datetime.fromtimestamp(t)}")
         # _, prev_t = self.sound_queue[len(self.sound_queue) - 1] if len(self.sound_queue) > 0 else None, None
         if self.recording:
             self.recorded_steps[i := step % len(self.recorded_steps)] = sound
@@ -541,7 +545,7 @@ class Sample:
 
     def queue_step(self, step, t, step_interval):
         # TODO magic
-        step = (step - self.step_offset) % 64
+        step = (step - self.oneshot_start_step) % 64
         srlength = round(self.step_repeat_length / self.get_rate())
         do_step_repeat = self.step_repeat and (self.looping or not self.is_muted())
         if step % 2 == 1 and self.spices_param.stretch_chance.toss(step - 1 % self.slices_per_loop):
