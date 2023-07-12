@@ -541,7 +541,6 @@ class Sample:
                 return None
             self.channel.queue(qsound.sound)
             sound_data[qsound.sound].playtime = predicted_finish
-            # self.channel.queue(sound)
             logger.debug(f"{self.name}: queued sample")
             return None
 
