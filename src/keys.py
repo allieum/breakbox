@@ -54,8 +54,8 @@ K_FX_CANCEL = 'z'
 K_RECORD = 'enter'
 K_ERASE = 'alt'
 
-FX_KEYS = set((
-    K_RECORD, K_SPICE_UP, K_SPICE_DOWN, K_QT, K_HT, K_PITCH_DOWN, K_PITCH_UP, *SR_KEYS.keys()
+AUTOPLAY_KEYS = set((
+    K_SPICE_UP, K_SPICE_DOWN, K_QT, K_HT, K_PITCH_DOWN, K_PITCH_UP, *SR_KEYS.keys()
 ))
 
 dactyl_keys =[
@@ -94,12 +94,14 @@ def pitch_up_mod(s):
     s.modulate(s.pitch, 1, Lfo.Shape.INC, 1)
 
 persist_fx_count = 0
-def momentary_fx_press(handler, shift_persist=True):
+def momentary_fx_press(handler, shift_persist=True, autoplay_sample=True):
     def fxpress(is_repeat, *args):
         global persist_fx_count
         if selected_sample is None or is_repeat:
             return
-        selected_sample.unmute()
+        if autoplay_sample:
+            selected_sample.mute_override = True
+            selected_sample.unmute()
         if persist := shift_persist and key_held[K_SHIFT]:
             logger.info(f"persisting current effect")
             selected_sample.looping = True
@@ -111,7 +113,7 @@ def momentary_fx_press(handler, shift_persist=True):
             selected_effects.clear()
     return fxpress
 
-def momentary_fx_release(handler = None, shift_persist=True):
+def momentary_fx_release(handler = None, shift_persist=True, autoplay_sample=True):
     def fxrelease(*args):
         global persist_fx_count
         if selected_sample is None:
@@ -121,9 +123,10 @@ def momentary_fx_release(handler = None, shift_persist=True):
             logger.info(f"skipping release so effect is persisted")
             persist_fx_count -= 1
             return
-        sample_activated = is_pushed(selected_sample) or any([key_held[k] for k in FX_KEYS])
-        if not selected_sample.looping and not sample_activated:
+        sample_activated = is_pushed(selected_sample) or any([key_held[k] for k in AUTOPLAY_KEYS])
+        if not selected_sample.looping and not sample_activated and autoplay_sample:
             selected_sample.mute()
+            selected_sample.mute_override = False
         if handler:
             handler(selected_sample, *args)
     return fxrelease
@@ -191,6 +194,7 @@ def sample_press(i, is_repeat):
         selected_effects.clear()
         if not prev_selected.looping and not is_pushed(prev_selected):
             prev_selected.mute()
+            prev_selected.mute_override = False
     selected_sample = sample.current_samples()[i]
 
     if key_held[K_SHIFT]:
@@ -208,6 +212,7 @@ def sample_press(i, is_repeat):
     if not sequence.is_started:
         sequence.start_internal()
 
+    selected_sample.mute_override = True
     selected_sample.unmute()
 
     for step_repeat_key, length in SR_KEYS.items():
@@ -228,14 +233,15 @@ def sample_release(i):
     s = sample.current_samples()[i]
     if is_current := s == selected_sample:
         selected_effects.clear()
-    if not s.looping and not (is_current and any([key_held[k] for k in FX_KEYS])):
+    if not s.looping and not (is_current and any([key_held[k] for k in AUTOPLAY_KEYS])):
         s.mute()
+        s.mute_override = False
 
 def shift_press(repeat):
     if repeat:
         return
     global persist_fx_count
-    fx_keys_pressed = sum([1 for k in FX_KEYS if key_held[k]])
+    fx_keys_pressed = sum([1 for k in AUTOPLAY_KEYS if key_held[k]])
     persist_fx_count += fx_keys_pressed
     if persist_fx_count > 0 and selected_sample is not None:
         selected_sample.looping = True
@@ -325,16 +331,17 @@ def fx_cancel_press(repeat, shift=None):
     selected_effects.clear()
 
 def record_press(selected):
-    selected.recording = True
-    return Effect(functools.partial(setattr, selected, 'recording', False))
+    selected.start_recording()
+    return Effect(selected.stop_recording)
 
 def record_release(selected):
-    selected.recording = False
+    selected.stop_recording()
 
 def oneshot_press(selected):
     selected.clear_sound_queue()
     sequence.last_queued_step -= 1
     selected.trigger_oneshot(sequence.step, time.time() - sequence.step_time(sequence.step))
+    return Effect(selected.stop_oneshot)
 
 def oneshot_release(selected):
     selected.stop_oneshot()
@@ -369,7 +376,7 @@ press = {
     # K_GATE_INVERT: gate_invert_press,
     # K_GATE_FOLLOW: gate_follow_press,
     K_SHIFT: shift_press,
-    K_RECORD: momentary_fx_press(record_press),
+    K_RECORD: momentary_fx_press(record_press, autoplay_sample=False),
     K_ONESHOT: momentary_fx_press(oneshot_press),
     K_ERASE: erase_press,
     K_FX_CANCEL: fx_cancel_press,
@@ -384,7 +391,7 @@ release = {
     K_SPICE_DOWN: momentary_fx_release(),
     K_PITCH_UP: momentary_fx_release(pitch_up_release, shift_persist=False),
     K_PITCH_DOWN: momentary_fx_release(pitch_down_release, shift_persist=False),
-    K_RECORD: momentary_fx_release(record_release),
+    K_RECORD: momentary_fx_release(record_release, autoplay_sample=False),
     K_ONESHOT: momentary_fx_release(oneshot_release),
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_release, i) for i in range(len(SAMPLE_KEYS))])),
     **{sr_key: momentary_fx_release(make_handler(step_repeat_release, length)) for sr_key, length in SR_KEYS.items()}
@@ -409,6 +416,9 @@ def key_pressed(e):
         # cancel held keys
         for s in sample.current_samples():
             s.mute()
+            s.clear_sound_queue()
+            if s.channel and (sound := s.channel.get_sound()):
+                sound.stop()
             s.looping = False
         if sequence.is_internal():
             sequence.stop_internal()

@@ -149,9 +149,9 @@ class Sequence:
         self.played_step = False
         if self.step == 0:
             self.measure_start = t
-        if self.step % 16 == 0:
-            for file in midi.load_midi_files():
-                sample.Sample.audio_executor.submit(midi.send_midi, file)
+        # if self.step % 16 == 0:
+        #     for file in midi.load_midi_files():
+        #         sample.Sample.audio_executor.submit(midi.send_midi, file)
         logger.debug(f"step {self.step}")
         if self.callback is not None:
             # TODO should be async

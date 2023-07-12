@@ -108,9 +108,12 @@ class Sample:
         self.step_repeat_length = 0 # in steps
         self.step_repeat_lengths = []
         self.step_repeat_index = 0  # which step to repeat
+        self.seq_start = 0
         self.channel: pygame.mixer.Channel | None = None
         self.sound_queue: PriorityQueue[QueuedSound] = PriorityQueue()
         self.muted = True
+        self.unmute_intervals: list[utility.TimeInterval] = []
+        self.mute_override = False
         self.oneshot_start_step = 0
         self.oneshot_offset = 0.0
         self.step_repeat_was_muted = False
@@ -159,7 +162,8 @@ class Sample:
         samples_per_step = round(step_time * SAMPLE_RATE)
         num_steps = round(self.sound.get_length() / step_time)
         wav = self.sound.get_raw()[:2 * samples_per_step * num_steps]
-        slice_size = math.ceil(len(wav) / num_steps)
+        slice_size = make_even(math.ceil(len(wav) / num_steps))
+        logger.info(f"{self.name} slice size {slice_size}")
         self.sound_slices = [pygame.mixer.Sound(buffer=wav[i:i + slice_size]) for i in range(0, len(wav), slice_size)]
         for i, s in enumerate(self.sound_slices):
             sound_data[s].bpm = self.bpm
@@ -167,8 +171,12 @@ class Sample:
             sound_data[s].source = None
             sound_data[s].semitones = 0
 
+    def seq_time(self):
+        return time.time() - self.seq_start
+
     def trigger_oneshot(self, step, offset):
         # TODO doesnt do pitch etc. make method to get sound for step
+        self.clear_sound_queue()
         self.queue(self.get_sound_slices()[0], time.time(), 0)
         self.oneshot_start_step = step
         self.oneshot_offset = offset
@@ -176,6 +184,18 @@ class Sample:
     def stop_oneshot(self):
         self.oneshot_start_step = 0
         self.oneshot_offset = 0
+
+    def start_recording(self):
+        self.recording = True
+        if self.mute_override and not self.is_muted():
+            logger.info(f"{self.name} start unmute interval [{self.seq_time()}]")
+            self.unmute_intervals.append(utility.TimeInterval(self.seq_time()))
+
+    def stop_recording(self):
+        self.recording = False
+        if len(self.unmute_intervals) > 0 and not (last := self.unmute_intervals[-1]).has_end():
+            last.end = self.seq_time()
+            logger.info(f"{self.name} finished interval [{last.start} {last.end}]")
 
     def dice(self):
         for param in self.spices_param:
@@ -335,15 +355,26 @@ class Sample:
     def swap_channel(self, other):
         self.channel, other.channel = other.channel, self.channel
 
-    def mute(self):
+    def mute(self, suppress_recording=False):
         logger.debug(f"{self.name} muted") # self.sound.set_volume(0)
         self.muted = True
-        # self.sound_queue = []
+        if not suppress_recording:
+            logger.debug(f"{self.unmute_intervals}")
+        if self.recording and not suppress_recording \
+            and len(self.unmute_intervals) > 0 \
+            and not (last := self.unmute_intervals[-1]).has_end():
+            last.end = self.seq_time()
+            logger.info(f"{self.name} finished interval [{last.start} {last.end}]")
+            logger.info(f"{self.name} intervals: {self.unmute_intervals}")
+        self.clear_sound_queue()
 
-    def unmute(self):
+    def unmute(self, suppress_recording=False):
         logger.debug(f"{self.name} unmuted")
         # self.sound.set_volume(Sample.MAX_VOLUME)
         self.muted = False
+        if self.recording and not suppress_recording:
+            logger.info(f"{self.name} start mute interval [{self.seq_time()}, ]")
+            self.unmute_intervals.append(utility.TimeInterval(self.seq_time()))
 
     def set_mute(self, mute):
         if mute:
@@ -371,7 +402,7 @@ class Sample:
 
     def queue(self, sound, t, step):
         t += self.oneshot_offset
-        logger.info(f"queued sound in {self.name} for step {step} {datetime.fromtimestamp(t)}")
+        logger.debug(f"queued sound in {self.name} for step {step} {datetime.fromtimestamp(t)}")
         # _, prev_t = self.sound_queue[len(self.sound_queue) - 1] if len(self.sound_queue) > 0 else None, None
         if self.recording:
             self.recorded_steps[i := step % len(self.recorded_steps)] = sound
@@ -411,6 +442,11 @@ class Sample:
 
     # returns callable to do the sound making
     def process_queue(self, now, step_duration):
+        for interval in self.unmute_intervals:
+            if interval.contains(self.seq_time()):
+                self.unmute(suppress_recording=True)
+            elif not self.mute_override:
+                self.mute(suppress_recording=True)
         if self.channel and (playing := self.channel.get_sound()) in sound_data:
             playing_step = sound_data[playing].step
             step_gate = self.gates[playing_step % len(self.gates)]
@@ -543,7 +579,11 @@ class Sample:
             slices[j:j + 4] = slices[i:i + 4]
         return slices
 
+    # TODO save measure start
     def queue_step(self, step, t, step_interval):
+        if step == 0:
+            self.seq_start = t
+        logger.info(self.seq_time())
         # TODO magic
         step = (step - self.oneshot_start_step) % 64
         srlength = round(self.step_repeat_length / self.get_rate())
