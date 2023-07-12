@@ -544,7 +544,6 @@ class Sample:
             # self.channel.queue(sound)
             logger.debug(f"{self.name}: queued sample")
             return None
-            # return self.play_step(lambda s: self.queue_sound(s, t), sound, step, t)
 
         return None
 
