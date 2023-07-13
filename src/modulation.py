@@ -80,12 +80,12 @@ class Param:
             self.value = self.last_value
         return self
 
-    # def control(self, encoder, scale, on_change=None):
-    #     self.encoder = encoder
-    #     self.encoder_scale = scale
-    #     self.encoder_prev = encoder.value()
-    #     self.on_change = on_change
-    #     return self
+    def control(self, encoder, scale, on_change=None):
+        self.encoder = encoder
+        self.encoder_scale = scale
+        # self.encoder_prev = encoder.value()
+        self.on_change = on_change
+        return self
 
     def get(self, step=-1):
         if step == -1:

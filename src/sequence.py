@@ -6,7 +6,6 @@ import midi
 import sample
 import modulation
 import utility
-import modulation
 import sample
 from midi import START, STOP, CLOCK
 import time
