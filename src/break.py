@@ -13,11 +13,6 @@ import midi
 import utility
 import blink
 import pkg_resources
-
-# dists = [str(d).replace(" ", "==") for d in pkg_resources.working_set]
-# for i in dists:
-# print(i)
-
 # import rtmidi
 # from ctypes import *
 # from contextlib import contextmanager
