@@ -130,8 +130,9 @@ sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
 
 
 lq = Queue(1)
-p = Process(target=lights.run, args=(lq,))
-p.start()
+if 'lights' in locals():
+    p = Process(target=lights.run, args=(lq,))
+    p.start()
 
 # blink.Light.set_brightness(50)
 last_dmx = time.time()
