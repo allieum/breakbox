@@ -59,7 +59,8 @@ def update(state):
 
     # Draw Some Text
     text = f"{bpm} bpm"
-    (font_width, font_height) = font.getsize(text)
+    # (font_width, font_height) = font.get.getsize(text)
+    (font_width, font_height) = 64, 16
     draw.text(
         (oled.width // 2 - font_width // 2, oled.height // 2 - font_height // 2),
         text,

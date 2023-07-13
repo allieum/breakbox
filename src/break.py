@@ -145,8 +145,8 @@ while True:
         # f = sample.Sample.audio_executor.submit(lights.update, samples_on)
         # f.add_done_callback(lambda _: lights.refresh_done())
 
-    # state = (sequence.bpm.get())
-    # display.update(state)
+    state = (sequence.bpm.get())
+    display.update(state)
 
     if midi.lost_connection():
         if sequence.midi_started:

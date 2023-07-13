@@ -581,7 +581,7 @@ class Sample:
     def queue_step(self, step, t, step_interval):
         if step == 0:
             self.seq_start = t
-        logger.info(self.seq_time())
+        # logger.info(self.seq_time())
         # TODO magic
         step = (step - self.oneshot_start_step) % 64
         srlength = round(self.step_repeat_length / self.get_rate())
