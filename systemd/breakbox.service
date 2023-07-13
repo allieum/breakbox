@@ -4,9 +4,10 @@ Description=breakbox service
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/home/pi/breakbox
+WorkingDirectory=/home/drum/breakbox/src
 ExecStart=python3.11 break.py
 Restart=always
+TimeoutStopSec=2
 
 [Install]
 WantedBy=multi-user.target

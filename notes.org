@@ -1,5 +1,11 @@
 #+title: Notes
 
+* new new
+** blink sample length
+** remove meter
+** setting change indicator
+*** led queue event types
+
 * pride preppers
 ** DONE lower than halftime still halftime
 CLOSED: [2023-06-11 Sun 10:51]

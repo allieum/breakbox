@@ -1,3 +1,10 @@
+import time
+import pygame.mixer
+
+from midi import START, STOP, CLOCK
+import midi
+import sample
+import modulation
 import utility
 import modulation
 import sample
@@ -17,7 +24,7 @@ MAX_BEATS = 16
 STEPS_PER_BEAT = 4
 MAX_STEPS = MAX_BEATS * STEPS_PER_BEAT
 
-midi_lag_time = 0.039
+midi_lag_time = 0.050
 lookahead_time = 0.100
 
 
@@ -52,7 +59,6 @@ class Sequence:
     def start_internal(self):
         self.internal_start_time = time.time()
         self._start()
-        # sample.queue_samples(0, self.internal_start_time)
         print("starting internal clock")
 
     def stop_internal(self):
@@ -156,6 +162,9 @@ class Sequence:
         self.played_step = False
         if self.step == 0:
             self.measure_start = t
+        # if self.step % 16 == 0:
+        #     for file in midi.load_midi_files():
+        #         sample.Sample.audio_executor.submit(midi.send_midi, file)
         logger.debug(f"step {self.step}")
         if self.callback is not None:
             # TODO should be async
