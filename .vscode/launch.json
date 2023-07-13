@@ -1,0 +1,12 @@
+{
+    "configurations": [
+        {
+            "name": "breakbox",
+            "type": "python",
+            "request": "launch",
+            "program": "src/break.py",
+            "justMyCode": true,
+            "sudo": true
+        }
+    ]
+}

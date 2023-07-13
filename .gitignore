@@ -1,3 +1,4 @@
 # *.wav
 /.dir-locals.el
 *.reapeaks
+src/**/__pycache__/*.pyc
