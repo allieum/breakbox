@@ -1,0 +1,28 @@
+version: "3"
+services:
+  breakbox:
+    container_name: breakbox
+    privileged: true
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - "8080:8080"
+    command:
+      [
+        "python",
+        "-m",
+        "break.py",
+        "--host=0.0.0.0",
+        "--reload"
+      ]
+    environment:
+      - PULSE_SERVER=docker.for.mac.localhost
+      # - PULSE_SERVER=host.docker.internal
+      #   - ALSA_PCM=usbstream:CARD=StargazerMicrop
+      #   - PORT=${PORT:-8080}
+      #   - ALSA_CARD=Generic
+    volumes:
+      - ~/.config/pulse:/usr/src/app/.config/pulse
+    #   - /etc/machine-id:/etc/machine-id:ro
+    #   - /run/user/1001/pulse:/run/user/1001/pulse:ro
