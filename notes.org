@@ -1,5 +1,17 @@
 #+title: Notes
 
+
+* fresh
+** hardwares
+*** rotary
+*** knob
+*** screen (edit visibility)
+*** faders, volume
+*** joystick.. pitch / stretch ?
+** finish rec
+** sexy oled fonts
+** distinguish user presses for displaying param update
+
 * new new
 ** blink sample length
 ** remove meter

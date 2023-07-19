@@ -43,10 +43,10 @@ def on_key(e):
         keys.key_released(e)
 keyboard.hook(on_key)
 
-display.init()
 lights.init()
 control.init()
 sample.load_samples()
+display.init(sample.all_samples())
 midi.connect()
 midi.load_midi_files()
 sequence.control_bpm(control.encoder)
@@ -123,7 +123,7 @@ while True:
     status, data = midi.get_status()
     sequence.update(status)
     sample.play_samples(sequence.step_duration())
-    sample_states = [lights.SampleState.of(s, keys.selected_sample, sequence.step) for s in sample.current_samples()]
+    sample_states = [lights.SampleState.of(s, keys.selected_sample, sequence.step, i) for i, s in enumerate(sample.current_samples())]
     # if lights.refresh_ready(samples_on):
         # lights.refreshing = True
     # lights.update(samples_on)
@@ -145,8 +145,8 @@ while True:
         # f = sample.Sample.audio_executor.submit(lights.update, samples_on)
         # f.add_done_callback(lambda _: lights.refresh_done())
 
-    state = (sequence.bpm.get())
-    display.update(state)
+    state = ()
+    display.update(sequence.bpm.get(), sample_states)
 
     if midi.lost_connection():
         if sequence.midi_started:

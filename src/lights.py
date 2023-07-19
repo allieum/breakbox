@@ -7,7 +7,7 @@ import time
 import board
 import adafruit_ws2801
 
-from sample import Sample, sound_data
+from sample import Sample, SampleState, sound_data
 import modulation
 import utility
 
@@ -73,36 +73,40 @@ def to_tuple(color):
         (color & 0x0000ff) >> 0
     )
 
-@dataclass
-class SampleState:
-    playing: bool = field(default=False)
-    bank: int = field(default=0)
-    length: float = field(default=0, compare=False)
-    steps: int = field(default=0, compare=False)
-    selected: bool = field(default=False)
-    recording: bool = field(default=False)
-    step: int | None = field(compare=False, default=None)
+# @dataclass
+# class SampleState:
+#     playing: bool = field(default=False)
+#     bank: int = field(default=0)
+#     length: float = field(default=0, compare=False)
+#     steps: int = field(default=0, compare=False)
+#     selected: bool = field(default=False)
+#     recording: bool = field(default=False)
+#     step: int | None = field(compare=False, default=None)
+#     pad: int = field(default=0)
 
-    @staticmethod
-    def of(sample: Sample, selected_sample: Sample, step):
-        selected = selected_sample == sample
-        # if selected:
-        #     logger.info(f"{selected_sample} vs {sample} {selected}")
-        length = sum(map(lambda s: s.get_length(), sample.get_sound_slices()))
-        length = sample.sound.get_length()
-        steps = len(sample.sound_slices)
-        if sample.step_repeating:
-            length *= sample.step_repeat_length / len(sample.sound_slices)
-            steps = sample.step_repeat_length
-        progress = (step % steps) / steps
-        length *= (1 - progress)
-        length -= 0.5
-        state = SampleState(sample.is_playing(), sample.bank, length, steps, selected, sample.recording, step)
-        # grab step from sequencer
-        # if sample.channel and (playing := sample.channel.get_sound()) in sound_data:
-        #     state.step = sound_data[playing].step
-        # state.step = step
-        return state
+#     @staticmethod
+#     def of(sample: Sample, selected_sample: Sample, step, pad):
+#         if sample is None:
+#             return None
+
+#         selected = selected_sample == sample
+#         # if selected:
+#         #     logger.info(f"{selected_sample} vs {sample} {selected}")
+#         length = sum(map(lambda s: s.get_length(), sample.get_sound_slices()))
+#         length = sample.sound.get_length()
+#         steps = len(sample.sound_slices)
+#         if sample.step_repeating:
+#             length *= sample.step_repeat_length / len(sample.sound_slices)
+#             steps = sample.step_repeat_length
+#         progress = (step % steps) / steps
+#         length *= (1 - progress)
+#         length -= 0.5
+#         state = SampleState(sample.is_playing(), sample.bank, length, steps, selected, sample.recording, step, pad)
+#         # grab step from sequencer
+#         # if sample.channel and (playing := sample.channel.get_sound()) in sound_data:
+#         #     state.step = sound_data[playing].step
+#         # state.step = step
+#         return state
 
 @dataclass
 class LedState:
@@ -196,11 +200,12 @@ def run(lights_q: Queue):
         logger.debug(f"got {sample_states} from queue")
         bank_changed = any(((new_bank := sample.bank) != prev.bank for sample, prev in zip(sample_states, prev_samples)))
         for sample, led, prev in zip(sample_states, led_states, prev_samples):
-            if sample.selected and prev.step != sample.step and sample.step % 4 == 0:
-                color = 0xff0000 if sample.recording else 0x00ff00
-                led.fade(color, 0.3, 0.5)
+            # if sample.selected and prev.step != sample.step and sample.step % 4 == 0:
+            #     color = 0xff0000 if sample.recording else 0x00ff00
+            #     led.fade(color, 0.3, 0.5)
             # pulse on sample loop
-            strength = 0.1 if sample.selected else 0.3
+            # strength = 0.1 if sample.selected else 0.3
+            strength = 0.3
             if sample.playing and prev.step != sample.step and sample.step % sample.steps == 0:
                 led.fade(palette[sample.bank % len(palette)], sample.length, strength)
             elif sample.playing and not prev.playing:
@@ -221,7 +226,8 @@ def run(lights_q: Queue):
                 led.write()
             leds.show()
             # logger.info(f"{selected_sample} vs ")
-            # logger.info(f"updating lights")
+            # light_str = ["on" if led.color != OFF else "off" for led in led_states]
+            # logger.debug(f"updating lights {light_str}")
         else:
             led_states = last_state
             sample_states = prev_samples

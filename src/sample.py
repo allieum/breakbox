@@ -30,6 +30,41 @@ pygame.mixer.set_num_channels(32)
 logger.info(pygame.mixer.get_init())
 
 @dataclass
+class SampleState:
+    playing: bool = field(default=False)
+    bank: int = field(default=0)
+    length: float = field(default=0, compare=False)
+    steps: int = field(default=0, compare=False)
+    selected: bool = field(default=False)
+    recording: bool = field(default=False)
+    step: int | None = field(compare=False, default=None)
+    pad: int = field(default=0)
+
+    @staticmethod
+    def of(sample: 'Sample', selected_sample: 'Sample', step, pad):
+        if sample is None:
+            return SampleState()
+
+        selected = selected_sample == sample
+        # if selected:
+        #     logger.info(f"{selected_sample} vs {sample} {selected}")
+        length = sum(map(lambda s: s.get_length(), sample.get_sound_slices()))
+        length = sample.sound.get_length()
+        steps = len(sample.sound_slices)
+        if sample.step_repeating:
+            length *= sample.step_repeat_length / len(sample.sound_slices)
+            steps = sample.step_repeat_length
+        progress = (step % steps) / steps
+        length *= (1 - progress)
+        length -= 0.5
+        state = SampleState(sample.is_playing(), sample.bank, length, steps, selected, sample.recording, step, pad)
+        # grab step from sequencer
+        # if sample.channel and (playing := sample.channel.get_sound()) in sound_data:
+        #     state.step = sound_data[playing].step
+        # state.step = step
+        return state
+
+@dataclass
 class SoundData:
     playtime: float
     bpm: int
@@ -117,21 +152,22 @@ class Sample:
         self.oneshot_start_step = 0
         self.oneshot_offset = 0.0
         self.step_repeat_was_muted = False
+
+        # TODO rate param affected by these two
         self.halftime = False
         self.quartertime = False
+
         self.bpm = bpm
         self.load(file)
         self.recorded_steps = [None] * len(self.sound_slices)
         self.recording = False
         self.last_printed = 0
-        self.gate = modulation.Param(1.0, min_value=0.25, max_value=1)
-        self.gate_period = modulation.Param(2, min_value=1, max_value=32)
         self.gate_mirror = None
         self.gates = [1] * len(self.sound_slices)
         self.gate_fade = 0.020
         self.unspiced_gates = self.gates
         self.spice_level = modulation.Param(0, min_value=0, max_value=1)
-        self.spice_level.on_change = self.spice_gates
+        self.spice_level.add_change_handler(self.spice_gates)
         self.spices_param = self.SpiceParams(
             skip_gate = modulation.SpiceParams(max_chance=0.05, max_delta=0, spice=self.spice_level, step_data=None),
             extra_gate = modulation.SpiceParams(max_chance=0.7, max_delta=0, spice=self.spice_level, step_data=None),
@@ -141,7 +177,9 @@ class Sample:
             pitch = modulation.SpiceParams(max_chance=0.1, max_delta=3, spice=self.spice_level, step_data=None),
             scatter = modulation.SpiceParams(max_chance=0.2, max_delta=16, spice=self.spice_level, step_data=None, integer=True)
         )
-        self.volume= modulation.Param(1, min_value=0, max_value=1).spice(self.spices_param.volume)
+        self.gate = modulation.Param(1.0, min_value=0.25, max_value=1)
+        self.gate_period = modulation.Param(2, min_value=1, max_value=32)
+        self.volume = modulation.Param(1, min_value=0, max_value=1).spice(self.spices_param.volume)
         self.pitch = modulation.Param(0, min_value=-12, max_value=12, round=True).spice(self.spices_param.pitch)
 
         self.dice()
