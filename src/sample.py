@@ -16,14 +16,15 @@ from dataclasses import dataclass, field
 from typing import Optional, List
 
 import modulation
+from modulation import Param
 import utility
 
 logger = utility.get_logger(__name__)
 # logger.setLevel('DEBUG')
-bank = 0
-BANK_SIZE = 6
 NUM_BANKS = 10
+BANK_SIZE = 6
 SAMPLE_RATE = 22050
+bank = Param(0, min_value=0, max_value=NUM_BANKS - 1, round = True)
 
 pygame.mixer.init(frequency=SAMPLE_RATE, buffer=256, channels=1)
 pygame.mixer.set_num_channels(32)
@@ -117,7 +118,7 @@ def load_samples():
         logger.info([s.name for s in bnk])
 
 def current_samples() -> List['Sample']:
-    return sample_banks[bank]
+    return sample_banks[bank.get()]
 
 def all_samples() -> List['Sample']:
     return functools.reduce(lambda a, b: a + b, sample_banks)

@@ -432,7 +432,7 @@ def key_pressed(e):
                 # print(f"looping index {i}")
         # cancel held keys
         delta = -1 if key_held[K_SHIFT] else 1
-        sample.bank = (sample.bank + delta) % sample.NUM_BANKS
+        sample.bank.set((sample.bank.get() + delta) % sample.NUM_BANKS)
         for new_sample, old_sample in zip(sample.current_samples(), old_samples):
             new_sample.swap_channel(old_sample)
         if looping_index is not None:

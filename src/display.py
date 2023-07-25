@@ -25,7 +25,7 @@ class ParamUpdate:
 
 UPDATE_LINGER = 3
 
-q = Queue(1)
+q = Queue(10)
 
 REFRESH_RATE = 0.1
 
@@ -47,11 +47,12 @@ def run(display_q: Queue):
     last_refresh = time.time()
     last_text = None
     prev_sample_states = []
-    bpm = "beyond"
+    bpm = "BEYOND"
     last_changed_param = ParamUpdate("dummy", "hot", 0.69, 0)
 
     while True:
         item = display_q.get()
+        # logger.info(f"got {item}")
         if isinstance(item, ParamUpdate):
             last_changed_param = item
             sample_states = prev_sample_states
@@ -104,7 +105,6 @@ def run(display_q: Queue):
         oled.image(image)
         oled.show()
 
-
 def init(samples: list[Sample]):
     for sample in samples:
         for param_name in [
@@ -116,12 +116,12 @@ def init(samples: list[Sample]):
 def on_param_changed(param: Param, name: str):
     def on_change(value):
         fullness = param.normalize(value)
-        if q.qsize() > 0:
-            q.get()
-        q.put(p := ParamUpdate(name, value, fullness, time.time()))
+        try:
+            q.put(p := ParamUpdate(name, value, fullness, time.time()), block=False)
+        except:
+            pass
         logger.info(f"updated param {p}")
     return on_change
-
 
 def draw_value_bar(draw, fullness):
     bar_height = 16

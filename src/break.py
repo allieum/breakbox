@@ -4,6 +4,7 @@ from threading import Thread
 import time
 # import rtmidi
 import sys
+from types import TracebackType
 import keyboard
 # from ctypes import *
 # from contextlib import contextmanager
@@ -110,13 +111,18 @@ def update_dmx(step, note_number=None):
     # logger.info(f"dmx frame send took {time.time() - now}s")
 sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
 
-Process(target=lights.run, args=(lights.q,)).start()
-Process(target=display.run, args=(display.q,)).start()
+subs = [
+    Process(target=lights.run, args=(lights.q,)),
+    Process(target=display.run, args=(display.q,)),
+]
+for sub in subs:
+    sub.start()
 
 # blink.Light.set_brightness(50)
 last_dmx = time.time()
 last_dmx_step = None
-while True:
+
+def update():
     # control.update()
     status, data = midi.get_status()
     sequence.update(status)
@@ -159,3 +165,12 @@ while True:
     # import keyboard
     # keyboard.hook(on_key)
     time.sleep(0.0005)
+
+
+while True:
+    try:
+        update()
+    except Exception as e:
+        for sub in subs:
+            sub.terminate()
+        raise e
