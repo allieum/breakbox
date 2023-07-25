@@ -1,6 +1,11 @@
 #+title: Notes
 
 
+* even fresher
+** joy stick!!
+** bank screen param
+** pitch broken
+
 * fresh
 ** hardwares
 *** rotary
@@ -11,6 +16,7 @@
 ** finish rec
 ** sexy oled fonts
 ** distinguish user presses for displaying param update
+** lights behavior with different source bpms
 
 * new new
 ** blink sample length

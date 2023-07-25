@@ -43,7 +43,6 @@ def on_key(e):
         keys.key_released(e)
 keyboard.hook(on_key)
 
-lights.init()
 control.init()
 sample.load_samples()
 display.init(sample.all_samples())
@@ -111,9 +110,8 @@ def update_dmx(step, note_number=None):
     # logger.info(f"dmx frame send took {time.time() - now}s")
 sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
 
-lq = Queue(1)
-p = Process(target=lights.run, args=(lq,))
-p.start()
+Process(target=lights.run, args=(lights.q,)).start()
+Process(target=display.run, args=(display.q,)).start()
 
 # blink.Light.set_brightness(50)
 last_dmx = time.time()
@@ -132,8 +130,10 @@ while True:
         # logger.info(f"{data} {status}")
         note_number = data[0]
         sample.Sample.audio_executor.submit(update_dmx, 0, note_number)
+
     try:
-        lq.put(sample_states, block=False)
+        lights.q.put(sample_states, block=False)
+        display.q.put(sample_states, block=False)
     except:
         pass
 
@@ -146,7 +146,7 @@ while True:
         # f.add_done_callback(lambda _: lights.refresh_done())
 
     state = ()
-    display.update(sequence.bpm.get(), sample_states)
+    # display.update(sequence.bpm.get(), sample_states)
 
     if midi.lost_connection():
         if sequence.midi_started:

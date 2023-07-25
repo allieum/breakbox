@@ -757,7 +757,7 @@ def make_even(x):
         x -= 1
     return x
 
-TS_TIME_DEFAULT = 0.060
+TS_TIME_DEFAULT = 0.030
 TS_TIME_DELTA = 0.001
 ts_time = TS_TIME_DEFAULT
 stretch_fade = 0.005

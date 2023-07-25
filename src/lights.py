@@ -13,6 +13,7 @@ import utility
 
 logger = utility.get_logger(__name__)
 
+q = Queue(1)
 
 AMARANTH = 0x9f2b68
 AMARANTH = (0x9f, 0x2b, 0x68)
@@ -135,40 +136,6 @@ class LedState:
         color = to_tuple(color)
         self.color = tuple(map(lambda ab: average(*ab, strength), zip(self.color, color)))
 
-def init():
-    # TODO conditional import / init
-    pass
-# leds.fill(0)
-# leds.show()
-
-# def refresh_ready(samples_on):
-#     # return time.time() - last_update > REFRESH_INTERVAL and samples_on != last_samples and not refreshing
-#     # too_soon = time.time() - last_update < REFRESH_INTERVAL
-#     return samples_on != last_state
-
-# def show_param(states: list[LedState], value, param: modulation.Param, color):
-#     if param.max_value is None or param.min_value is None:
-#         return
-#     range = param.max_value - param.min_value
-#     norm = value - param.min_value
-#     ratio = norm / range
-#     lights_value = 6 * ratio
-#     entire_lights = math.floor(lights_value)
-#     partial_light = lights_value - entire_lights
-#     for led in states[:entire_lights]:
-#         led.fade(color, 2, 0.6)
-#         led.update()
-#         led.leds.show()
-#     if partial_light > 0:
-#         led = states[entire_lights]
-#         led.fade(color, 2, 0.6)
-#         led.fade(OFF, 2, 0.6)
-#         led.update()
-#         led.leds.show()
-
-# def register_param(states, param: modulation.Param, color):
-#     param.on_change = lambda value: show_param(states, value, param, color)
-#     # put a thing on sample state for param change notify
 
 def run(lights_q: Queue):
     # global last_update, last_state, refreshing
