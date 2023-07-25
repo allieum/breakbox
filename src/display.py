@@ -6,7 +6,8 @@ import busio
 import time
 from PIL import Image, ImageDraw, ImageFont
 from modulation import Param
-from sample import Sample, SampleState
+from sample import Sample, SampleState, bank
+from sequence import sequence
 
 import utility
 
@@ -23,11 +24,11 @@ class ParamUpdate:
         return time.time() - self.time < UPDATE_LINGER
 
 
+REFRESH_RATE = 0.025
 UPDATE_LINGER = 3
 
 q = Queue(10)
 
-REFRESH_RATE = 0.1
 
 W = 128
 H = 64
@@ -35,6 +36,25 @@ H = 64
 WHITE = 255
 BLACK = 0
 
+def init(samples: list[Sample]):
+    for sample in samples:
+        for param_name in [
+                "gate", "gate_period", "spice_level",
+                "volume", "pitch", ]:
+            param = getattr(sample, param_name)
+            param.add_change_handler(on_param_changed(param, param_name))
+    bank.add_change_handler(on_param_changed(bank, "bank"))
+    sequence.bpm.add_change_handler(on_param_changed(sequence.bpm, "bpm"))
+
+def on_param_changed(param: Param, name: str):
+    def on_change(value):
+        fullness = param.normalize(value)
+        try:
+            q.put(p := ParamUpdate(name, value, fullness, time.time()), block=False)
+        except:
+            pass
+        logger.info(f"updated param {p}")
+    return on_change
 
 def run(display_q: Queue):
     try:
@@ -105,23 +125,6 @@ def run(display_q: Queue):
         oled.image(image)
         oled.show()
 
-def init(samples: list[Sample]):
-    for sample in samples:
-        for param_name in [
-                "gate", "gate_period", "spice_level",
-                "volume", "pitch"]:
-            param = getattr(sample, param_name)
-            param.add_change_handler(on_param_changed(param, param_name))
-
-def on_param_changed(param: Param, name: str):
-    def on_change(value):
-        fullness = param.normalize(value)
-        try:
-            q.put(p := ParamUpdate(name, value, fullness, time.time()), block=False)
-        except:
-            pass
-        logger.info(f"updated param {p}")
-    return on_change
 
 def draw_value_bar(draw, fullness):
     bar_height = 16

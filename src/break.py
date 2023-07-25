@@ -151,7 +151,6 @@ def update():
         # f = sample.Sample.audio_executor.submit(lights.update, samples_on)
         # f.add_done_callback(lambda _: lights.refresh_done())
 
-    state = ()
     # display.update(sequence.bpm.get(), sample_states)
 
     if midi.lost_connection():

@@ -3,8 +3,11 @@
 
 * even fresher
 ** joy stick!!
-** bank screen param
-** pitch broken
+** pi animations for sample progress
+** bigger circle for selected
+** smplflp
+** DONE bank screen param
+CLOSED: [2023-07-25 Tue 16:29]
 
 * fresh
 ** hardwares
