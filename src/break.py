@@ -148,7 +148,7 @@ def update():
     if midi.is_note_on(status):
         # logger.info(f"{data} {status}")
         note_number = data[0]
-        sample.Sample.audio_executor.submit(update_dmx, 0, note_number)
+        # sample.Sample.audio_executor.submit(update_dmx, 0, note_number)
 
     try:
         lights.q.put(sample_states, block=False)
