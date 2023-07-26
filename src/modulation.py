@@ -55,7 +55,7 @@ class Param:
         self.encoder_scale = None
         self.encoder_prev = None
         self.scale = None
-        self.on_change = None
+        self.on_change = []
         self.last_value = None
         self.min_value = min_value
         self.max_value = max_value
@@ -83,20 +83,21 @@ class Param:
     def control(self, encoder, scale, on_change=None):
         self.encoder = encoder
         self.encoder_scale = scale
-        # self.encoder_prev = encoder.value()
-        self.on_change = on_change
+
+        self.encoder_prev = encoder.value()
+        self.add_change_handler(on_change)
         return self
 
-    def get(self, step=-1):
+    def add_change_handler(self, handler):
+        self.on_change.append(handler)
+
+    def get(self, step = -1):
         if step == -1:
             if self.encoder:
                 delta = self.encoder_scale * \
                     (self.encoder.value() - self.encoder_prev)
                 self.value += delta
                 self.encoder_prev = self.encoder.value()
-                if delta != 0 and self.on_change is not None:
-                    self.on_change(self.value)
-
         value = self.value
         if self.steps is not None:
             self.steps -= 1
@@ -119,8 +120,9 @@ class Param:
             value = min(value, self.max_value)
         if self.round:
             value = round(value)
-        if value != self.last_value and self.on_change is not None:
-            self.on_change(value)
+        if value != self.last_value:
+            for handler in self.on_change:
+                handler(value)
         self.last_value = value
         if self.spice_params is not None and step >= 0:
             value = self.spice_params.value(value, step)
@@ -140,11 +142,20 @@ class Param:
             value = max(value, self.min_value)
         if self.max_value is not None and value is not None:
             value = min(value, self.max_value)
-        if (changed := value != self.value) and self.on_change is not None:
-            self.on_change(value)
+        if (changed := value != self.value):
+            for handler in self.on_change:
+                handler(value)
         self.value = value
         return changed
 
+    def normalize(self, value, scale=1.0):
+        if self.max_value is None or self.min_value is None:
+            logger.error(f"tried to normalize param {self} with unbounded range")
+            return value
+        range = self.max_value - self.min_value
+        norm = value - self.min_value
+        ratio = norm / range
+        return ratio * scale
 
 @dataclass
 class SpiceParams:

@@ -3,6 +3,7 @@ from multiprocessing import Process, Queue
 from threading import Thread
 import time
 import sys
+from types import TracebackType
 import keyboard
 from datetime import datetime
 from sequence import sequence
@@ -48,10 +49,9 @@ def on_key(e):
 
 keyboard.hook(on_key)
 
-# display.init()
-# lights.init()
 control.init()
 sample.load_samples()
+display.init(sample.all_samples())
 midi.connect()
 midi.load_midi_files()
 sequence.control_bpm(control.encoder)
@@ -123,21 +123,24 @@ def update_dmx(step, note_number=None):
     # logger.info(f"dmx frame send took {time.time() - now}s")
 sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
 
-
-lq = Queue(1)
-if 'lights' in locals():
-    p = Process(target=lights.run, args=(lq,))
-    p.start()
+subs = [
+    Process(target=lights.run, args=(lights.q,)),
+    Process(target=display.run, args=(display.q,)),
+]
+for sub in subs:
+    sub.start()
 
 # blink.Light.set_brightness(50)
 last_dmx = time.time()
 last_dmx_step = None
-while True:
+
+def update():
     # control.update()
     status, data = midi.get_status()
     sequence.update(status)
     sample.play_samples(sequence.step_duration())
-    # sample_states = [lights.SampleState.of(s, keys.selected_sample, sequence.step) for s in sample.current_samples()]
+    sample_states = [lights.SampleState.of(s, keys.selected_sample, sequence.step, i) for i, s in enumerate(sample.current_samples())]
+
     # if lights.refresh_ready(samples_on):
     # lights.refreshing = True
     # lights.update(samples_on)
@@ -146,8 +149,10 @@ while True:
         # logger.info(f"{data} {status}")
         note_number = data[0]
         sample.Sample.audio_executor.submit(update_dmx, 0, note_number)
+
     try:
-        lq.put(sample_states, block=False)
+        lights.q.put(sample_states, block=False)
+        display.q.put(sample_states, block=False)
     except:
         pass
 
@@ -159,8 +164,7 @@ while True:
     # f = sample.Sample.audio_executor.submit(lights.update, samples_on)
     # f.add_done_callback(lambda _: lights.refresh_done())
 
-    # state = (sequence.bpm.get())
-    # display.update(state)
+    # display.update(sequence.bpm.get(), sample_states)
 
     if midi.lost_connection():
         if sequence.midi_started:
@@ -173,3 +177,12 @@ while True:
     # import keyboard
     # keyboard.hook(on_key)
     time.sleep(0.0005)
+
+
+while True:
+    try:
+        update()
+    except Exception as e:
+        for sub in subs:
+            sub.terminate()
+        raise e

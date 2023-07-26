@@ -6,8 +6,9 @@ remote-deploy: push
 	# ssh pi@raspberrypi.local 'sudo systemctl restart breakbox && sudo journalctl -f -u breakbox'
 
 log:
-	ssh drum@breakbox.local  'journalctl -f -u breakbox'
-	# ssh pi@raspberrypi.local  'journalctl -f -u breakbox'
+
+	ssh drum@breakbox.local  'sudo journalctl -f -u breakbox'
+
 
 
 push:

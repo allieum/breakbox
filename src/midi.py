@@ -121,13 +121,18 @@ def get_status():
     global time_prev_midi_message
     if midi_input is None:
         return None, None
-    events = midi_input.read(1)
-    msg = events[0][0] if len(events) == 1 else None
-    if msg is not None:
-        time_prev_midi_message = time.time()
-        if is_note_on(status := msg[0]):
-            note_q.append(msg[1])
-        return msg[0], msg[1:]
+    try:
+        events = midi_input.read(1)
+        msg = events[0][0] if len(events) == 1 else None
+        if msg is not None:
+            time_prev_midi_message = time.time()
+            if is_note_on(status := msg[0]):
+                note_q.append(msg[1])
+            return msg[0], msg[1:]
+    except Exception as e:
+        logger.warn(f"{e}")
+        pass
+
     return None, None
 
 

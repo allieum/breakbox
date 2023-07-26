@@ -1,5 +1,26 @@
 #+title: Notes
 
+
+* even fresher
+** joy stick!!
+** pi animations for sample progress
+** bigger circle for selected
+** smplflp
+** DONE bank screen param
+CLOSED: [2023-07-25 Tue 16:29]
+
+* fresh
+** hardwares
+*** rotary
+*** knob
+*** screen (edit visibility)
+*** faders, volume
+*** joystick.. pitch / stretch ?
+** finish rec
+** sexy oled fonts
+** distinguish user presses for displaying param update
+** lights behavior with different source bpms
+
 * new new
 ** blink sample length
 ** remove meter

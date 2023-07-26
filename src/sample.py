@@ -17,21 +17,57 @@ from dataclasses import dataclass, field
 from typing import Optional, List
 
 import modulation
+from modulation import Param
 import utility
 # import os
 # os.environ['SDL_AUDIODRIVER'] = 'dsp'
 logger = utility.get_logger(__name__)
 # logger.setLevel('DEBUG')
-bank = 0
-BANK_SIZE = 6
 NUM_BANKS = 10
+BANK_SIZE = 6
 SAMPLE_RATE = 22050
+bank = Param(0, min_value=0, max_value=NUM_BANKS - 1, round = True)
 
 # pygame.init()
 pygame.mixer.init(frequency=SAMPLE_RATE, buffer=256, channels=1)
 pygame.mixer.set_num_channels(32)
 logger.info(pygame.mixer.get_init())
 
+
+@dataclass
+class SampleState:
+    playing: bool = field(default=False)
+    bank: int = field(default=0)
+    length: float = field(default=0, compare=False)
+    steps: int = field(default=0, compare=False)
+    selected: bool = field(default=False)
+    recording: bool = field(default=False)
+    step: int | None = field(compare=False, default=None)
+    pad: int = field(default=0)
+
+    @staticmethod
+    def of(sample: 'Sample', selected_sample: 'Sample', step, pad):
+        if sample is None:
+            return SampleState()
+
+        selected = selected_sample == sample
+        # if selected:
+        #     logger.info(f"{selected_sample} vs {sample} {selected}")
+        length = sum(map(lambda s: s.get_length(), sample.get_sound_slices()))
+        length = sample.sound.get_length()
+        steps = len(sample.sound_slices)
+        if sample.step_repeating:
+            length *= sample.step_repeat_length / len(sample.sound_slices)
+            steps = sample.step_repeat_length
+        progress = (step % steps) / steps
+        length *= (1 - progress)
+        length -= 0.5
+        state = SampleState(sample.is_playing(), sample.bank, length, steps, selected, sample.recording, step, pad)
+        # grab step from sequencer
+        # if sample.channel and (playing := sample.channel.get_sound()) in sound_data:
+        #     state.step = sound_data[playing].step
+        # state.step = step
+        return state
 
 @dataclass
 class SoundData:
@@ -96,7 +132,7 @@ def load_samples():
 
 
 def current_samples() -> List['Sample']:
-    return sample_banks[bank]
+    return sample_banks[bank.get()]
 
 
 def all_samples() -> List['Sample']:
@@ -134,21 +170,22 @@ class Sample:
         self.oneshot_start_step = 0
         self.oneshot_offset = 0.0
         self.step_repeat_was_muted = False
+
+        # TODO rate param affected by these two
         self.halftime = False
         self.quartertime = False
+
         self.bpm = bpm
         self.load(file)
         self.recorded_steps = [None] * len(self.sound_slices)
         self.recording = False
         self.last_printed = 0
-        self.gate = modulation.Param(1.0, min_value=0.25, max_value=1)
-        self.gate_period = modulation.Param(2, min_value=1, max_value=32)
         self.gate_mirror = None
         self.gates = [1] * len(self.sound_slices)
         self.gate_fade = 0.020
         self.unspiced_gates = self.gates
         self.spice_level = modulation.Param(0, min_value=0, max_value=1)
-        self.spice_level.on_change = self.spice_gates
+        self.spice_level.add_change_handler(self.spice_gates)
         self.spices_param = self.SpiceParams(
             skip_gate=modulation.SpiceParams(
                 max_chance=0.05, max_delta=0, spice=self.spice_level, step_data=None),
@@ -165,10 +202,11 @@ class Sample:
             scatter=modulation.SpiceParams(
                 max_chance=0.2, max_delta=16, spice=self.spice_level, step_data=None, integer=True)
         )
-        self.volume = modulation.Param(
-            1, min_value=0, max_value=1).spice(self.spices_param.volume)
-        self.pitch = modulation.Param(
-            0, min_value=-12, max_value=12, round=True).spice(self.spices_param.pitch)
+
+        self.gate = modulation.Param(1.0, min_value=0.25, max_value=1)
+        self.gate_period = modulation.Param(2, min_value=1, max_value=32)
+        self.volume = modulation.Param(1, min_value=0, max_value=1).spice(self.spices_param.volume)
+        self.pitch = modulation.Param(0, min_value=-12, max_value=12, round=True).spice(self.spices_param.pitch)
 
         self.dice()
         #
@@ -627,7 +665,7 @@ class Sample:
     def queue_step(self, step, t, step_interval):
         if step == 0:
             self.seq_start = t
-        logger.info(self.seq_time())
+        # logger.info(self.seq_time())
         # TODO magic
         step = (step - self.oneshot_start_step) % 64
         srlength = round(self.step_repeat_length / self.get_rate())
@@ -789,8 +827,7 @@ def make_even(x):
         x -= 1
     return x
 
-
-TS_TIME_DEFAULT = 0.060
+TS_TIME_DEFAULT = 0.030
 TS_TIME_DELTA = 0.001
 ts_time = TS_TIME_DEFAULT
 stretch_fade = 0.005
