@@ -1,4 +1,4 @@
-import board
+# import board
 import digitalio
 from enum import Enum
 import utility
@@ -15,11 +15,14 @@ logger = utility.get_logger(__name__)
 
 
 encoder = None
+
+
 def init():
     global encoder
-    encoderA = digitalio.DigitalInOut(board.D24)
-    encoderB = digitalio.DigitalInOut(board.D25)
-    encoder = RotaryEncoder(encoderA, encoderB)
+    # encoderA = digitalio.DigitalInOut(board.D24)
+    # encoderB = digitalio.DigitalInOut(board.D25)
+    # encoder = RotaryEncoder(encoderA, encoderB)
+
 
 def update():
     if encoder is None:
@@ -34,6 +37,7 @@ def update():
     #         pass
     #     case _:
     #         logger.error("shouldn't happen")
+
 
 class RotaryEncoder:
     Direction = Enum('Direction', ['CLOCK', 'COUNTERCLOCK'])

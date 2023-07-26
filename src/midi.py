@@ -24,7 +24,7 @@ last_connect_attempt = None
 # @dataclass
 # class NoteEvent:
 
-MIDI_DIR = f"../midi"
+MIDI_DIR = f"midi"
 # getting the name of the directory
 # where the this file is present.
 current = os.path.dirname(os.path.realpath(__file__))
@@ -37,11 +37,14 @@ logger.info(parent)
 # the sys.path.
 
 # print(mido.get_output_names())
+
+
 def load_midi_files() -> list[MidiFile]:
     logger.info(parent)
-    return [MidiFile(f"{MIDI_DIR}/{m.group()}")
-                for f in os.listdir(MIDI_DIR)
-                if (m := re.fullmatch(r".+\.mid", f))]
+    return [MidiFile(f"{parent}/{MIDI_DIR}/{m.group()}")
+            for f in os.listdir(f"{parent}/{MIDI_DIR}")
+            if (m := re.fullmatch(r".+\.mid", f))]
+
 
 def send_midi(file: MidiFile):
     odd = True
@@ -58,7 +61,7 @@ def send_midi(file: MidiFile):
                 if odd and trip == 0:
                     midi_output.note_on(2, 127)
                 elif odd:
-                    midi_output.note_on(2 , 70)
+                    midi_output.note_on(2, 70)
 
                 trip += 1
                 if trip == 4:
@@ -70,10 +73,12 @@ def send_midi(file: MidiFile):
                 midi_output.note_off(0)
                 logger.info(f"note off")
 
+
 def is_note_on(status):
     return status is not None and 0b11110000 & status == 0b10010000
 
-def connect(block = False, suppress_output = False):
+
+def connect(block=False, suppress_output=False):
     global time_prev_midi_message, midi_input, midi_output
     device_id = None
 
@@ -85,7 +90,7 @@ def connect(block = False, suppress_output = False):
         logger.info(pygame.midi.get_count())
         for i in range(pygame.midi.get_count()):
             # print(i, pygame.midi.get_device_info(i))
-            (_,name,inp,_,_) = pygame.midi.get_device_info(i)
+            (_, name, inp, _, _) = pygame.midi.get_device_info(i)
             logger.info(f"{name} {inp}")
             if name == b"TR-8S MIDI 1" and inp == 1:
                 device_id = i
@@ -102,12 +107,16 @@ def connect(block = False, suppress_output = False):
             time.sleep(0.5)
     return midi_input, midi_output
 
-def reconnect(block = False, suppress_output = False):
+
+def reconnect(block=False, suppress_output=False):
     global midi_input, midi_output
     pygame.midi.quit()
     midi_input, midi_output = connect(block, suppress_output)
 
+
 note_q = []
+
+
 def get_status():
     global time_prev_midi_message
     if midi_input is None:
@@ -125,6 +134,7 @@ def get_status():
         pass
 
     return None, None
+
 
 def lost_connection():
     if midi_input is None:

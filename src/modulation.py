@@ -5,6 +5,7 @@ import utility
 
 logger = utility.get_logger(__name__)
 
+
 class Lfo:
     class Shape(Enum):
         TRIANGLE = 1
@@ -37,10 +38,11 @@ class Lfo:
     def step(self):
         self.steps = (self.steps + 1) % self.period
 
-    def value(self, x = None):
+    def value(self, x=None):
         if x is None:
             x = self.steps
         return self.fn(x)
+
 
 class Param:
     def __init__(self, value, min_value=None, max_value=None, round=False) -> None:
@@ -81,6 +83,7 @@ class Param:
     def control(self, encoder, scale, on_change=None):
         self.encoder = encoder
         self.encoder_scale = scale
+
         self.encoder_prev = encoder.value()
         self.add_change_handler(on_change)
         return self
@@ -91,12 +94,10 @@ class Param:
     def get(self, step = -1):
         if step == -1:
             if self.encoder:
-                delta = self.encoder_scale * (self.encoder.value() - self.encoder_prev)
+                delta = self.encoder_scale * \
+                    (self.encoder.value() - self.encoder_prev)
                 self.value += delta
                 self.encoder_prev = self.encoder.value()
-                # if delta != 0 and self.on_change is not None:
-                #     self.on_change(self.value)
-        
         value = self.value
         if self.steps is not None:
             self.steps -= 1
@@ -107,7 +108,8 @@ class Param:
             value += self.lfo.value(lfo_step) * self.scale
             if self.round:
                 value = round(value)
-            logger.debug(f"LFO {self.lfo} value {value} step {step} lfo_step {lfo_step} start_step {self.start_step}")
+            logger.debug(
+                f"LFO {self.lfo} value {value} step {step} lfo_step {lfo_step} start_step {self.start_step}")
         if self.steps == 0 and self.lfo:
             self.lfo.enabled = False
         if self.lfo and not self.lfo.enabled and self.last_value is not None:
@@ -155,8 +157,6 @@ class Param:
         ratio = norm / range
         return ratio * scale
 
-
-
 @dataclass
 class SpiceParams:
     max_chance: float
@@ -180,7 +180,8 @@ class SpiceParams:
             return original
         if step > len(self.step_data):
             logger.debug(f"step {step} and step_data {self.step_data}")
-        step_intensity, step_chance = self.step_data[step % len(self.step_data)]
+        step_intensity, step_chance = self.step_data[step % len(
+            self.step_data)]
         val = original
         chance = self.spice.value * self.max_chance
         delta = 2 * self.max_delta * step_intensity - self.max_delta
@@ -193,6 +194,7 @@ class SpiceParams:
     def dice(self, step_data):
         self.step_data = step_data
 
+
 class Counter:
     def __init__(self, value, delta=1):
         self.value = value
@@ -204,17 +206,20 @@ class Counter:
         logger.info(f"counter next value {value}, (delta {self.delta})")
         return value
 
-    
+
 def inc(_):
     counter = Counter(0)
     return lambda _: counter.next()
+
 
 def dec(_):
     counter = Counter(0, -1)
     return lambda _: counter.next()
 
+
 def saw(period):
     return lambda x: x % period
+
 
 def triangle(period):
     return lambda x: x / x2 if x <= (x2 := period / 2) else 1 - (x - x2) / x2

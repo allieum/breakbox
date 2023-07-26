@@ -2,25 +2,26 @@ from concurrent.futures import thread
 from multiprocessing import Process, Queue
 from threading import Thread
 import time
-# import rtmidi
 import sys
 from types import TracebackType
 import keyboard
-# from ctypes import *
-# from contextlib import contextmanager
 from datetime import datetime
-
 from sequence import sequence
 import sample
 import control
 import keys
 import midi
 import utility
-import display
-import lights
-
-from dmx import DMXInterface
 import blink
+import pkg_resources
+# import rtmidi
+# from ctypes import *
+# from contextlib import contextmanager
+
+# import display
+# import lights
+
+# from dmx import DMXInterface
 
 
 # with DMXInterface() as interface:
@@ -32,16 +33,20 @@ current_time = datetime.now().strftime("%H:%M:%S")
 logger.debug(f"Start time = {current_time}")
 
 dmx_interface = None
-try:
-    dmx_interface = DMXInterface()
-except:
-    pass
+# try:
+#     dmx_interface = DMXInterface()
+# except:
+#     pass
+
 
 def on_key(e):
+    logger.info(f"{e.name} {e.event_type}")
     if e.event_type == keyboard.KEY_DOWN:
         keys.key_pressed(e)
     elif e.event_type == keyboard.KEY_UP:
         keys.key_released(e)
+
+
 keyboard.hook(on_key)
 
 control.init()
@@ -51,11 +56,13 @@ midi.connect()
 midi.load_midi_files()
 sequence.control_bpm(control.encoder)
 
+
 def bounce(step):
     x = step % 32
     if x < 16:
         return x + 1
     return 16 - (x % 16)
+
 
 def bounce_lights(step):
     # tri = modulation.triangle(15)
@@ -64,6 +71,7 @@ def bounce_lights(step):
     logger.debug(f"light {light}")
     return (light,)
 
+
 def lights_for_step(step):
     light_index = step % 8 + 1 + 8
     mirror_index = -(light_index - 8) + 8 + 1
@@ -71,6 +79,8 @@ def lights_for_step(step):
 
 # if (now := time.time()) - last_dmx > 0.050: # and last_dmx_step != sequence.step:
 # TODO move into own file
+
+
 def update_dmx(step, note_number=None):
     if dmx_interface is None:
         return
@@ -107,6 +117,8 @@ def update_dmx(step, note_number=None):
     dmx_interface.set_frame(list(blink.Light.data))
     now = time.time()
     dmx_interface.send_update()
+
+
     # sample.Sample.audio_executor.submit(dmx_interface.send_update)
     # logger.info(f"dmx frame send took {time.time() - now}s")
 sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
@@ -128,8 +140,9 @@ def update():
     sequence.update(status)
     sample.play_samples(sequence.step_duration())
     sample_states = [lights.SampleState.of(s, keys.selected_sample, sequence.step, i) for i, s in enumerate(sample.current_samples())]
+
     # if lights.refresh_ready(samples_on):
-        # lights.refreshing = True
+    # lights.refreshing = True
     # lights.update(samples_on)
 
     if midi.is_note_on(status):
@@ -148,8 +161,8 @@ def update():
     #     last_dmx = time.time()
 
     # logger.info(f"putting {samples_on} in queue")
-        # f = sample.Sample.audio_executor.submit(lights.update, samples_on)
-        # f.add_done_callback(lambda _: lights.refresh_done())
+    # f = sample.Sample.audio_executor.submit(lights.update, samples_on)
+    # f.add_done_callback(lambda _: lights.refresh_done())
 
     # display.update(sequence.bpm.get(), sample_states)
 
@@ -157,7 +170,7 @@ def update():
         if sequence.midi_started:
             print("lost midi connection")
             sequence.stop_midi()
-        midi.reconnect(suppress_output = True)
+        midi.reconnect(suppress_output=True)
 
     # sys.stdout.flush()
     # sys.stderr.flush()

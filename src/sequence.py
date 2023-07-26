@@ -6,6 +6,16 @@ import midi
 import sample
 import modulation
 import utility
+import sample
+from midi import START, STOP, CLOCK
+import time
+# import pygame
+import pygame.mixer
+import pkg_resources
+# dists = [str(d).replace(" ", "==") for d in pkg_resources.working_set]
+# for i in dists:
+#     print(i)
+
 
 logger = utility.get_logger(__name__)
 
@@ -15,6 +25,7 @@ MAX_STEPS = MAX_BEATS * STEPS_PER_BEAT
 
 midi_lag_time = 0.050
 lookahead_time = 0.100
+
 
 class Sequence:
 
@@ -120,7 +131,8 @@ class Sequence:
         prev = self.last_queued_step
         for i in (self.inc(prev), self.inc(prev, 2), self.inc(prev, 3)):
             if self.is_started and now + lookahead_time >= (t := self.step_time(i)):
-                logger.debug(f"------- queuing step {i} === {t - self.measure_start}")
+                logger.debug(
+                    f"------- queuing step {i} === {t - self.measure_start}")
                 sample.queue_samples(i, t, self.step_duration())
                 self.last_queued_step = i
 
@@ -162,5 +174,6 @@ class Sequence:
     # def make_lfo(self, period, shape):
     #     self.lfos.append(lfo := modulation.Lfo(period, shape))
     #     return lfo
+
 
 sequence = Sequence()
