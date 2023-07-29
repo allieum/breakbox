@@ -1,5 +1,7 @@
 from concurrent.futures import thread
+from functools import partial
 from multiprocessing import Process, Queue
+import random
 from threading import Thread
 import time
 import sys
@@ -13,7 +15,11 @@ import keys
 import midi
 import utility
 import blink
-import pkg_resources
+import dtxpro
+from dtxpro import DtxPad
+import display
+import lights
+import modulation
 # import rtmidi
 # from ctypes import *
 # from contextlib import contextmanager
@@ -49,12 +55,12 @@ def on_key(e):
 
 keyboard.hook(on_key)
 
-control.init()
+# control.init()
 sample.load_samples()
 display.init(sample.all_samples())
 midi.connect()
 midi.load_midi_files()
-sequence.control_bpm(control.encoder)
+# sequence.control_bpm(control.encoder)
 
 
 def bounce(step):
@@ -146,8 +152,33 @@ def update():
     # lights.update(samples_on)
 
     if midi.is_note_on(status):
-        # logger.info(f"{data} {status}")
+        logger.info(f"{data} {status}")
         note_number = data[0]
+        if (dtxpad := dtxpro.struck_pad(note_number)) is not None:
+            if keys.selected_sample is None:
+                keys.selected_sample = sample.current_samples()[0]
+            smpl = keys.selected_sample
+
+            # TODO quantize based on finishing a round eighth
+            hit_gate = sample.remaining_time(smpl.get_playing()) + 2 * sequence.step_duration()
+
+            logger.info(f"hit DTX pad {dtxpad}")
+            match dtxpad:
+                case DtxPad.SNARE:
+                    smpl.drum_trigger(sequence.step)
+                case DtxPad.TOM1:
+                    smpl.start_halftime(duration=hit_gate)
+                case DtxPad.TOM2:
+                    pass
+                case DtxPad.TOM3:
+                    pass
+                case DtxPad.CRASH1:
+                    smpl.pitch_mod(1, duration=hit_gate)
+                case DtxPad.CRASH2:
+                    smpl.pitch_mod(-1, duration=hit_gate)
+                case DtxPad.RIDE:
+                    pass
+            smpl.unmute(duration=hit_gate)
         # sample.Sample.audio_executor.submit(update_dmx, 0, note_number)
 
     try:

@@ -80,6 +80,12 @@ class Param:
             self.value = self.last_value
         return self
 
+    def mod_cancel(self, restore=True):
+        if self.lfo:
+            self.lfo.enabled = False
+        if restore:
+            self.restore_default()
+
     def control(self, encoder, scale, on_change=None):
         self.encoder = encoder
         self.encoder_scale = scale

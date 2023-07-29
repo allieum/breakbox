@@ -2,6 +2,9 @@
 
 
 * even fresher
+** use drum kit as "gate" for running sequence
+*** midi in
+*** quantized or unquantized
 ** joy stick!!
 ** pi animations for sample progress
 ** bigger circle for selected

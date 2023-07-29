@@ -53,7 +53,7 @@ def on_param_changed(param: Param, name: str):
             q.put(p := ParamUpdate(name, value, fullness, time.time()), block=False)
         except:
             pass
-        logger.info(f"updated param {p}")
+        logger.info(f"updated param {param}")
     return on_change
 
 def run(display_q: Queue):

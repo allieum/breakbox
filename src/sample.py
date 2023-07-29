@@ -2,6 +2,7 @@ import functools
 import math
 from queue import PriorityQueue
 import sys
+import threading
 # import pygame
 import pygame.mixer
 import os
@@ -17,7 +18,7 @@ from dataclasses import dataclass, field
 from typing import Optional, List
 
 import modulation
-from modulation import Param
+from modulation import Lfo, Param
 import utility
 # import os
 # os.environ['SDL_AUDIODRIVER'] = 'dsp'
@@ -71,15 +72,12 @@ class SampleState:
 
 @dataclass
 class SoundData:
-    playtime: float
-    bpm: int
-    source_step: int
-    step: int
+    playtime: float = field(default=0)
+    bpm: int = field(default=143)
+    source_step: int = field(default=0)
+    step: int | None = field(default=None)
     semitones: int = field(default=0)
-    source: Optional['SoundData'] = None
-
-    def __init__(self) -> None:
-        self.bpm = 143
+    source: Optional['SoundData'] = field(default=None)
 
 
 sound_data = defaultdict(SoundData)
@@ -128,7 +126,6 @@ def load_samples():
             else:
                 logger.warn(f"wrong filename format for {f}, not loaded")
         logger.info([s.name for s in bnk])
-    sample_banks[0][0].sound.play()
 
 
 def current_samples() -> List['Sample']:
@@ -152,6 +149,19 @@ class Sample:
         'skip_gate', 'extra_gate', 'stretch_chance', 'gate_length', 'volume', 'pitch', 'scatter'
     ])
 
+
+    @dataclass
+    class Roll:
+        last_hit: float
+        sound: pygame.mixer.Sound
+        pitch_delta: int
+        step: int
+
+        def update(self, gen_sound):
+            def set():
+                self.sound = gen_sound()
+            Sample.audio_executor.submit(set)
+
     def __init__(self, file, bpm, bank):
         self.name = file.split("samples/")[1]
         self.bank = bank
@@ -165,14 +175,18 @@ class Sample:
         self.channel: pygame.mixer.Channel | None = None
         self.sound_queue: PriorityQueue[QueuedSound] = PriorityQueue()
         self.muted = True
+        self.mute_timer: None | threading.Timer = None
         self.unmute_intervals: list[utility.TimeInterval] = []
         self.mute_override = False
         self.oneshot_start_step = 0
         self.oneshot_offset = 0.0
         self.step_repeat_was_muted = False
 
+        self.roll: Sample.Roll | None = None
+
         # TODO rate param affected by these two
         self.halftime = False
+        self.halftime_timer = None
         self.quartertime = False
 
         self.bpm = bpm
@@ -207,6 +221,7 @@ class Sample:
         self.gate_period = modulation.Param(2, min_value=1, max_value=32)
         self.volume = modulation.Param(1, min_value=0, max_value=1).spice(self.spices_param.volume)
         self.pitch = modulation.Param(0, min_value=-12, max_value=12, round=True).spice(self.spices_param.pitch)
+        self.pitch_timer: None | threading.Timer = None
 
         self.dice()
         #
@@ -230,6 +245,12 @@ class Sample:
         logger.info(f"{self.name} slice size {slice_size}")
         self.sound_slices = [pygame.mixer.Sound(
             buffer=wav[i:i + slice_size]) for i in range(0, len(wav), slice_size)]
+        self.stretched_slices = self.sound_slices.copy()
+        for i, slice in enumerate(self.stretched_slices):
+            def set(gen_sound, i):
+                self.stretched_slices[i] = gen_sound()
+            self.audio_executor.submit(set, lambda: timestretch(slice, 0.5), i)
+        # self.stretched_slices = [timestretch(sound, 0.5) for sound in self.sound_slices]
         for i, s in enumerate(self.sound_slices):
             sound_data[s].bpm = self.bpm
             sound_data[s].source_step = i
@@ -245,6 +266,45 @@ class Sample:
         self.queue(self.get_sound_slices()[0], time.time(), 0)
         self.oneshot_start_step = step
         self.oneshot_offset = offset
+
+    def drum_trigger(self, step):
+        if self.roll and time.time() - self.roll.last_hit > 0.200:
+            self.roll = None
+        elif self.roll:
+            self.roll.last_hit = time.time()
+
+        slices = self.get_sound_slices()
+        slice_i = step % len(slices)
+        if slice_i % 2 == 1:
+            slice_i -= 1
+        if not self.roll:
+            # if stretch:
+            #     sound = self.stretched_slices[slice_i]
+            # else:
+            sound = slices[slice_i]
+            delta = 1 if random() > 0.5 else -1
+            self.roll = Sample.Roll(time.time(), sound, delta, slice_i)
+
+        next_sound = slices[(self.roll.step + 1) % len(slices)]
+        self.play_sound(self.roll.sound)
+        if self.channel: # and not stretch:
+            self.channel.queue(next_sound)
+
+        self.roll.update(functools.partial(self.change_pitch, slice_i, self.roll.sound, self.roll.pitch_delta))
+        # cur_sample.step_repeat_start(sequence.step, 1)
+        # cur_sample.modulate(cur_sample.pitch, 1, modulation.Lfo.Shape.INC, 1)
+        # cur_sample.replace_async(lambda: cur_sample.change_pitch(slice_i, sound, cur_sample.pitch.get()), slice_i)
+
+    def pitch_mod(self, delta, duration=None):
+        self.modulate(self.pitch, 1, Lfo.Shape.INC, delta)
+        self.pitch_timer = self.after_delay(self.pitch.mod_cancel, self.pitch_timer, duration)
+
+    def pitch_mod_cancel(self):
+        self.pitch.mod_cancel()
+
+    def get_step_sound(self, step):
+        sound = self.get_sound_slices()[step % len(self.get_sound_slices())]
+        # TODO
 
     def stop_oneshot(self):
         self.oneshot_start_step = 0
@@ -288,6 +348,11 @@ class Sample:
                 spicy_gate = self.spices_param.gate_length.value(gate, step)
             spiced_gates.append(spicy_gate)
         self.gates = spiced_gates
+
+    def start_halftime(self, duration=None):
+        logger.info(f"{self.name} halftime started")
+        self.halftime = True
+        self.halftime_timer = self.after_delay(self.stop_halftime, self.halftime_timer, duration)
 
     def stop_halftime(self, *_):
         logger.info(f"{self.name} halftime stopped")
@@ -422,11 +487,16 @@ class Sample:
         self.queue(slicey, t, i)
         return slicey
 
+    def set_slice(self, i, sound_generator):
+        self.sound_slices[i % len(self.sound_slices)] = sound_generator()
+        slicey = self.sound_slices[i % len(self.sound_slices)]
+        return slicey
+
     def swap_channel(self, other):
         self.channel, other.channel = other.channel, self.channel
 
     def mute(self, suppress_recording=False):
-        logger.debug(f"{self.name} muted")  # self.sound.set_volume(0)
+        logger.info(f"{self.name} muted")  # self.sound.set_volume(0)
         self.muted = True
         if not suppress_recording:
             logger.debug(f"{self.unmute_intervals}")
@@ -439,14 +509,25 @@ class Sample:
             logger.info(f"{self.name} intervals: {self.unmute_intervals}")
         self.clear_sound_queue()
 
-    def unmute(self, suppress_recording=False):
-        logger.debug(f"{self.name} unmuted")
+    def unmute(self, duration=None, suppress_recording=False):
+        logger.info(f"{self.name} unmuted")
         # self.sound.set_volume(Sample.MAX_VOLUME)
         self.muted = False
         if self.recording and not suppress_recording:
             logger.info(
                 f"{self.name} start mute interval [{self.seq_time()}, ]")
             self.unmute_intervals.append(utility.TimeInterval(self.seq_time()))
+        self.mute_timer = self.after_delay(self.mute, self.mute_timer, duration)
+
+    def after_delay(self, action, timer: threading.Timer | None, duration):
+        if duration is None:
+            return
+        if timer is not None:
+            timer.cancel()
+        timer = threading.Timer(duration, action)
+        timer.start()
+        return timer
+
 
     def set_mute(self, mute):
         if mute:
@@ -507,6 +588,13 @@ class Sample:
         future.add_done_callback(future_done)
         return future
 
+    def replace_async(self, generate_sound, step):
+        logger.debug(f"{self.name} scheduling async sound for {step}")
+        future = self.audio_executor.submit(
+            self.set_slice, step, generate_sound)
+        future.add_done_callback(future_done)
+        return future
+
     def warn_dropped(self, dropped, now):
         if (n := len(dropped)) == 0:
             return
@@ -522,8 +610,11 @@ class Sample:
                 self.unmute(suppress_recording=True)
             elif not self.mute_override:
                 self.mute(suppress_recording=True)
-        if self.channel and (playing := self.channel.get_sound()) in sound_data:
+        if self.channel and (playing := self.channel.get_sound()) in sound_data and sound_data[playing].step is not None:
             playing_step = sound_data[playing].step
+            if playing_step is None:
+                # Shouldnt happen, but this makes red squiggles happy
+                return None
             step_gate = self.gates[playing_step % len(self.gates)]
             if (inverted := step_gate < 0):
                 step_gate *= -1
@@ -605,7 +696,7 @@ class Sample:
                 logger.warn(
                     f"sample length {playing.get_length()} vs step length {step_duration}")
                 logger.warn(f"dropping")
-                return None
+                # return None
             logger.debug(f"{self.name}: played sample")
             return self.play_step(self.play_sound, qsound.sound, qsound.step, qsound.t)
         if self.channel.get_queue() is None and in_queue_window:
@@ -628,6 +719,11 @@ class Sample:
 
         return None
 
+    def get_playing(self):
+        if self.channel:
+            return self.channel.get_sound()
+        return None
+
     def play_step(self, sound_player, sound, step, t):
         def fn():
             sound_player(sound)
@@ -636,9 +732,10 @@ class Sample:
 
     def play_sound(self, sound):
         if self.channel is None:
-            return
-        self.channel.play(sound)
-        sound_data[sound].playtime = time.time()
+            self.play_sound_new_channel(sound)
+        else:
+            self.channel.play(sound)
+            sound_data[sound].playtime = time.time()
 
     def play_sound_new_channel(self, sound):
         self.channel = sound.play()
@@ -750,13 +847,6 @@ class Sample:
         sound_data[pitched_sound].bpm = sound_data[sound].bpm
         sound_data[pitched_sound].semitones = semitones
         return pitched_sound
-
-    def pitch_mod(self):
-        Sample.modulate(self.pitch, 16, modulation.Lfo.Shape.TRIANGLE, 8, 8)
-
-    # def cancel_pitch_mod(self):
-    #     pass
-        # self.pitch.lfo = None
 
     @staticmethod
     def modulate(param, period, shape, amount, steps=None):

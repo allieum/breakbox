@@ -116,15 +116,15 @@ def reconnect(block=False, suppress_output=False):
 
 note_q = []
 
-
 def get_status():
     global time_prev_midi_message
     if midi_input is None:
-        return None, None
+        return None, []
     try:
         events = midi_input.read(1)
         msg = events[0][0] if len(events) == 1 else None
-        if msg is not None:
+        if isinstance(msg, list):
+            # logger.info(f"got midi msg {msg}")
             time_prev_midi_message = time.time()
             if is_note_on(status := msg[0]):
                 note_q.append(msg[1])
@@ -133,7 +133,7 @@ def get_status():
         logger.warn(f"{e}")
         pass
 
-    return None, None
+    return None, []
 
 
 def lost_connection():
