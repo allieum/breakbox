@@ -154,7 +154,8 @@ def update():
     if midi.is_note_on(status):
         logger.info(f"{data} {status}")
         note_number = data[0]
-        if (dtxpad := dtxpro.struck_pad(note_number)) is not None:
+        velocity = data[1]
+        if (dtxpad := dtxpro.struck_pad(note_number)) is not None and velocity != 0:
             if keys.selected_sample is None:
                 keys.selected_sample = sample.current_samples()[0]
             smpl = keys.selected_sample
@@ -173,12 +174,13 @@ def update():
                 case DtxPad.TOM3:
                     pass
                 case DtxPad.CRASH1:
-                    smpl.pitch_mod(1, duration=hit_gate)
+                    smpl.pitch_mod(1, sequence.step, duration=hit_gate)
                 case DtxPad.CRASH2:
-                    smpl.pitch_mod(-1, duration=hit_gate)
+                    smpl.pitch_mod(-1, sequence.step, duration=hit_gate)
                 case DtxPad.RIDE:
                     pass
             smpl.unmute(duration=hit_gate)
+            # smpl.drum_trigger(sequence.step, velocity / 127)
         # sample.Sample.audio_executor.submit(update_dmx, 0, note_number)
 
     try:

@@ -181,6 +181,7 @@ class Sample:
         self.oneshot_start_step = 0
         self.oneshot_offset = 0.0
         self.step_repeat_was_muted = False
+        self.step_repeat_timer = None
 
         self.roll: Sample.Roll | None = None
 
@@ -249,7 +250,7 @@ class Sample:
         for i, slice in enumerate(self.stretched_slices):
             def set(gen_sound, i):
                 self.stretched_slices[i] = gen_sound()
-            self.audio_executor.submit(set, lambda: timestretch(slice, 0.5), i)
+            # self.audio_executor.submit(set, lambda: timestretch(slice, 0.5), i)
         # self.stretched_slices = [timestretch(sound, 0.5) for sound in self.sound_slices]
         for i, s in enumerate(self.sound_slices):
             sound_data[s].bpm = self.bpm
@@ -267,7 +268,7 @@ class Sample:
         self.oneshot_start_step = step
         self.oneshot_offset = offset
 
-    def drum_trigger(self, step):
+    def drum_trigger(self, step, volume=0.5):
         if self.roll and time.time() - self.roll.last_hit > 0.200:
             self.roll = None
         elif self.roll:
@@ -286,6 +287,7 @@ class Sample:
             self.roll = Sample.Roll(time.time(), sound, delta, slice_i)
 
         next_sound = slices[(self.roll.step + 1) % len(slices)]
+        self.roll.sound.set_volume(volume + 0.25)
         self.play_sound(self.roll.sound)
         if self.channel: # and not stretch:
             self.channel.queue(next_sound)
@@ -295,9 +297,11 @@ class Sample:
         # cur_sample.modulate(cur_sample.pitch, 1, modulation.Lfo.Shape.INC, 1)
         # cur_sample.replace_async(lambda: cur_sample.change_pitch(slice_i, sound, cur_sample.pitch.get()), slice_i)
 
-    def pitch_mod(self, delta, duration=None):
+    def pitch_mod(self, delta, step, duration=None):
         self.modulate(self.pitch, 1, Lfo.Shape.INC, delta)
         self.pitch_timer = self.after_delay(self.pitch.mod_cancel, self.pitch_timer, duration)
+        self.step_repeat_start(step, 1)
+        self.step_repeat_timer = self.after_delay(self.step_repeat_stop, self.step_repeat_timer, duration)
 
     def pitch_mod_cancel(self):
         self.pitch.mod_cancel()
