@@ -152,7 +152,7 @@ def update():
     # lights.update(samples_on)
 
     if midi.is_note_on(status):
-        logger.info(f"{data} {status}")
+        # logger.info(f"{data} {status}")
         note_number = data[0]
         velocity = data[1]
         if (dtxpad := dtxpro.struck_pad(note_number)) is not None and velocity != 0:
@@ -182,6 +182,15 @@ def update():
             smpl.unmute(duration=hit_gate)
             # smpl.drum_trigger(sequence.step, velocity / 127)
         # sample.Sample.audio_executor.submit(update_dmx, 0, note_number)
+    elif midi.is_control_change(status):
+        logger.info(f"received CC #{(cc_num := data[0])}: {(cc_value := data[1])}")
+        dtxpro.update_bank(cc_num, cc_value)
+    elif midi.is_program_change(status):
+        prog_num = data[0]
+        kit = dtxpro.kit_index(prog_num)
+        logger.info(f"received program change {prog_num} -> {kit}")
+        keys.select_sample(kit)
+
 
     try:
         lights.q.put(sample_states, block=False)

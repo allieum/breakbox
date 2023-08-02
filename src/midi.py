@@ -77,6 +77,11 @@ def send_midi(file: MidiFile):
 def is_note_on(status):
     return status is not None and 0b11110000 & status == 0b10010000
 
+def is_program_change(status):
+    return status is not None and 0xF0 & status == 0xC0
+
+def is_control_change(status):
+    return status is not None and 0xF0 & status == 0xB0
 
 def connect(block=False, suppress_output=False):
     global time_prev_midi_message, midi_input, midi_output

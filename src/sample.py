@@ -34,6 +34,11 @@ pygame.mixer.init(frequency=SAMPLE_RATE, buffer=256, channels=1)
 pygame.mixer.set_num_channels(32)
 logger.info(pygame.mixer.get_init())
 
+def set_bank(i):
+    old_samples = current_samples()
+    bank.set(i)
+    for new_sample, old_sample in zip(current_samples(), old_samples):
+        new_sample.swap_channel(old_sample)
 
 @dataclass
 class SampleState:

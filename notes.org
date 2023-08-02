@@ -1,6 +1,13 @@
 #+title: Notes
 
 
+* wow
+** dtx midi ideas:
+*** CC 16 general controller (location snare strike)
+*** CC 17 ride location
+
+*** bank select 0 MSB, 32 LSB ch10
+
 * even fresher
 ** use drum kit as "gate" for running sequence
 *** midi in
@@ -11,7 +18,6 @@
 ** smplflp
 ** DONE bank screen param
 CLOSED: [2023-07-25 Tue 16:29]
-
 * fresh
 ** hardwares
 *** rotary

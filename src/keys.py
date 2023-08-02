@@ -82,6 +82,14 @@ selected_sample = None
 selected_effects = []
 key_held = defaultdict(bool)
 
+
+def select_sample(i):
+    global selected_sample
+    bank = (i // sample.BANK_SIZE) % sample.NUM_BANKS
+    if bank != sample.bank.get():
+        sample.set_bank(bank)
+    selected_sample = sample.all_samples()[i % len(sample.all_samples())]
+
 def get_activated_samples():
     return [sample.current_samples()[i] for i, k in enumerate(SAMPLE_KEYS) if key_held[(k)]]
 
