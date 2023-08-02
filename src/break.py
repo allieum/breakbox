@@ -160,8 +160,14 @@ def update():
                 keys.selected_sample = sample.current_samples()[0]
             smpl = keys.selected_sample
 
+            last_step_time = sequence.step_time(sequence.step) - sequence.step_duration()
+            offset = time.time() - last_step_time
+            if offset > sequence.step_duration():
+                offset -= sequence.step_duration()
+
             # TODO quantize based on finishing a round eighth
-            hit_gate = sample.remaining_time(smpl.get_playing()) + 2 * sequence.step_duration()
+            # hit_gate = sample.remaining_time(smpl.get_playing()) + 2 * sequence.step_duration()
+            hit_gate = 3 * sequence.step_duration() - offset
 
             logger.info(f"hit DTX pad {dtxpad}")
             match dtxpad:
@@ -179,7 +185,7 @@ def update():
                     smpl.pitch_mod(-1, sequence.step, duration=hit_gate)
                 case DtxPad.RIDE:
                     pass
-            smpl.unmute(duration=hit_gate)
+            smpl.unmute(duration=hit_gate, step=(sequence.step - 1) % sequence.steps, offset=offset)
             # smpl.drum_trigger(sequence.step, velocity / 127)
         # sample.Sample.audio_executor.submit(update_dmx, 0, note_number)
     elif midi.is_control_change(status):
