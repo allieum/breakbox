@@ -560,6 +560,8 @@ class Sample:
             f"partial trigger step {step} offset {offset} starting at {start_index} of {len(wav)}")
         sound = pygame.mixer.Sound(buffer=wav[start_index:])
         self.play_sound(sound)
+        next_sound = self.get_step_sound(step, time.time(), force=True)
+        self.channel.queue(next_sound.sound)
 
     def after_delay(self, action, timer: threading.Timer | None, duration):
         if duration is None:
@@ -587,7 +589,7 @@ class Sample:
 
     # Is sound happening?
     def is_playing(self):
-        return self.channel is not None and (s := self.channel.get_sound()) and s.get_volume() > 0
+        return self.channel is not None and (sound := self.channel.get_sound()) and sound.get_volume() > 0
         # return not self.is_muted() or self.looping
 
     def clear_sound_queue(self):
