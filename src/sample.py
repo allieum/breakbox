@@ -317,12 +317,15 @@ class Sample:
         # cur_sample.replace_async(lambda: cur_sample.change_pitch(slice_i, sound, cur_sample.pitch.get()), slice_i)
 
     def pitch_mod(self, delta, step, duration=None):
-        self.modulate(self.pitch, 1, Lfo.Shape.INC, delta)
-        self.pitch_timer = self.after_delay(
-            self.pitch.mod_cancel, self.pitch_timer, duration)
-        self.step_repeat_start(step, 1)
         self.step_repeat_timer = self.after_delay(
             self.step_repeat_stop, self.step_repeat_timer, duration)
+        self.pitch_timer = self.after_delay(
+            self.pitch.mod_cancel, self.pitch_timer, duration)
+        # TODO better way to tell if lfos are equivalent
+        if (lfo := self.pitch.lfo) and lfo.enabled and lfo.shape == lfo.Shape.INC and self.pitch.scale == delta:
+            return
+        self.modulate(self.pitch, 1, Lfo.Shape.INC, delta)
+        self.step_repeat_start(step, 1)
 
     def pitch_mod_cancel(self):
         self.pitch.mod_cancel()
@@ -534,6 +537,8 @@ class Sample:
         self.clear_sound_queue()
 
     def unmute(self, duration=None, suppress_recording=False, step=None, offset=None):
+        self.mute_timer = self.after_delay(
+            self.mute, self.mute_timer, duration)
         if not self.is_muted():
             return
         logger.info(f"{self.name} unmuted")
@@ -545,8 +550,6 @@ class Sample:
             logger.info(
                 f"{self.name} start mute interval [{self.seq_time()}, ]")
             self.unmute_intervals.append(utility.TimeInterval(self.seq_time()))
-        self.mute_timer = self.after_delay(
-            self.mute, self.mute_timer, duration)
 
     def partial_trigger(self, step, offset):
         queued_sound = self.get_step_sound(step, time.time(), force=True)
@@ -560,8 +563,9 @@ class Sample:
             f"partial trigger step {step} offset {offset} starting at {start_index} of {len(wav)}")
         sound = pygame.mixer.Sound(buffer=wav[start_index:])
         self.play_sound(sound)
-        next_sound = self.get_step_sound(step, time.time(), force=True)
-        self.channel.queue(next_sound.sound)
+        next_sound = self.get_step_sound(step + 1, time.time(), force=True)
+        if next_sound and self.channel: # both unnecessary checks except for linter
+            self.channel.queue(next_sound.sound)
 
     def after_delay(self, action, timer: threading.Timer | None, duration):
         if duration is None:

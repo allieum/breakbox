@@ -28,7 +28,7 @@ pads = [
     DrumPad(DtxPad.CRASH1, [49, 55, 59]),
     DrumPad(DtxPad.CRASH2, [16, 17, 20, 57]),
     DrumPad(DtxPad.RIDE, [49, 55, 59]),
-    DrumPad(DtxPad.HAT, [46, 78]),
+    DrumPad(DtxPad.HAT, [46, 77, 78]),
 ]
 
 def struck_pad(note_number) -> DtxPad | None:

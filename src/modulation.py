@@ -48,7 +48,7 @@ class Param:
     def __init__(self, value, min_value=None, max_value=None, round=False) -> None:
         self.value = value
         self.default_value = value
-        self.lfo = None
+        self.lfo: None | Lfo = None
         self.start_step = None
         self.steps = None
         self.encoder = None
