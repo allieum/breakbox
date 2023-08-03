@@ -169,7 +169,6 @@ def update():
                 offset -= sequence.step_duration()
 
             # TODO quantize based on finishing a round eighth
-            # hit_gate = sample.remaining_time(smpl.get_playing()) + 2 * sequence.step_duration()
             hit_gate = 3 * sequence.step_duration() - offset
 
             logger.info(f"hit DTX pad {dtxpad}")
