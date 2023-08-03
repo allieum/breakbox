@@ -564,7 +564,7 @@ class Sample:
         sound = pygame.mixer.Sound(buffer=wav[start_index:])
         self.play_sound(sound)
         next_sound = self.get_step_sound(step + 1, time.time(), force=True)
-        if next_sound and self.channel: # both unnecessary checks except for linter
+        if next_sound and self.channel:  # both unnecessary checks except for linter
             self.channel.queue(next_sound.sound)
 
     def after_delay(self, action, timer: threading.Timer | None, duration):

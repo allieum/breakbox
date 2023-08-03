@@ -1,5 +1,8 @@
 #+title: Notes
 
+Aug 3, 2023 todos:
+- program change, map to new knob so you can change breakbox samples without changing drum kit
+- group cymbal hits, if main hit is paired with rim or bell, ignore main. Allows using breakbox without triggering 404 effects
 
 * wow
 ** dtx midi ideas:
