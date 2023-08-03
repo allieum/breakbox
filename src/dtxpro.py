@@ -13,6 +13,7 @@ class DtxPad(Enum):
     CRASH1 = 4
     CRASH2 = 5
     RIDE = 6
+    HAT = 7
 
 @dataclass
 class DrumPad:
@@ -27,6 +28,7 @@ pads = [
     DrumPad(DtxPad.CRASH1, [49, 55, 59]),
     DrumPad(DtxPad.CRASH2, [16, 17, 20, 57]),
     DrumPad(DtxPad.RIDE, [49, 55, 59]),
+    DrumPad(DtxPad.HAT, [46, 78]),
 ]
 
 def struck_pad(note_number) -> DtxPad | None:

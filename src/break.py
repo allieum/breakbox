@@ -160,6 +160,9 @@ def update():
                 keys.selected_sample = sample.current_samples()[0]
             smpl = keys.selected_sample
 
+            if not sequence.is_started:
+                sequence.start_internal()
+
             last_step_time = sequence.step_time(sequence.step) - sequence.step_duration()
             offset = time.time() - last_step_time
             if offset > sequence.step_duration():
@@ -173,6 +176,9 @@ def update():
             match dtxpad:
                 case DtxPad.SNARE:
                     smpl.drum_trigger(sequence.step)
+                case DtxPad.HAT:
+                    logger.info(f"hit hat")
+                    pass
                 case DtxPad.TOM1:
                     smpl.start_halftime(duration=hit_gate)
                 case DtxPad.TOM2:
