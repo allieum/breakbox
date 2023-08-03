@@ -27,18 +27,20 @@ logger = utility.get_logger(__name__)
 NUM_BANKS = 10
 BANK_SIZE = 6
 SAMPLE_RATE = 22050
-bank = Param(0, min_value=0, max_value=NUM_BANKS - 1, round = True)
+bank = Param(0, min_value=0, max_value=NUM_BANKS - 1, round=True)
 
 # pygame.init()
 pygame.mixer.init(frequency=SAMPLE_RATE, buffer=256, channels=1)
 pygame.mixer.set_num_channels(32)
 logger.info(pygame.mixer.get_init())
 
+
 def set_bank(i):
     old_samples = current_samples()
     bank.set(i)
     for new_sample, old_sample in zip(current_samples(), old_samples):
         new_sample.swap_channel(old_sample)
+
 
 @dataclass
 class SampleState:
@@ -68,12 +70,14 @@ class SampleState:
         progress = (step % steps) / steps
         length *= (1 - progress)
         length -= 0.5
-        state = SampleState(sample.is_playing(), sample.bank, length, steps, selected, sample.recording, step, pad)
+        state = SampleState(sample.is_playing(), sample.bank,
+                            length, steps, selected, sample.recording, step, pad)
         # grab step from sequencer
         # if sample.channel and (playing := sample.channel.get_sound()) in sound_data:
         #     state.step = sound_data[playing].step
         # state.step = step
         return state
+
 
 @dataclass
 class SoundData:
@@ -93,12 +97,14 @@ class QueuedSound:
     t: float
     step: int = field(compare=False)
     sound: pygame.mixer.Sound = field(compare=False)
-    fx: Callable[[pygame.mixer.Sound], pygame.mixer.Sound] | None = field(compare=False)
+    fx: Callable[[pygame.mixer.Sound],
+                 pygame.mixer.Sound] | None = field(compare=False)
 
     def apply_fx(self):
         if self.fx is None or time.time() > self.t:
             return
         self.sound = self.fx(self.sound)
+
 
 def remaining_time(sound):
     if sound is None:
@@ -159,7 +165,6 @@ class Sample:
         'skip_gate', 'extra_gate', 'stretch_chance', 'gate_length', 'volume', 'pitch', 'scatter'
     ])
 
-
     @dataclass
     class Roll:
         last_hit: float
@@ -202,7 +207,8 @@ class Sample:
 
         self.bpm = bpm
         self.load(file)
-        self.recorded_steps: list[None | pygame.mixer.Sound] = [None] * len(self.sound_slices)
+        self.recorded_steps: list[None | pygame.mixer.Sound] = [
+            None] * len(self.sound_slices)
         self.recording = False
         self.last_printed = 0
         self.gate_mirror = None
@@ -230,8 +236,10 @@ class Sample:
 
         self.gate = modulation.Param(1.0, min_value=0.25, max_value=1)
         self.gate_period = modulation.Param(2, min_value=1, max_value=32)
-        self.volume = modulation.Param(1, min_value=0, max_value=1).spice(self.spices_param.volume)
-        self.pitch = modulation.Param(0, min_value=-12, max_value=12, round=True).spice(self.spices_param.pitch)
+        self.volume = modulation.Param(
+            1, min_value=0, max_value=1).spice(self.spices_param.volume)
+        self.pitch = modulation.Param(
+            0, min_value=-12, max_value=12, round=True).spice(self.spices_param.pitch)
         self.pitch_timer: None | threading.Timer = None
 
         self.dice()
@@ -299,23 +307,25 @@ class Sample:
         next_sound = slices[(self.roll.step + 1) % len(slices)]
         self.roll.sound.set_volume(volume + 0.25)
         self.play_sound(self.roll.sound)
-        if self.channel: # and not stretch:
+        if self.channel:  # and not stretch:
             self.channel.queue(next_sound)
 
-        self.roll.update(functools.partial(self.change_pitch, slice_i, self.roll.sound, self.roll.pitch_delta))
+        self.roll.update(functools.partial(self.change_pitch,
+                         slice_i, self.roll.sound, self.roll.pitch_delta))
         # cur_sample.step_repeat_start(sequence.step, 1)
         # cur_sample.modulate(cur_sample.pitch, 1, modulation.Lfo.Shape.INC, 1)
         # cur_sample.replace_async(lambda: cur_sample.change_pitch(slice_i, sound, cur_sample.pitch.get()), slice_i)
 
     def pitch_mod(self, delta, step, duration=None):
         self.modulate(self.pitch, 1, Lfo.Shape.INC, delta)
-        self.pitch_timer = self.after_delay(self.pitch.mod_cancel, self.pitch_timer, duration)
+        self.pitch_timer = self.after_delay(
+            self.pitch.mod_cancel, self.pitch_timer, duration)
         self.step_repeat_start(step, 1)
-        self.step_repeat_timer = self.after_delay(self.step_repeat_stop, self.step_repeat_timer, duration)
+        self.step_repeat_timer = self.after_delay(
+            self.step_repeat_stop, self.step_repeat_timer, duration)
 
     def pitch_mod_cancel(self):
         self.pitch.mod_cancel()
-
 
     def stop_oneshot(self):
         self.oneshot_start_step = 0
@@ -363,7 +373,8 @@ class Sample:
     def start_halftime(self, duration=None):
         logger.info(f"{self.name} halftime started")
         self.halftime = True
-        self.halftime_timer = self.after_delay(self.stop_halftime, self.halftime_timer, duration)
+        self.halftime_timer = self.after_delay(
+            self.stop_halftime, self.halftime_timer, duration)
 
     def stop_halftime(self, *_):
         logger.info(f"{self.name} halftime stopped")
@@ -534,18 +545,19 @@ class Sample:
             logger.info(
                 f"{self.name} start mute interval [{self.seq_time()}, ]")
             self.unmute_intervals.append(utility.TimeInterval(self.seq_time()))
-        self.mute_timer = self.after_delay(self.mute, self.mute_timer, duration)
+        self.mute_timer = self.after_delay(
+            self.mute, self.mute_timer, duration)
 
     def partial_trigger(self, step, offset):
-        qs = self.get_step_sound(step, time.time(), force=True)
-        if not qs:
+        queued_sound = self.get_step_sound(step, time.time(), force=True)
+        if not queued_sound:
             return
-        done_ratio = offset / qs.sound.get_length()
-        wav = qs.sound.get_raw()
+        done_ratio = offset / queued_sound.sound.get_length()
+        wav = queued_sound.sound.get_raw()
         start_index = make_even(round(done_ratio * len(wav)))
-        if start_index > len(wav):
-            start_index -= len(wav)
-        logger.info(f"partial trigger step {step} offset {offset} starting at {start_index} of {len(wav)}")
+        start_index %= len(wav)
+        logger.info(
+            f"partial trigger step {step} offset {offset} starting at {start_index} of {len(wav)}")
         sound = pygame.mixer.Sound(buffer=wav[start_index:])
         self.play_sound(sound)
 
@@ -590,7 +602,8 @@ class Sample:
             f"queued sound in {self.name} for step {qs.step} {datetime.fromtimestamp(qs.t)}")
         # _, prev_t = self.sound_queue[len(self.sound_queue) - 1] if len(self.sound_queue) > 0 else None, None
         if self.recording:
-            self.recorded_steps[i := qs.step % len(self.recorded_steps)] = qs.sound
+            self.recorded_steps[i := qs.step %
+                                len(self.recorded_steps)] = qs.sound
             logger.info(f"{self.name} recording sound for step {i}")
         # if (recorded := self.recorded_steps[step]) is not None:
         #     sound = recorded
@@ -986,6 +999,7 @@ def make_even(x):
     if x % 2 == 1:
         x -= 1
     return x
+
 
 TS_TIME_DEFAULT = 0.030
 TS_TIME_DELTA = 0.001
