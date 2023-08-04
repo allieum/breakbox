@@ -15,6 +15,7 @@ from sequence import sequence
 logger = utility.get_logger(__name__)
 logger.setLevel("WARN")
 
+
 @dataclass
 class ParamUpdate:
     name: str
@@ -38,15 +39,17 @@ H = 64
 WHITE = 255
 BLACK = 0
 
+
 def init(samples: list[Sample]):
     for sample in samples:
         for param_name in [
                 "gate", "gate_period", "spice_level",
-                "volume", "pitch" ]:
+                "volume", "pitch"]:
             param = getattr(sample, param_name)
             param.add_change_handler(on_param_changed(param, param_name))
     bank.add_change_handler(on_param_changed(bank, "bank"))
     sequence.bpm.add_change_handler(on_param_changed(sequence.bpm, "bpm"))
+
 
 def on_param_changed(param: Param, name: str):
     def on_change(value):
@@ -56,6 +59,7 @@ def on_param_changed(param: Param, name: str):
 
         logger.info(f"updated param {param}")
     return on_change
+
 
 def run(display_q: Queue):
     try:
@@ -111,12 +115,13 @@ def run(display_q: Queue):
         else:
             font = ImageFont.truetype("DejaVuSans.ttf", size=16)
 
-            (l, t, r, b) = font.getbbox(text)
-            (font_width, font_height) = r - l, b - t
+            (left, top, right, bottom) = font.getbbox(text)
+            (font_width, font_height) = right - left, bottom - top
             # (font_width, font_height) = 64, 16
             logger.info(f"drawing text {text} {font_width} x {font_height}")
             draw.text(
-                (oled.width // 2 - font_width // 2, oled.height // 2 - font_height // 2),
+                (oled.width // 2 - font_width // 2,
+                 oled.height // 2 - font_height // 2),
                 text,
                 font=font,
                 fill=255,
@@ -150,14 +155,15 @@ def draw_value_bar(draw, fullness):
     #     outline=0,
     #     fill=0,
 
+
 def draw_param(draw, param: ParamUpdate):
     # Load default font.
     # font = ImageFont.load_default()
     name_font = ImageFont.truetype("DejaVuSans.ttf", size=12)
     text = f"{param.name}: {param.value}"
 
-    (l, t, r, b) = name_font.getbbox(text)
-    (font_width, font_height) = r - l, b - t
+    (left, top, right, bottom) = name_font.getbbox(text)
+    (font_width, font_height) = right - left, bottom - top
     # (font_width, font_height) = 64, 16
     logger.info(f"drawing text {text} {font_width} x {font_height}")
     draw.text(
@@ -169,13 +175,15 @@ def draw_param(draw, param: ParamUpdate):
 
     draw_value_bar(draw, param.fullness)
 
+
 def draw_sample_icons(draw, sample_states: list[SampleState]):
     xpad = 10
     ypad = 10
     size = 8
     y = ypad - size // 2
     total_width = W - xpad * 2
-    for x, state in zip(range(xpad, W - xpad + 1, total_width // 5), sample_states):
+    for x, state in zip(range(xpad, W - xpad + 1, total_width // 5), sample_states, strict=True):
         fill = WHITE if state.selected else BLACK
         x -= size // 2
-        draw.rounded_rectangle((x, y, x + size, y + size), radius=3, fill=fill, outline=WHITE)
+        draw.rounded_rectangle((x, y, x + size, y + size),
+                               radius=3, fill=fill, outline=WHITE)

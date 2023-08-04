@@ -80,13 +80,14 @@ class Sequence:
 
     def update_midi_bpm(self, t):
         bpm = self.calculate_midi_bpm(t)
+        min_beats_to_change = 5
         if bpm != self.midi_bpm:
             if bpm == self.provisional_midi_bpm:
                 self.midi_stable_beats += 1
             else:
                 self.midi_stable_beats = 0
                 self.provisional_midi_bpm = bpm
-            if self.midi_stable_beats > 5:
+            if self.midi_stable_beats > min_beats_to_change:
                 sample.stretch_samples(bpm)
                 self.midi_bpm = bpm
                 logger.info(f"midi bpm changed to {bpm} on step {self.step}")
