@@ -1,8 +1,22 @@
 #+title: Notes
 
 Aug 3, 2023 todos:
-- program change, map to new knob so you can change breakbox samples without changing drum kit
 - group cymbal hits, if main hit is paired with rim or bell, ignore main. Allows using breakbox without triggering 404 effects
+- spice mapped to number of drum hits w/ cooloff
+- snare roll to toggle loop
+  - use other pad than snare: tom3
+- step repeat
+  - could do retrig, keep repeating as long as you keep hitting pad
+- fix pitch mod
+- take away program change
+- gate
+  - faster hits == shorter gate period
+  - velocity --> gate duty cycle
+  - try on ride
+
+    unclear how to implement
+- program change, map to new knob so you can change breakbox samples without changing drum kit
+
 
 * wow
 ** dtx midi ideas:

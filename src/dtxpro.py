@@ -1,6 +1,7 @@
 # Yamaha DTX-pro drum module
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+import time
 
 from utility import get_logger
 
@@ -16,10 +17,32 @@ class DtxPad(Enum):
     RIDE = 6
     HAT = 7
 
+HIT_TIMEOUT = 0.25
+ROLL_THRESHOLD = 5
+ROLL_DEBOUNCE = 2
+
 @dataclass
 class DrumPad:
     pad: DtxPad
     note_numbers: list[int]
+    last_hit: float = field(default=0)
+    last_roll: float = field(default=0)
+    hit_count: int = field(default=0)
+
+    def register_hit(self):
+        self.last_hit = time.time()
+        self.hit_count += 1
+
+    def roll_detected(self):
+        roll = self.hit_count >= ROLL_THRESHOLD
+        if roll and time.time() - self.last_roll > ROLL_DEBOUNCE:
+            self.last_roll = time.time()
+            return True
+        return False
+
+    def update(self):
+        if time.time() - self.last_hit > HIT_TIMEOUT:
+            self.hit_count = 0
 
 pads = [
     DrumPad(DtxPad.SNARE, [38, 37, 40]),
@@ -28,13 +51,26 @@ pads = [
     DrumPad(DtxPad.TOM3, [43]),
     DrumPad(DtxPad.CRASH1, [49, 55, 59]),
     DrumPad(DtxPad.CRASH2, [16, 17, 20, 57]),
-    DrumPad(DtxPad.RIDE, [49, 55, 59]),
-    DrumPad(DtxPad.HAT, [46, 77, 78]),
+    DrumPad(DtxPad.RIDE, [51, 52, 53]),
+    DrumPad(DtxPad.HAT, [46, 77, 78, 42, 79]),
 ]
 
-def struck_pad(note_number) -> DtxPad | None:
+def update():
+    for pad in pads:
+        pad.update()
+
+def total_hit_count():
+    return sum(pad.hit_count for pad in pads)
+
+def hit_count(dtx_pad: DtxPad):
+    for pad in pads:
+        if pad.pad == dtx_pad:
+            return pad.hit_count
+
+def struck_pad(note_number) -> DrumPad | None:
     if any(note_number in (drum_pad := p).note_numbers for p in pads):
-        return drum_pad.pad
+        drum_pad.register_hit()
+        return drum_pad
     return None
 
 def kit_index(prog_num):

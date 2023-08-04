@@ -97,13 +97,18 @@ class QueuedSound:
     step: int = field(compare=False)
     sound: pygame.mixer.Sound = field(compare=False)
     fx: Callable[[pygame.mixer.Sound],
-                 pygame.mixer.Sound] | None = field(compare=False)
+                 pygame.mixer.Sound] | None = field(compare=False, default=None)
+    applying_fx: bool = field(default=False)
 
     def apply_fx(self):
         if self.fx is None or time.time() > self.t:
             return
+        self.applying_fx = True
         self.sound = self.fx(self.sound)
+        self.applying_fx = False
 
+    def t_string(self):
+        return datetime.fromtimestamp(self.t)
 
 def remaining_time(sound):
     if sound is None:
@@ -115,7 +120,6 @@ def remaining_time(sound):
         return 0
     return max(0, sound.get_length() - (time.time() - sound_data[sound].playtime))
 
-
 def write_wav(soundbytes, filename):
     AudioSegment(
         soundbytes,
@@ -124,10 +128,8 @@ def write_wav(soundbytes, filename):
         channels=1,
     ).export(filename, format='wav')
 
-
 dir_path = os.path.dirname(os.path.realpath(__file__))
 sample_banks = []
-
 
 def load_samples():
     for i in range(1, NUM_BANKS + 1):
@@ -280,12 +282,12 @@ class Sample:
 
     def trigger_oneshot(self, step, offset):
         # TODO doesnt do pitch etc. make method to get sound for step
-        self.clear_sound_queue()
-        self.queue(self.get_sound_slices()[0], time.time(), 0)
+        # self.clear_sound_queue()
+        # self.queue(self.get_sound_slices()[0], time.time(), 0)
         self.oneshot_start_step = step
         self.oneshot_offset = offset
 
-    def drum_trigger(self, step, volume=0.5):
+    def drum_trigger(self, step, pitched=True, volume=0.5):
         if self.roll and time.time() - self.roll.last_hit > 0.200:
             self.roll = None
         elif self.roll:
@@ -299,15 +301,25 @@ class Sample:
             # if stretch:
             #     sound = self.stretched_slices[slice_i]
             # else:
-            sound = slices[slice_i]
+            queued_sound = self.get_step_sound(slice_i, time.time(), force=True)
+            if not queued_sound:
+                return
             delta = 1 if random() > 0.5 else -1
-            self.roll = Sample.Roll(time.time(), sound, delta, slice_i)
+            if pitched:
+                self.roll = Sample.Roll(time.time(), queued_sound.sound, delta, slice_i)
+            else:
+                self.play_sound(queued_sound.sound)
 
-        next_sound = slices[(self.roll.step + 1) % len(slices)]
+        if not self.roll:
+            return
+
+        next_sound = self.get_step_sound(slice_i + 1, time.time(), force=True)
+        if not next_sound:
+            return
         self.roll.sound.set_volume(volume + 0.25)
         self.play_sound(self.roll.sound)
         if self.channel:  # and not stretch:
-            self.channel.queue(next_sound)
+            self.channel.queue(next_sound.sound)
 
         self.roll.update(functools.partial(self.change_pitch,
                          slice_i, self.roll.sound, self.roll.pitch_delta))
@@ -316,15 +328,13 @@ class Sample:
         # cur_sample.replace_async(lambda: cur_sample.change_pitch(slice_i, sound, cur_sample.pitch.get()), slice_i)
 
     def pitch_mod(self, delta, step, duration=None):
-        self.step_repeat_timer = self.after_delay(
-            self.step_repeat_stop, self.step_repeat_timer, duration)
+        self.step_repeat_start(step, 1, duration)
         self.pitch_timer = self.after_delay(
             self.pitch.mod_cancel, self.pitch_timer, duration)
         # TODO better way to tell if lfos are equivalent
         if (lfo := self.pitch.lfo) and lfo.enabled and lfo.shape == lfo.Shape.INC and self.pitch.scale == delta:
             return
         self.modulate(self.pitch, 1, Lfo.Shape.INC, delta)
-        self.step_repeat_start(step, 1)
 
     def pitch_mod_cancel(self):
         self.pitch.mod_cancel()
@@ -386,7 +396,9 @@ class Sample:
         logger.info(f"{self.name} quartertime stopped")
         self.quartertime = False
 
-    def step_repeat_start(self, index, length):
+    def step_repeat_start(self, index, length, duration=None):
+        self.step_repeat_timer = self.after_delay(
+            self.step_repeat_stop, self.step_repeat_timer, duration)
         logger.info(
             f"starting step repeat at {self.step_repeat_index} with length {length}")
         if length in self.step_repeat_lengths:
@@ -508,7 +520,7 @@ class Sample:
     def set_and_queue_slice(self, i, t, sound_generator):
         self.sound_slices[i % len(self.sound_slices)] = sound_generator()
         slicey = self.sound_slices[i % len(self.sound_slices)]
-        self.queue(slicey, t, i)
+        self.queue(QueuedSound(t, i, slicey))
         return slicey
 
     def set_slice(self, i, sound_generator):
@@ -601,6 +613,7 @@ class Sample:
     def queue(self, qs: QueuedSound | None):
         if qs is None:
             return
+        logger.info(f"queuing sound for {qs.t_string()} {qs}")
         qs.t += self.oneshot_offset
         logger.debug(
             f"queued sound in {self.name} for step {qs.step} {datetime.fromtimestamp(qs.t)}")
@@ -627,7 +640,7 @@ class Sample:
     def queue_async(self, generate_sound, t, step):
         logger.debug(f"{self.name} scheduling async sound for {t}")
         future = self.audio_executor.submit(
-            lambda: self.queue(generate_sound(), t, step))
+            lambda: self.queue(QueuedSound(t, step, generate_sound())))
         future.add_done_callback(future_done)
 
     def queue_and_replace_async(self, generate_sound, t, step):
@@ -761,9 +774,13 @@ class Sample:
                     f"{self.name} queueing sample would make it early by {-error}, putting back on queue")
                 self.sound_queue.put(qsound)
                 return None
+            if qsound.applying_fx:
+                logger.info(f"{self.name} not queueing yet because fx haven't finished applying")
+                self.sound_queue.put(qsound)
+                return None
             self.channel.queue(qsound.sound)
             sound_data[qsound.sound].playtime = predicted_finish
-            logger.debug(f"{self.name}: queued sample")
+            logger.info(f"{self.name}: queued sample {qsound.t_string()} {qsound}")
             return None
 
         return None
@@ -823,15 +840,15 @@ class Sample:
         if rate != 1:
             fxs.append(lambda sound: timestretch(
                 sound, rate, sound_data, stretch_fade))
-        if (p := self.pitch.get(step)) != sound_data[sound].semitones:
+        if (p := self.pitch.get(step)):# != sound_data[sound].semitones:
             logger.debug(f"{self.name} setting pitch to {p}")
             fxs.append(lambda sound: self.change_pitch(step, sound, p))
             # self.queue_and_replace_async(lambda: self.change_pitch(step, sound, p), t, step)
         if (sound_bpm := sound_data[sound].bpm) != self.bpm:
             logger.info(
-                f"{self.name} step {step} stretching sample from {sound_bpm} to {self.bpm}")
+               f"{self.name} step {step} stretching sample from {sound_bpm} to {self.bpm}")
             future = self.queue_and_replace_async(lambda: timestretch(
-                self.source_sound(sound), self.bpm / sound_bpm), sound_data, t, step)
+                self.source_sound(sound), self.bpm / sound_bpm, sound_data), t, step)
             future.add_done_callback(
                 lambda f: set_sound_bpm(f.result(), self.bpm))
 
@@ -873,8 +890,9 @@ class Sample:
                     step) else 1
                 rate = self.get_rate() / spice_factor
                 ts = t + i * step_interval / rate
-                slice_step = step + i
-                qs = self.get_step_sound(substep, ts, source_step=slice_step)
+                for_step = step + i
+                qs = self.get_step_sound(for_step, ts, source_step=substep)
+                logger.info(f"step repeat queueing {substep} for step {for_step} {qs.t_string() if qs else '?'}")
                 self.queue(qs)
                 # if rate != 1:
                 #     stretch = functools.partial(

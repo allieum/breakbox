@@ -41,7 +41,7 @@ dmx_interface = None
 
 
 def on_key(e):
-    logger.info(f"{e.name} {e.event_type}")
+    # logger.info(f"{e.name} {e.event_type}")
     if e.event_type == keyboard.KEY_DOWN:
         keys.key_pressed(e)
     elif e.event_type == keyboard.KEY_UP:
@@ -142,6 +142,7 @@ def update():
     sample.play_samples(sequence.step_duration())
     sample_states = [lights.SampleState.of(
         s, keys.selected_sample, sequence.step, i) for i, s in enumerate(sample.current_samples())]
+    dtxpro.update()
 
     # if lights.refresh_ready(samples_on):
     # lights.refreshing = True
@@ -169,7 +170,7 @@ def update():
             hit_gate = 3 * sequence.step_duration() - offset
 
             logger.info(f"hit DTX pad {dtxpad}")
-            match dtxpad:
+            match dtxpad.pad:
                 case DtxPad.SNARE:
                     smpl.drum_trigger(sequence.step)
                 case DtxPad.HAT:
@@ -178,17 +179,22 @@ def update():
                 case DtxPad.TOM1:
                     smpl.start_halftime(duration=hit_gate)
                 case DtxPad.TOM2:
-                    pass
+                    # smpl.drum_trigger(sequence.step, pitched=False)
+                    # TODO why not work
+                    smpl.step_repeat_start(sequence.step, 2, duration=hit_gate * 2)
                 case DtxPad.TOM3:
-                    pass
+                    if dtxpad.roll_detected():
+                        smpl.looping = not smpl.looping
                 case DtxPad.CRASH1:
                     smpl.pitch_mod(1, sequence.step, duration=hit_gate)
                 case DtxPad.CRASH2:
                     smpl.pitch_mod(-1, sequence.step, duration=hit_gate)
                 case DtxPad.RIDE:
+                    # add timer to gate param, velocity/position use
                     pass
             smpl.unmute(duration=hit_gate, step=(sequence.step - 1) %
                         sequence.steps, offset=offset)
+            logger.info(f"hit combo: {dtxpro.total_hit_count()}")
             # smpl.drum_trigger(sequence.step, velocity / 127)
         # sample.Sample.audio_executor.submit(update_dmx, 0, note_number)
     elif midi.is_control_change(status):
