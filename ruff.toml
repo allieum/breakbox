@@ -1,11 +1,11 @@
  select = [
-     "E",  # pycodestyle errors
-     "F",  # pyflakes
-     "UP", # pyupgrade
-     "W",  # pycodestyle warnings
-     "PL", # pylint
+     "E",   # pycodestyle errors
+     "F",   # pyflakes
+     "UP",  # pyupgrade
+     "W",   # pycodestyle warnings
+     "PL",  # pylint
      "FBT", # boolean trap 
-     "I", # isort 
+     "I",   # isort 
      "BLE", # blind except
      "SIM", # simplify
      "C90", # mccabe - complexity 
@@ -22,11 +22,15 @@
      "C4",    # comprehensions - better list/set/dict comprehensions 
      "DTZ",   # datetimez - usage of unsafe naive datetime class
      "SLF",   # self - private member access
+     "A",     # shadowing builtins
 
-     "RET",
-     "PIE",
-     "INP", # pep420 - checks for invalid imports
-     "TRY" # try - checks for invalid try/except/finally statements
+     "RET",  # return statement best practices
+     "PIE",  # misc lints 
+     "TRY",  # try - checks for invalid try/except/finally statements
+     "PERF", # performance - checks for performance issues
+     "RUF",  # ruff specific rules
+
+     #"INP", # pep420 - checks for invalid imports
      ]
 
 #select = ["SIM"] # code that can be simplified
@@ -36,8 +40,8 @@
 ignore = [
     "E501", # line length
     "E722", # bare except
-    "F541", # f-string is missing placeholders
-    "S311"  # Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+    "F541", # f-string without placeholders
+    "S311"  # PRNGs are not suitable for crypto
 ]
 
 # Group violations by containing file.

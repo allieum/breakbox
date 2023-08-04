@@ -97,10 +97,10 @@ class Param:
     def add_change_handler(self, handler):
         self.on_change.append(handler)
 
-    def get(self, step = -1):
+    def get(self, step=-1):
         if step == -1 and self.encoder:
             delta = self.encoder_scale * \
-                    (self.encoder.value() - self.encoder_prev)
+                (self.encoder.value() - self.encoder_prev)
             self.value += delta
             self.encoder_prev = self.encoder.value()
         value = self.value
@@ -155,12 +155,14 @@ class Param:
 
     def normalize(self, value, scale=1.0):
         if self.max_value is None or self.min_value is None:
-            logger.error(f"tried to normalize param {self} with unbounded range")
+            logger.error(
+                f"tried to normalize param {self} with unbounded range")
             return value
         range = self.max_value - self.min_value
         norm = value - self.min_value
         ratio = norm / range
         return ratio * scale
+
 
 @dataclass
 class SpiceParams:
