@@ -1,25 +1,20 @@
-from concurrent.futures import thread
-from functools import partial
-from multiprocessing import Process, Queue
-import random
-from threading import Thread
 import time
-import sys
-from types import TracebackType
-import keyboard
 from datetime import datetime
-from sequence import sequence
-import sample
-import control
-import keys
-import midi
-import utility
+from multiprocessing import Process
+
 import blink
-import dtxpro
-from dtxpro import DtxPad
 import display
+import dtxpro
+import keyboard
+import keys
 import lights
-import modulation
+import sample
+import utility
+from dtxpro import DtxPad
+from sequence import sequence
+
+import midi
+
 # import rtmidi
 # from ctypes import *
 # from contextlib import contextmanager
@@ -121,9 +116,8 @@ def update_dmx(step, note_number=None):
     #     blink.lights[light_index].set(color)
     #     blink.lights[mirror_index].set(color)
     dmx_interface.set_frame(list(blink.Light.data))
-    now = time.time()
+    time.time()
     dmx_interface.send_update()
-
 
     # sample.Sample.audio_executor.submit(dmx_interface.send_update)
     # logger.info(f"dmx frame send took {time.time() - now}s")
@@ -140,12 +134,14 @@ for sub in subs:
 last_dmx = time.time()
 last_dmx_step = None
 
+
 def update():
     # control.update()
     status, data = midi.get_status()
     sequence.update(status)
     sample.play_samples(sequence.step_duration())
-    sample_states = [lights.SampleState.of(s, keys.selected_sample, sequence.step, i) for i, s in enumerate(sample.current_samples())]
+    sample_states = [lights.SampleState.of(
+        s, keys.selected_sample, sequence.step, i) for i, s in enumerate(sample.current_samples())]
 
     # if lights.refresh_ready(samples_on):
     # lights.refreshing = True
@@ -163,7 +159,8 @@ def update():
             if not sequence.is_started:
                 sequence.start_internal()
 
-            last_step_time = sequence.step_time(sequence.step) - sequence.step_duration()
+            last_step_time = sequence.step_time(
+                sequence.step) - sequence.step_duration()
             offset = time.time() - last_step_time
             if offset > sequence.step_duration():
                 offset -= sequence.step_duration()
@@ -190,18 +187,19 @@ def update():
                     smpl.pitch_mod(-1, sequence.step, duration=hit_gate)
                 case DtxPad.RIDE:
                     pass
-            smpl.unmute(duration=hit_gate, step=(sequence.step - 1) % sequence.steps, offset=offset)
+            smpl.unmute(duration=hit_gate, step=(sequence.step - 1) %
+                        sequence.steps, offset=offset)
             # smpl.drum_trigger(sequence.step, velocity / 127)
         # sample.Sample.audio_executor.submit(update_dmx, 0, note_number)
     elif midi.is_control_change(status):
-        logger.info(f"received CC #{(cc_num := data[0])}: {(cc_value := data[1])}")
+        logger.info(
+            f"received CC #{(cc_num := data[0])}: {(cc_value := data[1])}")
         dtxpro.update_bank(cc_num, cc_value)
     elif midi.is_program_change(status):
         prog_num = data[0]
         kit = dtxpro.kit_index(prog_num)
         logger.info(f"received program change {prog_num} -> {kit}")
         keys.select_sample(kit)
-
 
     try:
         lights.q.put(sample_states, block=False)
@@ -235,7 +233,7 @@ def update():
 while True:
     try:
         update()
-    except Exception as e:
+    except Exception:
         for sub in subs:
             sub.terminate()
-        raise e
+        raise

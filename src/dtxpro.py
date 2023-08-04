@@ -1,6 +1,7 @@
 # Yamaha DTX-pro drum module
 from dataclasses import dataclass
 from enum import Enum
+
 from utility import get_logger
 
 logger = get_logger(__name__)

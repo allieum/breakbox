@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from random import random
+
 import utility
 
 logger = utility.get_logger(__name__)
@@ -98,12 +98,11 @@ class Param:
         self.on_change.append(handler)
 
     def get(self, step = -1):
-        if step == -1:
-            if self.encoder:
-                delta = self.encoder_scale * \
+        if step == -1 and self.encoder:
+            delta = self.encoder_scale * \
                     (self.encoder.value() - self.encoder_prev)
-                self.value += delta
-                self.encoder_prev = self.encoder.value()
+            self.value += delta
+            self.encoder_prev = self.encoder.value()
         value = self.value
         if self.steps is not None:
             self.steps -= 1
@@ -139,7 +138,7 @@ class Param:
     def set(self, value=None, delta=None):
         if (value is None and delta is None) or (value is not None and delta is not None):
             logger.error(f"must specify just 1 of value and delta")
-            return
+            return None
         if delta is None:
             delta = 0
         if value is None:

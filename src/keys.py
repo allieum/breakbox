@@ -1,12 +1,12 @@
-from collections import defaultdict
 import functools
 import time
+from collections import defaultdict
 
 import sample
-from sequence import sequence
-from modulation import Lfo
 import utility
-from effects import increase_ts_time, decrease_ts_time
+from effects import decrease_ts_time, increase_ts_time
+from modulation import Lfo
+from sequence import sequence
 
 logger = utility.get_logger(__name__)
 
@@ -25,7 +25,7 @@ SR_KEYS = {
     K_SR8: 8,
     K_SR4: 4,
     K_SR2: 2,
-    K_SR1: 1
+    K_SR1: 1,
 }
 
 K_GATE_UP = '5'
@@ -55,9 +55,9 @@ K_FX_CANCEL = 'z'
 K_RECORD = 'enter'
 K_ERASE = 'alt'
 
-AUTOPLAY_KEYS = set((
-    K_SPICE_UP, K_SPICE_DOWN, K_QT, K_HT, K_PITCH_DOWN, K_PITCH_UP, *SR_KEYS.keys()
-))
+AUTOPLAY_KEYS = {
+    K_SPICE_UP, K_SPICE_DOWN, K_QT, K_HT, K_PITCH_DOWN, K_PITCH_UP, *SR_KEYS.keys(),
+}
 
 dactyl_keys = [
     ['esc',   '1', '2',   '3',   '4', '5'],
@@ -142,7 +142,7 @@ def momentary_fx_release(handler=None, shift_persist=True, autoplay_sample=True)
             persist_fx_count -= 1
             return
         sample_activated = is_pushed(selected_sample) or any(
-            [key_held[k] for k in AUTOPLAY_KEYS])
+            key_held[k] for k in AUTOPLAY_KEYS)
         if not selected_sample.looping and not sample_activated and autoplay_sample:
             selected_sample.mute()
             selected_sample.mute_override = False
@@ -209,7 +209,7 @@ def sample_press(i, is_repeat):
     logger.debug(f"pressed sample key {i} {is_repeat} {selected_sample}")
 
     if is_repeat:
-        return
+        return None
 
     prev_selected = selected_sample
     if prev_selected and sample.current_samples()[i] != prev_selected:
@@ -259,13 +259,14 @@ def sample_press(i, is_repeat):
     if key_held[(K_QT)]:
         selected_sample.quartertime = True
         return (Effect(selected_sample.stop_quartertime))
+    return None
 
 
 def sample_release(i):
     s = sample.current_samples()[i]
     if is_current := s == selected_sample:
         selected_effects.clear()
-    if not s.looping and not (is_current and any([key_held[k] for k in AUTOPLAY_KEYS])):
+    if not s.looping and not (is_current and any(key_held[k] for k in AUTOPLAY_KEYS)):
         s.mute()
         s.mute_override = False
 
@@ -337,12 +338,11 @@ def gate_invert_press(*_):
 def gate_follow_press(*_):
     if selected_sample is None:
         return
-    if key_held[K_SHIFT]:
-        if mirror := selected_sample.gate_mirror:
-            selected_sample.gate_mirror = None
-            mirror.gate_mirror = None
-            selected_sample.default_gates()
-            mirror.default_gates()
+    if key_held[K_SHIFT] and (mirror := selected_sample.gate_mirror):
+        selected_sample.gate_mirror = None
+        mirror.gate_mirror = None
+        selected_sample.default_gates()
+        mirror.default_gates()
 
 
 def ht_press(selected):
@@ -440,7 +440,7 @@ press = {
     K_ERASE: erase_press,
     K_FX_CANCEL: fx_cancel_press,
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_press, i) for i in range(len(SAMPLE_KEYS))])),
-    **{sr_key: momentary_fx_press(make_handler(step_repeat_press, length)) for sr_key, length in SR_KEYS.items()}
+    **{sr_key: momentary_fx_press(make_handler(step_repeat_press, length)) for sr_key, length in SR_KEYS.items()},
 }
 
 release = {
@@ -453,14 +453,14 @@ release = {
     K_RECORD: momentary_fx_release(record_release, autoplay_sample=False),
     K_ONESHOT: momentary_fx_release(oneshot_release),
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_release, i) for i in range(len(SAMPLE_KEYS))])),
-    **{sr_key: momentary_fx_release(make_handler(step_repeat_release, length)) for sr_key, length in SR_KEYS.items()}
+    **{sr_key: momentary_fx_release(make_handler(step_repeat_release, length)) for sr_key, length in SR_KEYS.items()},
 }
 
 
 def key_pressed(e):
     logger.debug(f"start press handler for {e.name}")
 
-    if all([key_held[k] for k in RESET_KEYS]):
+    if all(key_held[k] for k in RESET_KEYS):
         logger.warning("restarting program!!!")
         utility.restart_program()
 
@@ -472,7 +472,7 @@ def key_pressed(e):
         return
     key_held[e.name] = True
 
-    if K_STOP == e.name:
+    if e.name == K_STOP:
         # cancel held keys
         for s in sample.current_samples():
             s.mute()
@@ -483,7 +483,7 @@ def key_pressed(e):
         if sequence.is_internal():
             sequence.stop_internal()
 
-    if K_NEXT_BANK == e.name:
+    if e.name == K_NEXT_BANK:
         looping_index = None
         old_samples = sample.current_samples()
         for i, s in enumerate(old_samples):

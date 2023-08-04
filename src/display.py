@@ -1,15 +1,16 @@
+import contextlib
+import time
 from dataclasses import dataclass
 from multiprocessing import Queue
+
 import adafruit_ssd1306
 import board
 import busio
-import time
-from PIL import Image, ImageDraw, ImageFont
+import utility
 from modulation import Param
+from PIL import Image, ImageDraw, ImageFont
 from sample import Sample, SampleState, bank
 from sequence import sequence
-
-import utility
 
 logger = utility.get_logger(__name__)
 
@@ -40,7 +41,7 @@ def init(samples: list[Sample]):
     for sample in samples:
         for param_name in [
                 "gate", "gate_period", "spice_level",
-                "volume", "pitch", ]:
+                "volume", "pitch" ]:
             param = getattr(sample, param_name)
             param.add_change_handler(on_param_changed(param, param_name))
     bank.add_change_handler(on_param_changed(bank, "bank"))
@@ -49,10 +50,9 @@ def init(samples: list[Sample]):
 def on_param_changed(param: Param, name: str):
     def on_change(value):
         fullness = param.normalize(value)
-        try:
+        with contextlib.suppress(Exception):
             q.put(p := ParamUpdate(name, value, fullness, time.time()), block=False)
-        except:
-            pass
+
         logger.info(f"updated param {param}")
     return on_change
 

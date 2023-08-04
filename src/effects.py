@@ -1,11 +1,10 @@
 import math
 import sys
-import pygame
-from pygame.mixer import Sound
 import time
+
+import pygame
 from pydub.utils import db_to_float
-from collections import defaultdict
-from utility import make_even, get_logger
+from utility import get_logger, make_even
 
 logger = get_logger(__name__)
 
@@ -117,8 +116,7 @@ def change_rate(sound, rate, sound_data):
 
     # from new_wav -> wav
     def convert_sample_index(i):
-        j = make_even(math.floor(i * rate))
-        return j
+        return make_even(math.floor(i * rate))
 
     for i in range(0, len(new_wav), 2):
         j = convert_sample_index(i)

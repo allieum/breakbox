@@ -1,12 +1,10 @@
-from dataclasses import dataclass
-import mido
-from mido import MidiFile, Message
 import os
-import pygame.midi
 import re
 import time
 
+import pygame.midi
 import utility
+from mido import MidiFile
 
 logger = utility.get_logger(__name__)
 
@@ -77,11 +75,14 @@ def send_midi(file: MidiFile):
 def is_note_on(status):
     return status is not None and 0b11110000 & status == 0b10010000
 
+
 def is_program_change(status):
     return status is not None and 0xF0 & status == 0xC0
 
+
 def is_control_change(status):
     return status is not None and 0xF0 & status == 0xB0
+
 
 def connect(block=False, suppress_output=False):
     global time_prev_midi_message, midi_input, midi_output
@@ -120,6 +121,7 @@ def reconnect(block=False, suppress_output=False):
 
 
 note_q = []
+
 
 def get_status():
     global time_prev_midi_message

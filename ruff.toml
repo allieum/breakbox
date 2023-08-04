@@ -1,16 +1,44 @@
-#  select = [
-#      "E", "F", "UP", "W", 
-#      "C90", "YTT", "ASYNC", "S", 
-#      "B", "COM", "C4", "DTZ",
-#      "SLF", "PL"
-#  ]
+ select = [
+     "E",  # pycodestyle errors
+     "F",  # pyflakes
+     "UP", # pyupgrade
+     "W",  # pycodestyle warnings
+     "PL", # pylint
+     "FBT", # boolean trap 
+     "I", # isort 
+     "BLE", # blind except
+     "SIM", # simplify
+     "C90", # mccabe - complexity 
+     # more info:
+     # https://here-be-pythons.readthedocs.io/en/latest/python/mccabe.html
+     # https://en.wikipedia.org/wiki/Cyclomatic_complexity#Implications_for_software_testing
 
-#select = ["SIM"]
-#select = ["FBT", "I", "BLE", "E722"]
+     # flake8 - “The wrapper which verifies pep8, pyflakes, and circular complexity. It has a low rate of false positives."
+     "YTT",   # 2020 - checks for misuse of `sys.version` or `sys.version_info`
+     "ASYNC", # checks bad async / asyncio practices
+     "S",     # bandit - security issues
+     "B",     # bugbear - likely bugs and design problems in your program
+     "COM",   # commas - checks for missing or misplaced commas
+     "C4",    # comprehensions - better list/set/dict comprehensions 
+     "DTZ",   # datetimez - usage of unsafe naive datetime class
+     "SLF",   # self - private member access
+
+     "RET",
+     "PIE",
+     "INP", # pep420 - checks for invalid imports
+     "TRY" # try - checks for invalid try/except/finally statements
+     ]
+
+#select = ["SIM"] # code that can be simplified
+
 
 # skip line length and use of bare "except"
-# ignore = ["E501", "E722", "F401", "F541", "S311"]
-ignore = ["E501", "E722", "F541", "S311"]
+ignore = [
+    "E501", # line length
+    "E722", # bare except
+    "F541", # f-string is missing placeholders
+    "S311"  # Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+]
 
 # Group violations by containing file.
 format = "grouped"

@@ -1,8 +1,8 @@
-from dataclasses import dataclass, field
-from math import inf
+import logging
 import os
 import sys
-import logging
+from dataclasses import dataclass, field
+from math import inf
 
 
 def get_logger(name):

@@ -6,11 +6,12 @@ import re
 import threading
 import time
 from collections import defaultdict, namedtuple
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from queue import PriorityQueue
 from random import random
-from typing import Callable, List, Optional
+from typing import Optional
 
 import modulation
 import pygame.mixer
@@ -60,7 +61,7 @@ class SampleState:
         selected = selected_sample == sample
         # if selected:
         #     logger.info(f"{selected_sample} vs {sample} {selected}")
-        length = sum(map(lambda s: s.get_length(), sample.get_sound_slices()))
+        length = sum(s.get_length() for s in sample.get_sound_slices())
         length = sample.sound.get_length()
         steps = len(sample.sound_slices)
         if sample.step_repeating:
@@ -69,13 +70,12 @@ class SampleState:
         progress = (step % steps) / steps
         length *= (1 - progress)
         length -= 0.5
-        state = SampleState(sample.is_playing(), sample.bank,
+        return SampleState(sample.is_playing(), sample.bank,
                             length, steps, selected, sample.recording, step, pad)
         # grab step from sequencer
         # if sample.channel and (playing := sample.channel.get_sound()) in sound_data:
         #     state.step = sound_data[playing].step
         # state.step = step
-        return state
 
 
 @dataclass
@@ -121,7 +121,7 @@ def write_wav(soundbytes, filename):
         soundbytes,
         sample_width=2,
         frame_rate=SAMPLE_RATE,
-        channels=1
+        channels=1,
     ).export(filename, format='wav')
 
 
@@ -143,11 +143,11 @@ def load_samples():
         logger.info([s.name for s in bnk])
 
 
-def current_samples() -> List['Sample']:
+def current_samples() -> list['Sample']:
     return sample_banks[bank.get()]
 
 
-def all_samples() -> List['Sample']:
+def all_samples() -> list['Sample']:
     return functools.reduce(lambda a, b: a + b, sample_banks)
 
 
@@ -161,7 +161,7 @@ class Sample:
     lookahead = 0.001
     audio_executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
     SpiceParams = namedtuple('SpicedParams', [
-        'skip_gate', 'extra_gate', 'stretch_chance', 'gate_length', 'volume', 'pitch', 'scatter'
+        'skip_gate', 'extra_gate', 'stretch_chance', 'gate_length', 'volume', 'pitch', 'scatter',
     ])
 
     @dataclass
@@ -230,7 +230,7 @@ class Sample:
             pitch=modulation.SpiceParams(
                 max_chance=0.1, max_delta=3, spice=self.spice_level, step_data=None),
             scatter=modulation.SpiceParams(
-                max_chance=0.2, max_delta=16, spice=self.spice_level, step_data=None, integer=True)
+                max_chance=0.2, max_delta=16, spice=self.spice_level, step_data=None, integer=True),
         )
 
         self.gate = modulation.Param(1.0, min_value=0.25, max_value=1)
@@ -264,7 +264,7 @@ class Sample:
         self.sound_slices = [pygame.mixer.Sound(
             buffer=wav[i:i + slice_size]) for i in range(0, len(wav), slice_size)]
         self.stretched_slices = self.sound_slices.copy()
-        for i, slice in enumerate(self.stretched_slices):
+        for i, _slice in enumerate(self.stretched_slices):
             def set(gen_sound, i):
                 self.stretched_slices[i] = gen_sound()
             # self.audio_executor.submit(set, lambda: timestretch(slice, 0.5), i)
@@ -513,8 +513,7 @@ class Sample:
 
     def set_slice(self, i, sound_generator):
         self.sound_slices[i % len(self.sound_slices)] = sound_generator()
-        slicey = self.sound_slices[i % len(self.sound_slices)]
-        return slicey
+        return self.sound_slices[i % len(self.sound_slices)]
 
     def swap_channel(self, other):
         self.channel, other.channel = other.channel, self.channel
@@ -568,7 +567,7 @@ class Sample:
 
     def after_delay(self, action, timer: threading.Timer | None, duration):
         if duration is None:
-            return
+            return None
         if timer is not None:
             timer.cancel()
         timer = threading.Timer(duration, action)

@@ -1,17 +1,14 @@
 import time
-import pygame.mixer
 
-from midi import START, STOP, CLOCK
-import midi
-import sample
 import modulation
-import utility
-import sample
-from midi import START, STOP, CLOCK
-import time
+
 # import pygame
 import pygame.mixer
-import pkg_resources
+import sample
+import utility
+
+from midi import CLOCK, START, STOP
+
 # dists = [str(d).replace(" ", "==") for d in pkg_resources.working_set]
 # for i in dists:
 #     print(i)
@@ -79,8 +76,7 @@ class Sequence:
     def calculate_midi_bpm(self, beat_time):
         sec_per_beat = beat_time - self.last_midi_beat
         logger.debug(f"sec per beat {sec_per_beat}")
-        bpm = round(60 / sec_per_beat)
-        return bpm
+        return round(60 / sec_per_beat)
 
     def update_midi_bpm(self, t):
         bpm = self.calculate_midi_bpm(t)

@@ -1,15 +1,13 @@
-from dataclasses import dataclass, field
-import functools
-import math
 import dataclasses
-from multiprocessing import Queue
+import math
 import time
-import board
-import adafruit_ws2801
+from dataclasses import dataclass, field
+from multiprocessing import Queue
 
-from sample import Sample, SampleState, sound_data
-import modulation
+import adafruit_ws2801
+import board
 import utility
+from sample import SampleState
 
 logger = utility.get_logger(__name__)
 
@@ -71,7 +69,7 @@ def to_tuple(color):
     return (
         (color & 0xff0000) >> 4 * 4,
         (color & 0x00ff00) >> 2 * 4,
-        (color & 0x0000ff) >> 0
+        (color & 0x0000ff) >> 0,
     )
 
 # @dataclass
@@ -117,7 +115,6 @@ class LedState:
     fade_goals: list[tuple[tuple[int, int, int], float, float, float]] = field(compare=False, default_factory=list)
 
     def update(self):
-        color = self.color
         for item in self.fade_goals:
             fade_color, start, duration, strength = item
             if time.time() - start > duration:
@@ -134,7 +131,7 @@ class LedState:
 
     def mix(self, color, strength=0.25):
         color = to_tuple(color)
-        self.color = tuple(map(lambda ab: average(*ab, strength), zip(self.color, color)))
+        self.color = tuple(average(*ab, strength) for ab in zip(self.color, color))
 
 
 def run(lights_q: Queue):
