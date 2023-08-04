@@ -1,0 +1,6 @@
+- repo: https://github.com/allieum/breakbox
+  # Ruff version.
+  rev: v0.0.282
+  hooks:
+    - id: ruff
+      args: [--fix, --exit-non-zero-on-fix]
