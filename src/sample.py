@@ -825,7 +825,8 @@ class Sample:
         sound = ss[(source_step // steps_per_slice) % len(ss)]
         fxs = []
         if rate != 1:
-            fxs.append(lambda sound: timestretch(sound, rate, stretch_fade))
+            fxs.append(lambda sound: timestretch(
+                sound, rate, sound_data, stretch_fade))
         if (p := self.pitch.get(step)) != sound_data[sound].semitones:
             logger.debug(f"{self.name} setting pitch to {p}")
             fxs.append(lambda sound: self.change_pitch(step, sound, p))
@@ -834,7 +835,7 @@ class Sample:
             logger.info(
                 f"{self.name} step {step} stretching sample from {sound_bpm} to {self.bpm}")
             future = self.queue_and_replace_async(lambda: timestretch(
-                self.source_sound(sound), self.bpm / sound_bpm), t, step)
+                self.source_sound(sound), self.bpm / sound_bpm), sound_data, t, step)
             future.add_done_callback(
                 lambda f: set_sound_bpm(f.result(), self.bpm))
 
@@ -934,7 +935,7 @@ class Sample:
         if semitones == 0:
             return sound
         logger.info(f"{self.name}: step {step} by {semitones} semitones")
-        pitched_sound = pitch_shift(sound, semitones)
+        pitched_sound = pitch_shift(sound, semitones, sound_data)
         sound_data[pitched_sound].bpm = sound_data[sound].bpm
         sound_data[pitched_sound].semitones = semitones
         return pitched_sound
@@ -1001,3 +1002,8 @@ def step_repeat_stop(length):
 def stop_halftime():
     for s in current_samples():
         s.stop_stretch()
+
+
+def stretch_samples(target_bpm):
+    for s in all_samples():
+        s.bpm = target_bpm

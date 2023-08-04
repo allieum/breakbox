@@ -6,6 +6,7 @@ import sample
 from sequence import sequence
 from modulation import Lfo
 import utility
+from effects import increase_ts_time, decrease_ts_time
 
 logger = utility.get_logger(__name__)
 
@@ -58,21 +59,23 @@ AUTOPLAY_KEYS = set((
     K_SPICE_UP, K_SPICE_DOWN, K_QT, K_HT, K_PITCH_DOWN, K_PITCH_UP, *SR_KEYS.keys()
 ))
 
-dactyl_keys =[
+dactyl_keys = [
     ['esc',   '1', '2',   '3',   '4', '5'],
     ['`',     'q', 'w',   'e',   'r', 't'],
     ['tab',   'a', 's',   'd',   'f', 'g'],
     ['shift', 'z', 'x',   'c',   'v', 'b'],
-                  ['tab', '#'],
-                                 ['delete',     'shift'],
-                                 ['space',  'ctrl'],
-                                 ['enter',    'alt'],
+    ['tab', '#'],
+    ['delete',     'shift'],
+    ['space',  'ctrl'],
+    ['enter',    'alt'],
 ]
 RESET_KEYS = ['space', 'ctrl', 'enter', 'alt']
+
 
 class Effect:
     def __init__(self, cancel):
         self.cancel = cancel
+
 
 # LOOP_KEYS = dactyl_keys[0]
 SAMPLE_KEYS = dactyl_keys[2]
@@ -90,18 +93,24 @@ def select_sample(i):
         sample.set_bank(bank)
     selected_sample = sample.all_samples()[i % len(sample.all_samples())]
 
+
 def get_activated_samples():
     return [sample.current_samples()[i] for i, k in enumerate(SAMPLE_KEYS) if key_held[(k)]]
+
 
 def pitch_down_mod(s):
     logger.info(f"{s.name} pitch down activated")
     s.modulate(s.pitch, 1, Lfo.Shape.DEC, 1)
 
+
 def pitch_up_mod(s):
     logger.info(f"{s.name} pitch up activated")
     s.modulate(s.pitch, 1, Lfo.Shape.INC, 1)
 
+
 persist_fx_count = 0
+
+
 def momentary_fx_press(handler, shift_persist=True, autoplay_sample=True):
     def fxpress(is_repeat, *args):
         global persist_fx_count
@@ -121,7 +130,8 @@ def momentary_fx_press(handler, shift_persist=True, autoplay_sample=True):
             selected_effects.clear()
     return fxpress
 
-def momentary_fx_release(handler = None, shift_persist=True, autoplay_sample=True):
+
+def momentary_fx_release(handler=None, shift_persist=True, autoplay_sample=True):
     def fxrelease(*args):
         global persist_fx_count
         if selected_sample is None:
@@ -131,7 +141,8 @@ def momentary_fx_release(handler = None, shift_persist=True, autoplay_sample=Tru
             logger.info(f"skipping release so effect is persisted")
             persist_fx_count -= 1
             return
-        sample_activated = is_pushed(selected_sample) or any([key_held[k] for k in AUTOPLAY_KEYS])
+        sample_activated = is_pushed(selected_sample) or any(
+            [key_held[k] for k in AUTOPLAY_KEYS])
         if not selected_sample.looping and not sample_activated and autoplay_sample:
             selected_sample.mute()
             selected_sample.mute_override = False
@@ -139,23 +150,28 @@ def momentary_fx_release(handler = None, shift_persist=True, autoplay_sample=Tru
             handler(selected_sample, *args)
     return fxrelease
 
+
 def spice_up_press(selected):
     selected.spice_level.set(delta=0.1)
     logger.info(f"{selected.name} set spice to {selected.spice_level.value}")
 
+
 def spice_down_press(selected):
     selected.spice_level.set(delta=-0.1)
     logger.info(f"{selected.name} set spice to {selected.spice_level.value}")
+
 
 def pitch_up_press(selected):
     pitch_up_mod(selected)
     step_repeat_press(1, selected)
     return (Effect(functools.partial(pitch_up_release, selected)))
 
+
 def pitch_down_press(selected):
     pitch_down_mod(selected)
     step_repeat_press(1, selected)
     return (Effect(functools.partial(pitch_down_release, selected)))
+
 
 def pitch_up_release(selected):
     # todo cancel & gretel
@@ -168,6 +184,7 @@ def pitch_up_release(selected):
             selected.pitch.restore_default()
         step_repeat_release(1, selected)
 
+
 def pitch_down_release(selected):
     if key_held[K_PITCH_UP]:
         pitch_up_mod(selected)
@@ -178,12 +195,14 @@ def pitch_down_release(selected):
             selected.pitch.restore_default()
         step_repeat_release(1, selected)
 
+
 def is_pushed(s: sample.Sample):
     try:
         i = sample.current_samples().index(s)
         return key_held[SAMPLE_KEYS[i]]
     except ValueError:
         return False
+
 
 def sample_press(i, is_repeat):
     global selected_sample
@@ -194,8 +213,10 @@ def sample_press(i, is_repeat):
 
     prev_selected = selected_sample
     if prev_selected and sample.current_samples()[i] != prev_selected:
-        logger.info(f"{prev_selected.name} clearing active effects, switch to {sample.current_samples()[i].name}")
-        logger.info(f"{prev_selected.name} looping = {prev_selected.looping}, {selected_effects}")
+        logger.info(
+            f"{prev_selected.name} clearing active effects, switch to {sample.current_samples()[i].name}")
+        logger.info(
+            f"{prev_selected.name} looping = {prev_selected.looping}, {selected_effects}")
         for effect in selected_effects:
             if effect is not None:
                 effect.cancel()
@@ -207,10 +228,12 @@ def sample_press(i, is_repeat):
 
     if key_held[K_SHIFT]:
         selected_sample.looping = True
-        logger.info(f"{selected_sample.name} looping set to {selected_sample.looping}")
+        logger.info(
+            f"{selected_sample.name} looping set to {selected_sample.looping}")
     elif selected_sample.looping:
         selected_sample.looping = False
-        logger.info(f"{selected_sample.name} looping set to {selected_sample.looping}")
+        logger.info(
+            f"{selected_sample.name} looping set to {selected_sample.looping}")
 
     # if key_held[K_GATE_FOLLOW] and prev_selected and prev_selected != selected_sample:
     #     logger.info(f"set {prev_selected.name} to invert gates of {selected_sample.name}")
@@ -237,6 +260,7 @@ def sample_press(i, is_repeat):
         selected_sample.quartertime = True
         return (Effect(selected_sample.stop_quartertime))
 
+
 def sample_release(i):
     s = sample.current_samples()[i]
     if is_current := s == selected_sample:
@@ -244,6 +268,7 @@ def sample_release(i):
     if not s.looping and not (is_current and any([key_held[k] for k in AUTOPLAY_KEYS])):
         s.mute()
         s.mute_override = False
+
 
 def shift_press(repeat):
     if repeat:
@@ -253,49 +278,61 @@ def shift_press(repeat):
     persist_fx_count += fx_keys_pressed
     if persist_fx_count > 0 and selected_sample is not None:
         selected_sample.looping = True
-    for s in [sample.current_samples()[i] for i,k in enumerate(SAMPLE_KEYS) if key_held[k]]:
+    for s in [sample.current_samples()[i] for i, k in enumerate(SAMPLE_KEYS) if key_held[k]]:
         s.looping = True
         logger.info(f"{s.name} set looping to {s.looping}")
     if key_held[K_FX_CANCEL]:
         fx_cancel_press(False, shift=True)
 
+
 def step_repeat_press(length, selected):
     selected.step_repeat_start(sequence.step, length)
     return (Effect(functools.partial(selected.step_repeat_stop, length)))
+
 
 def step_repeat_release(length, selected):
     logger.info(f"releasing {length}")
     selected.step_repeat_stop(length)
 
+
 def gate_period_up_press(*_):
     if selected_sample is None:
         return
     selected_sample.gate_period_increase()
-    logger.info(f"set gate period to {selected_sample.gate_period.value} for {selected_sample.name}")
+    logger.info(
+        f"set gate period to {selected_sample.gate_period.value} for {selected_sample.name}")
+
 
 def gate_period_down_press(*_):
     if selected_sample is None:
         return
     selected_sample.gate_period_decrease()
-    logger.info(f"set gate period to {selected_sample.gate_period.value} for {selected_sample.name}")
+    logger.info(
+        f"set gate period to {selected_sample.gate_period.value} for {selected_sample.name}")
+
 
 def gate_up_press(*_):
     if selected_sample is None:
         return
     selected_sample.gate_increase()
-    logger.info(f"set gate to {selected_sample.gate.value} for {selected_sample.name}")
+    logger.info(
+        f"set gate to {selected_sample.gate.value} for {selected_sample.name}")
+
 
 def gate_down_press(*_):
     if selected_sample is None:
         return
     selected_sample.gate_decrease()
-    logger.info(f"set gate to {selected_sample.gate.value} for {selected_sample.name}")
+    logger.info(
+        f"set gate to {selected_sample.gate.value} for {selected_sample.name}")
+
 
 def gate_invert_press(*_):
     if selected_sample is None:
         return
     selected_sample.gates = selected_sample.invert_gates()
     logger.info(f"inverted gates for {selected_sample.name}")
+
 
 def gate_follow_press(*_):
     if selected_sample is None:
@@ -307,24 +344,30 @@ def gate_follow_press(*_):
             selected_sample.default_gates()
             mirror.default_gates()
 
+
 def ht_press(selected):
     selected.halftime = True
     return (Effect(selected.stop_halftime))
+
 
 def qt_press(selected):
     selected.quartertime = True
     return (Effect(selected.stop_quartertime))
 
+
 def ht_release(selected):
     selected.halftime = False
 
+
 def qt_release(selected):
     selected.quartertime = False
+
 
 def dice_press(repeat):
     if selected_sample is None or repeat:
         return
     selected_sample.dice()
+
 
 def fx_cancel_press(repeat, shift=None):
     if shift is None:
@@ -338,26 +381,33 @@ def fx_cancel_press(repeat, shift=None):
         selected_sample.cancel_fx()
     selected_effects.clear()
 
+
 def record_press(selected):
     selected.start_recording()
     return Effect(selected.stop_recording)
 
+
 def record_release(selected):
     selected.stop_recording()
+
 
 def oneshot_press(selected):
     selected.clear_sound_queue()
     sequence.last_queued_step -= 1
-    selected.trigger_oneshot(sequence.step, time.time() - sequence.step_time(sequence.step))
+    selected.trigger_oneshot(
+        sequence.step, time.time() - sequence.step_time(sequence.step))
     return Effect(selected.stop_oneshot)
+
 
 def oneshot_release(selected):
     selected.stop_oneshot()
 
+
 def erase_press(_):
     if selected_sample is None:
         return
-    selected_sample.recorded_steps[s := (sequence.step + 2) % len(selected_sample.recorded_steps)] = None
+    selected_sample.recorded_steps[s := (
+        sequence.step + 2) % len(selected_sample.recorded_steps)] = None
     logger.info(f"{selected_sample.name} erasing step {s}")
 
 
@@ -366,9 +416,10 @@ def make_handler(handler, x):
         handler(x, *args)
     return f
 
+
 press = {
-    K_TS_UP: sample.increase_ts_time,
-    K_TS_DOWN: sample.decrease_ts_time,
+    K_TS_UP: increase_ts_time,
+    K_TS_DOWN: decrease_ts_time,
     K_SPICE_UP: momentary_fx_press(spice_up_press, shift_persist=False),
     K_SPICE_DOWN: momentary_fx_press(spice_down_press, shift_persist=False),
     K_HT: momentary_fx_press(ht_press),
@@ -404,6 +455,7 @@ release = {
     **dict(zip(SAMPLE_KEYS, [make_handler(sample_release, i) for i in range(len(SAMPLE_KEYS))])),
     **{sr_key: momentary_fx_release(make_handler(step_repeat_release, length)) for sr_key, length in SR_KEYS.items()}
 }
+
 
 def key_pressed(e):
     logger.debug(f"start press handler for {e.name}")
@@ -470,6 +522,7 @@ def key_released(e):
         return
     key_held[e.name] = False
     process_release(e.name)
+
 
 def process_release(k):
     logger.debug(f"start release handler for {k}")

@@ -4,19 +4,20 @@ import math
 import sys
 # import threading
 import pygame
-# import pygame.mixer
+from pygame.mixer import Sound
 # import os
 import time
 # from collections import deque, defaultdict, namedtuple
 # import concurrent.futures
 # from datetime import datetime
 # from pydub import AudioSegment
-from sample import SAMPLE_RATE, sound_data, all_samples
+# from sample import sound_data
 from pydub.utils import db_to_float
 # from random import random
 # import re
 # from dataclasses import dataclass, field
 # from typing import Callable, Optional, List
+from collections import defaultdict
 
 # import modulation
 # from modulation import Lfo, Param
@@ -62,13 +63,13 @@ def fade(soundbytes, start, end, gain_start=0, gain_end=0):
         soundbytes[i:i + 2] = sb
 
 
-def fade_in(soundbytes, fade_time):
-    num_samples = math.floor(fade_time * SAMPLE_RATE)
+def fade_in(soundbytes, fade_time, sample_rate=22050):
+    num_samples = math.floor(fade_time * sample_rate)
     fade(soundbytes, 0, num_samples * 2, gain_start=-120)
 
 
-def fade_out(soundbytes, fade_time):
-    num_samples = math.floor(fade_time * SAMPLE_RATE)
+def fade_out(soundbytes, fade_time, sample_rate=22050):
+    num_samples = math.floor(fade_time * sample_rate)
     start = len(soundbytes) - num_samples * 2
     fade(soundbytes, start, len(soundbytes), gain_end=-120)
     return soundbytes
@@ -81,7 +82,7 @@ def fadeinout(soundbytes, fade_time):
     return soundbytes
 
 
-def timestretch(sound, rate, fade_time=0.005):
+def timestretch(sound, rate, sound_data, fade_time=0.005, sample_rate=22050):
     logger.info(
         f"start stretch x{rate} ({fade_time} fade), {ts_time}ms chunks")
     chunk_time = ts_time
@@ -89,7 +90,7 @@ def timestretch(sound, rate, fade_time=0.005):
     new_wav = bytearray(make_even(math.ceil(len(wav) / rate)))
     logger.debug(f"{len(wav)} {len(new_wav)} vs {len(wav) / rate}")
 
-    chunk_size = math.ceil(chunk_time * SAMPLE_RATE) * 2  # 2 bytes per sample
+    chunk_size = math.ceil(chunk_time * sample_rate) * 2  # 2 bytes per sample
     growth_factor = 1 / rate
 
     # print(f"chunk_time {chunk_time} chunk_size {chunk_size} growth_factor {growth_factor}")
@@ -125,7 +126,7 @@ def timestretch(sound, rate, fade_time=0.005):
     return new_sound
 
 
-def change_rate(sound, rate):
+def change_rate(sound, rate, sound_data):
     wav = sound.get_raw()
     new_wav = bytearray(math.ceil(len(wav) / rate))
 
@@ -144,7 +145,7 @@ def change_rate(sound, rate):
     return new_sound
 
 
-def pitch_shift(sound, semitones):
+def pitch_shift(sound, semitones, sound_data):
     start = time.time()
     if semitones == 0:
         return sound
@@ -154,14 +155,11 @@ def pitch_shift(sound, semitones):
 
     fade_time = 0.002
     if semitones > 0:
-        new_sound = timestretch(change_rate(sound, rate), inverse, fade_time)
+        new_sound = timestretch(change_rate(
+            sound, rate, sound_data), inverse, sound_data, fade_time)
     else:
-        new_sound = change_rate(timestretch(sound, inverse, fade_time), rate)
+        new_sound = change_rate(timestretch(
+            sound, inverse, sound_data, fade_time), rate, sound_data)
     logger.info(
         f"shifting by {semitones} semitones took {time.time() - start}s")
     return new_sound
-
-
-def stretch_samples(target_bpm):
-    for s in all_samples():
-        s.bpm = target_bpm
