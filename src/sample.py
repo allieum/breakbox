@@ -1,25 +1,24 @@
+import concurrent.futures
 import functools
 import math
-from queue import PriorityQueue
-import sys
-import threading
-import pygame.mixer
 import os
-import time
-from collections import deque, defaultdict, namedtuple
-import concurrent.futures
-from datetime import datetime
-from pydub import AudioSegment
-from pydub.utils import db_to_float
-from random import random
 import re
+import threading
+import time
+from collections import defaultdict, namedtuple
 from dataclasses import dataclass, field
-from typing import Callable, Optional, List
-from effects import timestretch, fade, stretch_fade, pitch_shift
+from datetime import datetime
+from queue import PriorityQueue
+from random import random
+from typing import Callable, List, Optional
 
 import modulation
+import pygame.mixer
+from effects import pitch_shift, stretch_fade, timestretch
 from modulation import Lfo, Param
-from utility import make_even, get_logger, TimeInterval
+from pydub import AudioSegment
+from utility import TimeInterval, get_logger, make_even
+
 # import os
 # os.environ['SDL_AUDIODRIVER'] = 'dsp'
 logger = get_logger(__name__)
@@ -406,7 +405,7 @@ class Sample:
     def step_repeat_stop(self, length=None):
         if not self.step_repeat:
             return
-        if length == None:
+        if length is None:
             self.step_repeat_lengths.clear()
             logger.info(f"{self.name} removing all lengths from step repeat")
         elif length not in self.step_repeat_lengths:
