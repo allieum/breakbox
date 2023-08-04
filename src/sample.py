@@ -38,7 +38,7 @@ logger.info(pygame.mixer.get_init())
 def set_bank(i):
     old_samples = current_samples()
     bank.set(i)
-    for new_sample, old_sample in zip(current_samples(), old_samples):
+    for new_sample, old_sample in zip(current_samples(), old_samples, strict=True):
         new_sample.swap_channel(old_sample)
 
 
@@ -71,7 +71,7 @@ class SampleState:
         length *= (1 - progress)
         length -= 0.5
         return SampleState(sample.is_playing(), sample.bank,
-                            length, steps, selected, sample.recording, step, pad)
+                           length, steps, selected, sample.recording, step, pad)
         # grab step from sequencer
         # if sample.channel and (playing := sample.channel.get_sound()) in sound_data:
         #     state.step = sound_data[playing].step
@@ -97,7 +97,7 @@ class QueuedSound:
     step: int = field(compare=False)
     sound: pygame.mixer.Sound = field(compare=False)
     fx: list[Callable[[pygame.mixer.Sound],
-                    pygame.mixer.Sound]] = field(compare=False, default_factory=list)
+                      pygame.mixer.Sound]] = field(compare=False, default_factory=list)
 
     def apply_fx(self):
         if self.fx is None or time.time() > self.t:
@@ -109,6 +109,7 @@ class QueuedSound:
     def t_string(self):
         return datetime.fromtimestamp(self.t)
 
+
 def remaining_time(sound):
     if sound is None:
         return 0
@@ -119,6 +120,7 @@ def remaining_time(sound):
         return 0
     return max(0, sound.get_length() - (time.time() - sound_data[sound].playtime))
 
+
 def write_wav(soundbytes, filename):
     AudioSegment(
         soundbytes,
@@ -127,8 +129,10 @@ def write_wav(soundbytes, filename):
         channels=1,
     ).export(filename, format='wav')
 
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 sample_banks = []
+
 
 def load_samples():
     for i in range(1, NUM_BANKS + 1):
@@ -173,9 +177,9 @@ class Sample:
         step: int
 
         def update(self, gen_sound):
-            def set():
+            def set_sound():
                 self.sound = gen_sound()
-            Sample.audio_executor.submit(set)
+            Sample.audio_executor.submit(set_sound)
 
     def __init__(self, file, bpm, bank):
         self.name = file.split("samples/")[1]
@@ -300,13 +304,15 @@ class Sample:
             # if stretch:
             #     sound = self.stretched_slices[slice_i]
             # else:
-            queued_sound = self.get_step_sound(slice_i, time.time(), force=True)
+            queued_sound = self.get_step_sound(
+                slice_i, time.time(), force=True)
             # TODO apply_fx never called for sound
             if not queued_sound:
                 return
             delta = 1 if random() > 0.5 else -1
             if pitched:
-                self.roll = Sample.Roll(time.time(), queued_sound.sound, delta, slice_i)
+                self.roll = Sample.Roll(
+                    time.time(), queued_sound.sound, delta, slice_i)
             else:
                 self.play_sound(queued_sound.sound)
 
@@ -774,12 +780,14 @@ class Sample:
                 self.sound_queue.put(qsound)
                 return None
             if len(qsound.fx) > 0:
-                logger.info(f"{self.name} not queueing yet because fx haven't finished applying")
+                logger.info(
+                    f"{self.name} not queueing yet because fx haven't finished applying")
                 self.sound_queue.put(qsound)
                 return None
             self.channel.queue(qsound.sound)
             sound_data[qsound.sound].playtime = predicted_finish
-            logger.info(f"{self.name}: queued sample {qsound.t_string()} {qsound}")
+            logger.info(
+                f"{self.name}: queued sample {qsound.t_string()} {qsound}")
             return None
 
         return None
@@ -834,18 +842,20 @@ class Sample:
         sound_slices = self.get_sound_slices()
         if source_step is None:
             source_step = step
-        sound = sound_slices[(source_step // steps_per_slice) % len(sound_slices)]
+        sound = sound_slices[(source_step // steps_per_slice) %
+                             len(sound_slices)]
         fx = []
         if rate != 1:
             fx.append(lambda sound: timestretch(
                 sound, rate, sound_data, stretch_fade))
-        if (pitch := self.pitch.get(step)):# != sound_data[sound].semitones:
+        if (pitch := self.pitch.get(step)):  # != sound_data[sound].semitones:
             logger.debug(f"{self.name} setting pitch to {pitch}")
-            fx.append(lambda sound: self.change_pitch(source_step, sound, pitch))
+            fx.append(lambda sound: self.change_pitch(
+                source_step, sound, pitch))
             # self.queue_and_replace_async(lambda: self.change_pitch(step, sound, p), t, step)
         if (sound_bpm := sound_data[sound].bpm) != self.bpm:
             logger.info(
-               f"{self.name} step {step} stretching sample from {sound_bpm} to {self.bpm}")
+                f"{self.name} step {step} stretching sample from {sound_bpm} to {self.bpm}")
             future = self.queue_and_replace_async(lambda: timestretch(
                 self.source_sound(sound), self.bpm / sound_bpm, sound_data), t, step)
             future.add_done_callback(
@@ -887,7 +897,8 @@ class Sample:
                 ts = t + i * step_interval / rate
                 for_step = step + i
                 qs = self.get_step_sound(for_step, ts, source_step=substep)
-                logger.info(f"step repeat queueing {substep} for step {for_step} {qs.t_string() if qs else '?'}")
+                logger.info(
+                    f"step repeat queueing {substep} for step {for_step} {qs.t_string() if qs else '?'}")
                 self.queue(qs)
                 # if rate != 1:
                 #     stretch = functools.partial(
