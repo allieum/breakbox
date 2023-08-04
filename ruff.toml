@@ -1,15 +1,16 @@
-# select = [
-#     "E", "F", "UP", "W", 
-#     "C90", "YTT", "ASYNC", "S", 
-#     "B", "COM", "C4", "DTZ",
-#     "SLF", 
-# ]
+#  select = [
+#      "E", "F", "UP", "W", 
+#      "C90", "YTT", "ASYNC", "S", 
+#      "B", "COM", "C4", "DTZ",
+#      "SLF", "PL"
+#  ]
 
-select = ["SIM"]
+#select = ["SIM"]
 #select = ["FBT", "I", "BLE", "E722"]
 
 # skip line length and use of bare "except"
-#ignore = ["E501", "E722", "F401", "F541", "S311"]
+# ignore = ["E501", "E722", "F401", "F541", "S311"]
+ignore = ["E501", "E722", "F541", "S311"]
 
 # Group violations by containing file.
 format = "grouped"
