@@ -1,27 +1,12 @@
-# import functools
 import math
-# from queue import PriorityQueue
 import sys
-# import threading
 import pygame
 from pygame.mixer import Sound
-# import os
 import time
-# from collections import deque, defaultdict, namedtuple
-# import concurrent.futures
-# from datetime import datetime
-# from pydub import AudioSegment
-# from sample import sound_data
 from pydub.utils import db_to_float
-# from random import random
-# import re
-# from dataclasses import dataclass, field
-# from typing import Callable, Optional, List
 from collections import defaultdict
-
-# import modulation
-# from modulation import Lfo, Param
 from utility import make_even, get_logger
+
 logger = get_logger(__name__)
 
 TS_TIME_DEFAULT = 0.030

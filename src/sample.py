@@ -3,7 +3,6 @@ import math
 from queue import PriorityQueue
 import sys
 import threading
-# import pygame
 import pygame.mixer
 import os
 import time
@@ -20,7 +19,6 @@ from effects import timestretch, fade, stretch_fade, pitch_shift
 
 import modulation
 from modulation import Lfo, Param
-# import utility
 from utility import make_even, get_logger, TimeInterval
 # import os
 # os.environ['SDL_AUDIODRIVER'] = 'dsp'
