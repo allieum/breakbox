@@ -181,7 +181,7 @@ def update():
                 case DtxPad.TOM2:
                     # smpl.drum_trigger(sequence.step, pitched=False)
                     # TODO why not work
-                    smpl.step_repeat_start(sequence.step, 2, duration=hit_gate * 2)
+                    smpl.step_repeat_start(sequence.step, 4, duration=hit_gate * 2)
                 case DtxPad.TOM3:
                     if dtxpad.roll_detected():
                         smpl.looping = not smpl.looping
