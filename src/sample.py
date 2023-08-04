@@ -96,16 +96,15 @@ class QueuedSound:
     t: float
     step: int = field(compare=False)
     sound: pygame.mixer.Sound = field(compare=False)
-    fx: Callable[[pygame.mixer.Sound],
-                 pygame.mixer.Sound] | None = field(compare=False, default=None)
-    applying_fx: bool = field(default=False)
+    fx: list[Callable[[pygame.mixer.Sound],
+                    pygame.mixer.Sound]] = field(compare=False, default_factory=list)
 
     def apply_fx(self):
         if self.fx is None or time.time() > self.t:
             return
-        self.applying_fx = True
-        self.sound = self.fx(self.sound)
-        self.applying_fx = False
+        while len(self.fx) > 0:
+            effect = self.fx.pop()
+            self.sound = effect(self.sound)
 
     def t_string(self):
         return datetime.fromtimestamp(self.t)
@@ -302,6 +301,7 @@ class Sample:
             #     sound = self.stretched_slices[slice_i]
             # else:
             queued_sound = self.get_step_sound(slice_i, time.time(), force=True)
+            # TODO apply_fx never called for sound
             if not queued_sound:
                 return
             delta = 1 if random() > 0.5 else -1
@@ -574,8 +574,7 @@ class Sample:
         sound = pygame.mixer.Sound(buffer=wav[start_index:])
         self.play_sound(sound)
         next_sound = self.get_step_sound(step + 1, time.time(), force=True)
-        if next_sound and self.channel:  # both unnecessary checks except for linter
-            self.channel.queue(next_sound.sound)
+        self.queue(next_sound)
 
     def after_delay(self, action, timer: threading.Timer | None, duration):
         if duration is None:
@@ -774,7 +773,7 @@ class Sample:
                     f"{self.name} queueing sample would make it early by {-error}, putting back on queue")
                 self.sound_queue.put(qsound)
                 return None
-            if qsound.applying_fx:
+            if len(qsound.fx) > 0:
                 logger.info(f"{self.name} not queueing yet because fx haven't finished applying")
                 self.sound_queue.put(qsound)
                 return None
@@ -832,17 +831,17 @@ class Sample:
         steps_per_slice = round(1 / rate)
         if step % steps_per_slice != 0 and not force:
             return None
-        ss = self.get_sound_slices()
+        sound_slices = self.get_sound_slices()
         if source_step is None:
             source_step = step
-        sound = ss[(source_step // steps_per_slice) % len(ss)]
-        fxs = []
+        sound = sound_slices[(source_step // steps_per_slice) % len(sound_slices)]
+        fx = []
         if rate != 1:
-            fxs.append(lambda sound: timestretch(
+            fx.append(lambda sound: timestretch(
                 sound, rate, sound_data, stretch_fade))
-        if (p := self.pitch.get(step)):# != sound_data[sound].semitones:
-            logger.debug(f"{self.name} setting pitch to {p}")
-            fxs.append(lambda sound: self.change_pitch(step, sound, p))
+        if (pitch := self.pitch.get(step)):# != sound_data[sound].semitones:
+            logger.debug(f"{self.name} setting pitch to {pitch}")
+            fx.append(lambda sound: self.change_pitch(source_step, sound, pitch))
             # self.queue_and_replace_async(lambda: self.change_pitch(step, sound, p), t, step)
         if (sound_bpm := sound_data[sound].bpm) != self.bpm:
             logger.info(
@@ -851,10 +850,6 @@ class Sample:
                 self.source_sound(sound), self.bpm / sound_bpm, sound_data), t, step)
             future.add_done_callback(
                 lambda f: set_sound_bpm(f.result(), self.bpm))
-
-        def compose(f, g):
-            return lambda x: f(g(x))
-        fx = functools.reduce(compose, fxs, lambda x: x)
 
         return QueuedSound(t, step, sound, fx)
 

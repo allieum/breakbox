@@ -13,6 +13,7 @@ from sample import Sample, SampleState, bank
 from sequence import sequence
 
 logger = utility.get_logger(__name__)
+logger.setLevel("WARN")
 
 @dataclass
 class ParamUpdate:
