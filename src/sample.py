@@ -291,7 +291,8 @@ class Sample:
         self.oneshot_offset = offset
 
     def drum_trigger(self, step, pitched=True, volume=0.5):
-        if self.roll and time.time() - self.roll.last_hit > 0.200:
+        max_roll_interval = 0.200
+        if self.roll and time.time() - self.roll.last_hit > max_roll_interval:
             self.roll = None
         elif self.roll:
             self.roll.last_hit = time.time()
@@ -309,7 +310,7 @@ class Sample:
             # TODO apply_fx never called for sound
             if not queued_sound:
                 return
-            delta = 1 if random() > 0.5 else -1
+            delta = 1 if random() > 0.5 else -1  # noqa: PLR2004
             if pitched:
                 self.roll = Sample.Roll(
                     time.time(), queued_sound.sound, delta, slice_i)
@@ -367,7 +368,7 @@ class Sample:
         for param in self.spices_param:
             data = []
             while len(data) < self.slices_per_loop:
-                flip = random() > 0.5
+                flip = random() > 0.5  # noqa: PLR2004
                 grain_size = 2 if flip else 4
                 if self.spices_param.skip_gate is param:
                     grain_size = 2
@@ -769,12 +770,13 @@ class Sample:
         if self.channel.get_queue() is None and in_queue_window:
             playing = self.channel.get_sound()
             predicted_finish = time.time() + remaining_time(playing)
-            if (error := predicted_finish - qsound.t) > 0.015:
+            max_start_discrepancy = 0.015
+            if (error := predicted_finish - qsound.t) > max_start_discrepancy:
                 logger.debug(
                     f"{self.name} queueing sample would make it late by {error}, putting back on queue")
                 self.sound_queue.put(qsound)
                 return None
-            if error < -0.015:
+            if error < -1 * max_start_discrepancy:
                 logger.debug(
                     f"{self.name} queueing sample would make it early by {-error}, putting back on queue")
                 self.sound_queue.put(qsound)
@@ -819,7 +821,7 @@ class Sample:
 
     def get_sound_slices(self):
         slices = [s if rec is None else rec for s, rec in zip(
-            self.sound_slices, self.recorded_steps)]
+            self.sound_slices, self.recorded_steps, strict=True)]
         for i in range(0, len(slices) - 2, 2):
             scatter_offset = (
                 val := self.spices_param.scatter.value(0, i)) - val % 4

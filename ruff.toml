@@ -20,7 +20,7 @@
      "B",     # bugbear - likely bugs and design problems in your program
      "COM",   # commas - checks for missing or misplaced commas
      "C4",    # comprehensions - better list/set/dict comprehensions 
-     "DTZ",   # datetimez - usage of unsafe naive datetime class
+    #  "DTZ",   # datetimez - usage of unsafe naive datetime class
      "SLF",   # self - private member access
      "A",     # shadowing builtins
 
@@ -41,7 +41,8 @@ ignore = [
     "E501", # line length
     "E722", # bare except
     "F541", # f-string without placeholders
-    "S311"  # PRNGs are not suitable for crypto
+    "S311",  # PRNGs are not suitable for crypto
+    "FBT002" # boolean trap
 ]
 
 # Group violations by containing file.
