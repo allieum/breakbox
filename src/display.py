@@ -55,7 +55,7 @@ def on_param_changed(param: Param, name: str):
     def on_change(value):
         fullness = param.normalize(value)
         with contextlib.suppress(Exception):
-            q.put(p := ParamUpdate(name, value, fullness, time.time()), block=False)
+            q.put(ParamUpdate(name, value, fullness, time.time()), block=False)
 
         logger.info(f"updated param {param}")
     return on_change
@@ -184,6 +184,6 @@ def draw_sample_icons(draw, sample_states: list[SampleState]):
     total_width = W - xpad * 2
     for x, state in zip(range(xpad, W - xpad + 1, total_width // 5), sample_states, strict=True):
         fill = WHITE if state.selected else BLACK
-        x -= size // 2
-        draw.rounded_rectangle((x, y, x + size, y + size),
+        left = x - size // 2
+        draw.rounded_rectangle((left, y, left + size, y + size),
                                radius=3, fill=fill, outline=WHITE)

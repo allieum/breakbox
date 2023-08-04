@@ -22,7 +22,7 @@
      "C4",    # comprehensions - better list/set/dict comprehensions 
     #  "DTZ",   # datetimez - usage of unsafe naive datetime class
      "SLF",   # self - private member access
-     "A",     # shadowing builtins
+     #"A",     # shadowing builtins
 
      "RET",  # return statement best practices
      "PIE",  # misc lints 

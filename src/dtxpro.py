@@ -1,11 +1,12 @@
 # Yamaha DTX-pro drum module
+import time
 from dataclasses import dataclass, field
 from enum import Enum
-import time
 
 from utility import get_logger
 
 logger = get_logger(__name__)
+
 
 class DtxPad(Enum):
     SNARE = 0
@@ -17,9 +18,11 @@ class DtxPad(Enum):
     RIDE = 6
     HAT = 7
 
+
 HIT_TIMEOUT = 0.25
 ROLL_THRESHOLD = 5
 ROLL_DEBOUNCE = 2
+
 
 @dataclass
 class DrumPad:
@@ -44,6 +47,7 @@ class DrumPad:
         if time.time() - self.last_hit > HIT_TIMEOUT:
             self.hit_count = 0
 
+
 pads = [
     DrumPad(DtxPad.SNARE, [38, 37, 40]),
     DrumPad(DtxPad.TOM1, [48]),
@@ -55,23 +59,29 @@ pads = [
     DrumPad(DtxPad.HAT, [46, 77, 78, 42, 79]),
 ]
 
+
 def update():
     for pad in pads:
         pad.update()
 
+
 def total_hit_count():
     return sum(pad.hit_count for pad in pads)
+
 
 def hit_count(dtx_pad: DtxPad):
     for pad in pads:
         if pad.pad == dtx_pad:
             return pad.hit_count
+    return None
+
 
 def struck_pad(note_number) -> DrumPad | None:
     if any(note_number in (drum_pad := p).note_numbers for p in pads):
         drum_pad.register_hit()
         return drum_pad
     return None
+
 
 def kit_index(prog_num):
     match bank_lsb:
@@ -85,7 +95,10 @@ def kit_index(prog_num):
             offset = 0
     return prog_num + offset
 
+
 bank_lsb = 0
+
+
 def update_bank(cc_num, cc_val):
     global bank_lsb
     if cc_num == 32:

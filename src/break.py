@@ -60,7 +60,7 @@ midi.load_midi_files()
 
 def bounce(step):
     x = step % 32
-    if x < 16:
+    if x < 16:  # noqa: PLR2004
         return x + 1
     return 16 - (x % 16)
 
@@ -118,6 +118,7 @@ def update_dmx(step, note_number=None):
     dmx_interface.set_frame(list(blink.Light.data))
     time.time()
     dmx_interface.send_update()
+
 
     # sample.Sample.audio_executor.submit(dmx_interface.send_update)
     # logger.info(f"dmx frame send took {time.time() - now}s")
@@ -181,7 +182,8 @@ def update():
                 case DtxPad.TOM2:
                     # smpl.drum_trigger(sequence.step, pitched=False)
                     # TODO why not work
-                    smpl.step_repeat_start(sequence.step, 4, duration=hit_gate * 2)
+                    smpl.step_repeat_start(
+                        sequence.step, 4, duration=hit_gate * 2)
                 case DtxPad.TOM3:
                     if dtxpad.roll_detected():
                         smpl.looping = not smpl.looping
