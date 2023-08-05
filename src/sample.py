@@ -139,18 +139,19 @@ def init():
     sample_count = 0
     for i in range(1, NUM_BANKS + 1):
         sample_dir = f'{dir_path}/samples/{i}'
-        sample_banks.append(bnk := [])
+        bank = []
+        sample_banks.append(bank)
         for filename in sorted(os.listdir(sample_dir)):
             if m := re.fullmatch(r"([0-9]{2,3}).+.wav", filename):
                 sample_count += 1
                 channel = channels[sample_count % BANK_SIZE]
                 bpm = int(m.group(1))
-                bnk.append(
+                bank.append(
                     Sample(f"{sample_dir}/{m.group()}", bpm, i - 1, channel))
             else:
                 logger.warn(
                     f"wrong filename format for {filename}, not loaded")
-        logger.info([s.name for s in bnk])
+        logger.info([s.name for s in bank])
 
 
 def current_samples() -> list['Sample']:
@@ -172,6 +173,19 @@ def find_channel(i: int) -> pygame.mixer.Channel:
 def init_channels() -> list[pygame.mixer.Channel]:
     # pygame.mixer.set_reserved(n) todo: set number of reserved channels
     return [find_channel(i) for i in range(BANK_SIZE)]
+
+
+'''
+Sample class
+
+What it does (syntonic):
+    - represents a .wav file that has been loaded
+    - in charge of playing the sound
+    - applies effects to the sound
+What it does (dystonic)
+    - process_queue (priority queue based on time)
+    - sequencer stuff (mostly process_queue, also others)
+'''
 
 
 class Sample:
@@ -281,7 +295,7 @@ class Sample:
         wav = self.sound.get_raw()[:2 * samples_per_step * num_steps]
         slice_size = make_even(math.ceil(len(wav) / num_steps))
         logger.info(f"{self.name} slice size {slice_size}")
-        self.sound_slices = [pygame.mixer.Sound(
+        self.sound_slices: list[pygame.mixer.Sound] = [pygame.mixer.Sound(
             buffer=wav[i:i + slice_size]) for i in range(0, len(wav), slice_size)]
         self.stretched_slices = self.sound_slices.copy()
         for i, _slice in enumerate(self.stretched_slices):
@@ -879,11 +893,9 @@ class Sample:
         return QueuedSound(t, step, sound, fx)
 
     # TODO save measure start
-    def queue_step(self, step, t, step_interval):
+    def queue_step(self, step: int, t: float, step_interval: float):
         if step == 0:
             self.seq_start = t
-        # logger.info(self.seq_time())
-        # TODO magic
         step = (step - self.oneshot_start_step) % 64
         srlength = round(self.step_repeat_length / self.get_rate())
         do_step_repeat = self.step_repeat and (
@@ -894,9 +906,6 @@ class Sample:
         if do_step_repeat and step in range(self.step_repeat_index % srlength, self.slices_per_loop, srlength):
             self.step_repeating = True
             self.clear_sound_queue()
-            # slices = self.sound_slices[self.step_repeat_index: self.step_repeat_index + max(self.step_repeat_lengths)]
-            # subslices = [self.get_sound_slices()[self.step_repeat_index: self.step_repeat_index + length]
-            #              for length in self.step_repeat_lengths]
             # TODO could save work here, only process each
             subslices = [range(self.step_repeat_index, self.step_repeat_index + length)
                          for length in self.step_repeat_lengths]
@@ -915,47 +924,10 @@ class Sample:
                 logger.info(
                     f"step repeat queueing {substep} for step {for_step} {qs.t_string() if qs else '?'}")
                 self.queue(qs)
-                # if rate != 1:
-                #     stretch = functools.partial(
-                #         timestretch, s, rate, stretch_fade)
-                #     self.queue_async(stretch, ts, slice_step)
-                #     logger.debug(f"queueing {s}")
-                # elif (p := self.pitch.get(step + i)) != sound_data[s].semitones:
-                #     shift = functools.partial(
-                #         self.change_pitch, self.step_repeat_index + i, s, p)
-                #     self.queue_async(shift, ts, slice_step)
-                # else:
-                #     self.queue(s, ts, slice_step)
-        if not self.step_repeating:
-            if not self.is_muted() or self.looping or self.step_repeat:
-                self.queue(self.get_step_sound(step, t))
-                # sound = self.get_sound_slices()[step % len(self.sound_slices)]
-                # spice_factor = 2 if self.spices_param.stretch_chance.toss(
-                #     step) else 1
-                # rate = self.get_rate() / spice_factor
-                # if rate != 1:
-                #     steps_per_slice = round(1 / rate)
-                #     if step % steps_per_slice != 0:
-                #         return
-                #     sound = self.get_sound_slices()[(
-                #         step // steps_per_slice) % len(self.sound_slices)]
-                #     self.queue_async(lambda: timestretch(
-                #         sound, rate, stretch_fade), t, step)
-                # elif (p := self.pitch.get(step)) != sound_data[sound].semitones:
-                #     logger.debug(f"{self.name} setting pitch to {p}")
-                #     self.queue_async(lambda: self.change_pitch(
-                #         step, sound, p), t, step)
-                #     # self.queue_and_replace_async(lambda: self.change_pitch(step, sound, p), t, step)
-                # else:
-                #     if (sound_bpm := sound_data[sound].bpm) != self.bpm:
-                #         logger.info(
-                #             f"{self.name} step {step} stretching sample from {sound_bpm} to {self.bpm}")
-                #         future = self.queue_and_replace_async(lambda: timestretch(
-                #             self.source_sound(sound), self.bpm / sound_bpm), t, step)
-                #         future.add_done_callback(
-                #             lambda f: set_sound_bpm(f.result(), self.bpm))
-                #     else:
-                #         self.queue(sound, t, step)
+        should_be_queued = (not self.is_muted()
+                            or self.looping or self.step_repeat)
+        if not self.step_repeating and should_be_queued:
+            self.queue(self.get_step_sound(step, t))
 
     @staticmethod
     def source_sound(sound, ignore_bpm_changes=False):

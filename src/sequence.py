@@ -118,15 +118,18 @@ class Sequence:
                 self.stop_midi()
 
             if midi_status == CLOCK and self.midi_started:
-                self.clock_count = (self.clock_count + 1) % 24
+                clocks_per_quarter_note = 24
+                self.clock_count = (self.clock_count +
+                                    1) % clocks_per_quarter_note
                 if self.clock_count == 0:
                     self.update_midi_bpm(now)
                     self.last_midi_beat = now
-                if self.clock_count % (24 / STEPS_PER_BEAT) == 0:
+                if self.clock_count % (clocks_per_quarter_note / STEPS_PER_BEAT) == 0:
                     self.step_forward(time.time())
 
         prev = self.last_queued_step
-        for i in (self.inc(prev), self.inc(prev, 2), self.inc(prev, 3)):
+        next_steps = (self.inc(prev), self.inc(prev, 2), self.inc(prev, 3))
+        for i in next_steps:
             if self.is_started and now + lookahead_time >= (t := self.step_time(i)):
                 logger.debug(
                     f"------- queuing step {i} === {t - self.measure_start}")

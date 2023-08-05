@@ -1,5 +1,10 @@
 #+title: Notes
 
+Outside Lands must haves:
+- channel_init must work
+- partial_trigger don't break things
+- drum vs keys selection
+
 Aug 3, 2023 todos:
 - group cymbal hits, if main hit is paired with rim or bell, ignore main. Allows using breakbox without triggering 404 effects
 - spice mapped to number of drum hits w/ cooloff
