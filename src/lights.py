@@ -36,32 +36,34 @@ palette = [
     0x00fff9,
     0x00ff85,
 ]
-    #ff00c1,
-    #9600ff,
-    #4900ff,
-    #00b8ff,
-    #00fff9,
-    #00ff85,
+# ff00c1,
+# 9600ff,
+# 4900ff,
+# 00b8ff,
+# 00fff9,
+# 00ff85,
 # TODO colors module
 palette = [
-    #4deeea,
+    # 4deeea,
     0x4deeea,
-    #74ee15,
+    # 74ee15,
     0x74ee15,
-    #ffe700,
+    # ffe700,
     0xffe700,
-    #f000ff,
+    # f000ff,
     0xf000ff,
-    #001eff,
+    # 001eff,
     0x001eff,
-    #FF7A53,
+    # FF7A53,
     0xFF7A53,
 ]
 OFF = 0x0
 
+
 def average(a, b, b_weight=0.5):
     a_weight = 1 - b_weight
     return math.floor(a * a_weight + b * b_weight)
+
 
 def to_tuple(color):
     if type(color) is tuple:
@@ -107,12 +109,14 @@ def to_tuple(color):
 #         # state.step = step
 #         return state
 
+
 @dataclass
 class LedState:
     i: int = field(compare=False)
     leds: adafruit_ws2801.WS2801 = field(compare=False)
     color: tuple[int, int, int] = field(default=(0, 0, 0))
-    fade_goals: list[tuple[tuple[int, int, int], float, float, float]] = field(compare=False, default_factory=list)
+    fade_goals: list[tuple[tuple[int, int, int], float, float, float]] = field(
+        compare=False, default_factory=list)
 
     def update(self):
         for item in self.fade_goals:
@@ -127,11 +131,13 @@ class LedState:
         self.leds[self.i] = self.color
 
     def fade(self, color, duration, strength=0.25):
-        self.fade_goals.append((to_tuple(color), time.time(), duration, strength))
+        self.fade_goals.append(
+            (to_tuple(color), time.time(), duration, strength))
 
     def mix(self, color, strength=0.25):
         color = to_tuple(color)
-        self.color = tuple(average(*ab, strength) for ab in zip(self.color, color))
+        self.color = tuple(average(*ab, strength)
+                           for ab in zip(self.color, color))
 
 
 def run(lights_q: Queue):
@@ -144,14 +150,16 @@ def run(lights_q: Queue):
     numleds = 6
     bright = 0.5
     try:
-        leds = adafruit_ws2801.WS2801(oclock, odata, numleds, brightness=bright, auto_write=False)
+        leds = adafruit_ws2801.WS2801(
+            oclock, odata, numleds, brightness=bright, auto_write=False)
     except:
         logger.info("failed to initialize lights")
         return
     leds.fill(0)
     leds.show()
     sample_lights_offset = 0
-    led_states = [LedState(j + sample_lights_offset, leds) for j in range(numleds)]
+    led_states = [LedState(j + sample_lights_offset, leds)
+                  for j in range(numleds)]
     min_refresh = 2
     max_refresh = 0.010
     last_update = time.time()
@@ -162,18 +170,23 @@ def run(lights_q: Queue):
         last_state = list(map(dataclasses.replace, led_states))
         sample_states = lights_q.get()
         logger.debug(f"got {sample_states} from queue")
-        bank_changed = any(((new_bank := sample.bank) != prev.bank for sample, prev in zip(sample_states, prev_samples)))
-        for sample, led, prev in zip(sample_states, led_states, prev_samples):
+        bank_changed = any(((new_bank := sample.bank) != prev.bank for sample, prev in zip(
+            sample_states, prev_samples, strict=True)))
+        for sample, led, prev in zip(sample_states, led_states, prev_samples, strict=True):
             # if sample.selected and prev.step != sample.step and sample.step % 4 == 0:
             #     color = 0xff0000 if sample.recording else 0x00ff00
             #     led.fade(color, 0.3, 0.5)
             # pulse on sample loop
             # strength = 0.1 if sample.selected else 0.3
             strength = 0.3
-            if sample.playing and prev.step != sample.step and sample.step % sample.steps == 0:
-                led.fade(palette[sample.bank % len(palette)], sample.length, strength)
+            first_step = sample.step % sample.steps == 0
+            new_step = prev.step != sample.step
+            if sample.playing and new_step and first_step:
+                led.fade(palette[sample.bank % len(palette)],
+                         sample.length, strength)
             elif sample.playing and not prev.playing:
-                led.fade(palette[sample.bank % len(palette)], sample.length, strength)
+                led.fade(palette[sample.bank % len(palette)],
+                         sample.length, strength)
             if not sample.playing and prev.playing:
                 led.fade_goals.clear()
                 led.fade(OFF, 1)
