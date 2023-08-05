@@ -103,8 +103,10 @@ class QueuedSound:
         if self.fx is None or time.time() > self.t:
             return
         while len(self.fx) > 0:
-            effect = self.fx.pop()
+            effect = self.fx[0]
             self.sound = effect(self.sound)
+            # fx is shared with another thread, don't pop until effect is applied
+            self.fx.pop(0)
 
     def t_string(self):
         return datetime.fromtimestamp(self.t)
@@ -591,8 +593,8 @@ class Sample:
         logger.info(f"{self.name} unmuted")
         # self.sound.set_volume(Sample.MAX_VOLUME)
         self.muted = False
-        if step and offset:
-            self.partial_trigger(step, offset)
+        # if step and offset:
+        #     self.partial_trigger(step, offset)
         if self.recording and not suppress_recording:
             logger.info(
                 f"{self.name} start mute interval [{self.elapsed_sequence_time()}, ]")
