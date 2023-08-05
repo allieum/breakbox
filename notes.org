@@ -1,4 +1,6 @@
 #+title: Notes
+Cool things:
+- spice can change current pitch mod value (randomly :))
 
 Outside Lands must haves:
 - channel_init must work

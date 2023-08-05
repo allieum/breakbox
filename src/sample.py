@@ -91,8 +91,9 @@ class SoundData:
 sound_data = defaultdict(SoundData)
 
 
+# Slice of a sound, with effects applied
 @dataclass(order=True)
-class QueuedSound:
+class SampleSlice:
     t: float
     step: int = field(compare=False)
     sound: pygame.mixer.Sound = field(compare=False)
@@ -223,7 +224,7 @@ class Sample:
         self.step_repeat_index = 0  # which step to repeat
         self.seq_start = 0
         self.channel = channel
-        self.sound_queue: PriorityQueue[QueuedSound] = PriorityQueue()
+        self.sound_queue: PriorityQueue[SampleSlice] = PriorityQueue()
         self.muted = True
         self.mute_timer: None | threading.Timer = None
         self.unmute_intervals: list[TimeInterval] = []
@@ -559,7 +560,7 @@ class Sample:
     def set_and_queue_slice(self, i, t, sound_generator):
         self.sound_slices[i % len(self.sound_slices)] = sound_generator()
         slicey = self.sound_slices[i % len(self.sound_slices)]
-        self.queue(QueuedSound(t, i, slicey))
+        self.queue_sound(SampleSlice(t, i, slicey))
         return slicey
 
     def set_slice(self, i, sound_generator):
@@ -614,7 +615,7 @@ class Sample:
         sound = pygame.mixer.Sound(buffer=wav[start_index:])
         self.play_sound(sound)
         next_sound = self.get_step_sound(step + 1, time.time(), force=True)
-        self.queue(next_sound)
+        self.queue_sound(next_sound)
 
     def after_delay(self, action, timer: threading.Timer | None, duration):
         if duration is None:
@@ -649,47 +650,49 @@ class Sample:
         while not self.sound_queue.empty():
             self.sound_queue.get()
 
-    def queue(self, qs: QueuedSound | None):
-        if qs is None:
+    def queue_sound(self, sample_slice: SampleSlice | None):
+        if sample_slice is None:
             return
-        logger.info(f"queuing sound for {qs.t_string()} {qs}")
-        qs.t += self.oneshot_offset
+        logger.info(
+            f"queuing sound for {sample_slice.t_string()} {sample_slice}")
+        sample_slice.t += self.oneshot_offset
         logger.debug(
-            f"queued sound in {self.name} for step {qs.step} {datetime.fromtimestamp(qs.t)}")
+            f"queued sound in {self.name} for step {sample_slice.step} {datetime.fromtimestamp(sample_slice.t)}")
         # _, prev_t = self.sound_queue[len(self.sound_queue) - 1] if len(self.sound_queue) > 0 else None, None
         if self.recording:
-            self.recorded_steps[i := qs.step %
-                                len(self.recorded_steps)] = qs.sound
+            self.recorded_steps[i := sample_slice.step %
+                                len(self.recorded_steps)] = sample_slice.sound
             logger.info(f"{self.name} recording sound for step {i}")
         # if (recorded := self.recorded_steps[step]) is not None:
         #     sound = recorded
-        sound_data[qs.sound].step = qs.step
-        step_gate = self.gates[qs.step % len(self.gates)]
-        prev_step_gate = self.gates[(qs.step - 1) % len(self.gates)]
+        sound_data[sample_slice.sound].step = sample_slice.step
+        step_gate = self.gates[sample_slice.step % len(self.gates)]
+        prev_step_gate = self.gates[(sample_slice.step - 1) % len(self.gates)]
         if self.step_repeating and step_gate == 0:
             step_gate = 0.5
         if step_gate > 0 and prev_step_gate == 1:
-            qs.sound.set_volume(self.volume.get(qs.step))
+            sample_slice.sound.set_volume(self.volume.get(sample_slice.step))
         else:
-            qs.sound.set_volume(0)
-        self.sound_queue.put(qs)
-        self.audio_executor.submit(qs.apply_fx).add_done_callback(future_done)
+            sample_slice.sound.set_volume(0)
+        self.sound_queue.put(sample_slice)
+        self.audio_executor.submit(
+            sample_slice.apply_fx).add_done_callback(future_done)
 
     # call provided fn to create sound and add to queue
-    def queue_async(self, generate_sound, t, step):
+    def queue_async(self, generate_sound, t: float, step: int):
         logger.debug(f"{self.name} scheduling async sound for {t}")
         future = self.audio_executor.submit(
-            lambda: self.queue(QueuedSound(t, step, generate_sound())))
+            lambda: self.queue_sound(SampleSlice(t, step, generate_sound())))
         future.add_done_callback(future_done)
 
-    def queue_and_replace_async(self, generate_sound, t, step):
+    def queue_and_replace_async(self, generate_sound, t: float, step: int):
         logger.debug(f"{self.name} scheduling async sound for {t}")
         future = self.audio_executor.submit(
             self.set_and_queue_slice, step, t, generate_sound)
         future.add_done_callback(future_done)
         return future
 
-    def replace_async(self, generate_sound, step):
+    def replace_async(self, generate_sound, step: int):
         logger.debug(f"{self.name} scheduling async sound for {step}")
         future = self.audio_executor.submit(
             self.set_slice, step, generate_sound)
@@ -862,7 +865,7 @@ class Sample:
             slices[j:j + 4] = slices[i:i + 4]
         return slices
 
-    def get_step_sound(self, step, t, source_step=None, force=False) -> QueuedSound | None:
+    def get_step_sound(self, step, t, source_step=None, force=False) -> SampleSlice | None:
         # TODO
         spice_factor = 2 if self.spices_param.stretch_chance.toss(
             step) else 1
@@ -892,14 +895,14 @@ class Sample:
             future.add_done_callback(
                 lambda f: set_sound_bpm(f.result(), self.bpm))
 
-        return QueuedSound(t, step, sound, fx)
+        return SampleSlice(t, step, sound, fx)
 
     def queue_step_repeat_steps(self, step, step_time, step_interval):
         self.step_repeating = True
         self.clear_sound_queue()
         # TODO could save work here, only process each
         subslices = [range(self.step_repeat_index, self.step_repeat_index + length)
-                        for length in self.step_repeat_lengths]
+                     for length in self.step_repeat_lengths]
         all_slices = []
         for subslice in subslices:
             all_slices.extend(subslice)
@@ -914,7 +917,7 @@ class Sample:
             qs = self.get_step_sound(for_step, ts, source_step=substep)
             logger.info(
                 f"step repeat queueing {substep} for step {for_step} {qs.t_string() if qs else '?'}")
-            self.queue(qs)
+            self.queue_sound(qs)
 
     # TODO save measure start
     def queue_step(self, step: int, step_time: float, step_interval: float):
@@ -933,7 +936,7 @@ class Sample:
         should_be_queued = (not self.is_muted()
                             or self.looping or self.step_repeat)
         if not self.step_repeating and should_be_queued:
-            self.queue(self.get_step_sound(step, step_time))
+            self.queue_sound(self.get_step_sound(step, step_time))
 
     @staticmethod
     def source_sound(sound, ignore_bpm_changes=False):
