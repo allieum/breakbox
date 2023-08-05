@@ -280,7 +280,7 @@ class Sample:
             sound_data[s].source = None
             sound_data[s].semitones = 0
 
-    def seq_time(self):
+    def elapsed_sequence_time(self):
         return time.time() - self.seq_start
 
     def trigger_oneshot(self, step, offset):
@@ -354,13 +354,14 @@ class Sample:
         self.recording = True
         if self.mute_override and not self.is_muted():
             logger.info(
-                f"{self.name} start unmute interval [{self.seq_time()}]")
-            self.unmute_intervals.append(TimeInterval(self.seq_time()))
+                f"{self.name} start unmute interval [{self.elapsed_sequence_time()}]")
+            self.unmute_intervals.append(
+                TimeInterval(self.elapsed_sequence_time()))
 
     def stop_recording(self):
         self.recording = False
         if len(self.unmute_intervals) > 0 and not (last := self.unmute_intervals[-1]).has_end():
-            last.end = self.seq_time()
+            last.end = self.elapsed_sequence_time()
             logger.info(
                 f"{self.name} finished interval [{last.start} {last.end}]")
 
@@ -547,7 +548,7 @@ class Sample:
         if self.recording and not suppress_recording \
                 and len(self.unmute_intervals) > 0 \
                 and not (last := self.unmute_intervals[-1]).has_end():
-            last.end = self.seq_time()
+            last.end = self.elapsed_sequence_time()
             logger.info(
                 f"{self.name} finished interval [{last.start} {last.end}]")
             logger.info(f"{self.name} intervals: {self.unmute_intervals}")
@@ -565,8 +566,9 @@ class Sample:
             self.partial_trigger(step, offset)
         if self.recording and not suppress_recording:
             logger.info(
-                f"{self.name} start mute interval [{self.seq_time()}, ]")
-            self.unmute_intervals.append(TimeInterval(self.seq_time()))
+                f"{self.name} start mute interval [{self.elapsed_sequence_time()}, ]")
+            self.unmute_intervals.append(
+                TimeInterval(self.elapsed_sequence_time()))
 
     def partial_trigger(self, step, offset):
         queued_sound = self.get_step_sound(step, time.time(), force=True)
@@ -671,13 +673,16 @@ class Sample:
         msg += f" sched. {datetime.fromtimestamp(dropped.t)}"
         logger.debug(msg)
 
-    # returns callable to do the sound making
-    def process_queue(self, now, step_duration):
+    def unmute_active_intervals(self):
         for interval in self.unmute_intervals:
-            if interval.contains(self.seq_time()):
+            if interval.contains(self.elapsed_sequence_time()):
                 self.unmute(suppress_recording=True)
             elif not self.mute_override:
                 self.mute(suppress_recording=True)
+
+    # returns callable to do the sound making
+    def process_queue(self, now, step_duration):
+        self.unmute_active_intervals()
         if self.channel and (playing := self.channel.get_sound()) in sound_data and sound_data[playing].step is not None:
             playing_step = sound_data[playing].step
             if playing_step is None:
