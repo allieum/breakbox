@@ -51,7 +51,7 @@ def on_key(e):
 keyboard.hook(on_key)
 
 # control.init()
-sample.load_samples()
+sample.init()
 display.init(sample.all_samples())
 midi.connect()
 midi.load_midi_files()

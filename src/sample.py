@@ -134,17 +134,22 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 sample_banks = []
 
 
-def load_samples():
+def init():
+    channels = init_channels()
+    sample_count = 0
     for i in range(1, NUM_BANKS + 1):
         sample_dir = f'{dir_path}/samples/{i}'
         sample_banks.append(bnk := [])
-        for f in sorted(os.listdir(sample_dir)):
-            if m := re.fullmatch(r"([0-9]{2,3}).+.wav", f):
-                # print(f)
+        for filename in sorted(os.listdir(sample_dir)):
+            if m := re.fullmatch(r"([0-9]{2,3}).+.wav", filename):
+                sample_count += 1
+                channel = channels[sample_count % BANK_SIZE]
                 bpm = int(m.group(1))
-                bnk.append(Sample(f"{sample_dir}/{m.group()}", bpm, i - 1))
+                bnk.append(
+                    Sample(f"{sample_dir}/{m.group()}", bpm, i - 1, channel))
             else:
-                logger.warn(f"wrong filename format for {f}, not loaded")
+                logger.warn(
+                    f"wrong filename format for {filename}, not loaded")
         logger.info([s.name for s in bnk])
 
 
@@ -155,8 +160,11 @@ def current_samples() -> list['Sample']:
 def all_samples() -> list['Sample']:
     return functools.reduce(lambda a, b: a + b, sample_banks)
 
+# TODO instead of find_channel need to ensure that it picks distinct channels. check play_sound_new_channel
 
-channels = set()
+
+def init_channels() -> list[pygame.mixer.Channel]:
+    return [pygame.mixer.find_channel() for _ in range(BANK_SIZE)]
 
 
 class Sample:
@@ -181,7 +189,7 @@ class Sample:
                 self.sound = gen_sound()
             Sample.audio_executor.submit(set_sound)
 
-    def __init__(self, file, bpm, bank):
+    def __init__(self, file: str, bpm: int, bank: int, channel: pygame.mixer.Channel):
         self.name = file.split("samples/")[1]
         self.bank = bank
         self.looping = False
@@ -191,7 +199,7 @@ class Sample:
         self.step_repeat_lengths = []
         self.step_repeat_index = 0  # which step to repeat
         self.seq_start = 0
-        self.channel: pygame.mixer.Channel | None = None
+        self.channel = channel
         self.sound_queue: PriorityQueue[QueuedSound] = PriorityQueue()
         self.muted = True
         self.mute_timer: None | threading.Timer = None
@@ -256,6 +264,11 @@ class Sample:
         #         **dict.fromkeys(range(self.num_slices), {})
         #     }
         # }
+
+    def init_channel(self):
+        channel = pygame.mixer.find_channel()
+        channels.add(channel)
+        return channel
 
     def load(self, file):
         logger.debug(f"loading sample {file}")
