@@ -680,15 +680,12 @@ class Sample:
             elif not self.mute_override:
                 self.mute(suppress_recording=True)
 
-    # returns callable to do the sound making
-    def process_queue(self, now, step_duration):
-        self.unmute_active_intervals()
-        playing_sound: pygame.mixer.Sound | None = self.channel.get_sound() if self.channel else None
+    def apply_gate(self, playing_sound: pygame.mixer.Sound):
         if self.channel and playing_sound in sound_data and sound_data[playing_sound].step is not None:
             playing_step = sound_data[playing_sound].step
             if playing_step is None:
                 # Shouldnt happen, but this makes red squiggles happy
-                return None
+                return
             step_gate = self.gates[playing_step % len(self.gates)]
             if (inverted := step_gate < 0):
                 step_gate *= -1
@@ -714,6 +711,13 @@ class Sample:
                     volume := self.volume.get(playing_step) * ratio)
                 logger.debug(
                     f"{self.name} volume to {volume}, {ratio}% faded in")
+
+    # returns callable to do the sound making
+    def process_queue(self, now, step_duration):
+        self.unmute_active_intervals()
+        playing_sound: pygame.mixer.Sound | None = self.channel.get_sound() if self.channel else None
+        if playing_sound:
+            self.apply_gate(playing_sound)
 
         logger.debug(f"{self.name} start process queue")
         if self.sound_queue.empty():
@@ -764,18 +768,18 @@ class Sample:
             return self.play_step(self.play_sound_new_channel, qsound.sound, qsound.step, qsound.t)
         if in_play_window:
             if self.channel.get_busy():
-                playing = self.channel.get_sound()
+                playing_sound = self.channel.get_sound()
                 logger.warn(
-                    f"{self.name} interrupted sample with {remaining_time(playing)}s left")
+                    f"{self.name} interrupted sample with {remaining_time(playing_sound)}s left")
                 logger.warn(
-                    f"sample length {playing.get_length()} vs step length {step_duration}")
+                    f"sample length {playing_sound.get_length()} vs step length {step_duration}")
                 logger.warn(f"dropping")
                 # return None
             logger.debug(f"{self.name}: played sample")
             return self.play_step(self.play_sound, qsound.sound, qsound.step, qsound.t)
         if self.channel.get_queue() is None and in_queue_window:
-            playing = self.channel.get_sound()
-            predicted_finish = time.time() + remaining_time(playing)
+            playing_sound = self.channel.get_sound()
+            predicted_finish = time.time() + remaining_time(playing_sound)
             max_start_discrepancy = 0.015
             if (error := predicted_finish - qsound.t) > max_start_discrepancy:
                 logger.debug(
