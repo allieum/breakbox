@@ -683,8 +683,9 @@ class Sample:
     # returns callable to do the sound making
     def process_queue(self, now, step_duration):
         self.unmute_active_intervals()
-        if self.channel and (playing := self.channel.get_sound()) in sound_data and sound_data[playing].step is not None:
-            playing_step = sound_data[playing].step
+        playing_sound: pygame.mixer.Sound | None = self.channel.get_sound() if self.channel else None
+        if self.channel and playing_sound in sound_data and sound_data[playing_sound].step is not None:
+            playing_step = sound_data[playing_sound].step
             if playing_step is None:
                 # Shouldnt happen, but this makes red squiggles happy
                 return None
@@ -693,8 +694,8 @@ class Sample:
                 step_gate *= -1
             if self.step_repeating and step_gate == 0:
                 step_gate = 0.5
-            gate_time = step_gate * playing.get_length()
-            time_playing = time.time() - sound_data[playing].playtime
+            gate_time = step_gate * playing_sound.get_length()
+            time_playing = time.time() - sound_data[playing_sound].playtime
             time_fading = time_playing - gate_time
             prev_step_gate = self.gates[(playing_step - 1) % len(self.gates)]
             start_fade = step_gate > 0 and prev_step_gate != 1
@@ -703,13 +704,13 @@ class Sample:
                 if not inverted:
                     ratio = 1 - ratio
                 volume = ratio * self.volume.get(playing_step)
-                if playing.get_volume() != volume:
-                    playing.set_volume(volume)
+                if playing_sound.get_volume() != volume:
+                    playing_sound.set_volume(volume)
                     logger.debug(
                         f"{self.name} volume to {volume}, {ratio}% faded")
-            elif start_fade and playing.get_volume() != self.volume.get(playing_step):
+            elif start_fade and playing_sound.get_volume() != self.volume.get(playing_step):
                 ratio = min(1, time_playing / self.gate_fade)
-                playing.set_volume(
+                playing_sound.set_volume(
                     volume := self.volume.get(playing_step) * ratio)
                 logger.debug(
                     f"{self.name} volume to {volume}, {ratio}% faded in")
