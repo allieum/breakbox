@@ -163,8 +163,15 @@ def all_samples() -> list['Sample']:
 # TODO instead of find_channel need to ensure that it picks distinct channels. check play_sound_new_channel
 
 
+def find_channel(i: int) -> pygame.mixer.Channel:
+    channel = pygame.mixer.find_channel()
+    pygame.mixer.set_reserved(i + 1)
+    return channel
+
+
 def init_channels() -> list[pygame.mixer.Channel]:
-    return [pygame.mixer.find_channel() for _ in range(BANK_SIZE)]
+    # pygame.mixer.set_reserved(n) todo: set number of reserved channels
+    return [find_channel(i) for i in range(BANK_SIZE)]
 
 
 class Sample:
@@ -264,11 +271,6 @@ class Sample:
         #         **dict.fromkeys(range(self.num_slices), {})
         #     }
         # }
-
-    def init_channel(self):
-        channel = pygame.mixer.find_channel()
-        channels.add(channel)
-        return channel
 
     def load(self, file):
         logger.debug(f"loading sample {file}")
@@ -778,7 +780,7 @@ class Sample:
             f"{self.name} processing {datetime.fromtimestamp(qsound.t)}")
         if self.channel is None:
             logger.debug(f"{self.name}: played sample on new channel")
-            return self.play_step(self.play_sound_new_channel, qsound.sound, qsound.step, qsound.t)
+            return self.play_step(self.play_sound, qsound.sound, qsound.step, qsound.t)
         if in_play_window:
             if self.channel.get_busy():
                 logger.warn(
@@ -827,18 +829,8 @@ class Sample:
         return fn
 
     def play_sound(self, sound):
-        if self.channel is None:
-            self.play_sound_new_channel(sound)
-        else:
-            self.channel.play(sound)
-            sound_data[sound].playtime = time.time()
-
-    def play_sound_new_channel(self, sound):
-        self.channel = sound.play()
+        self.channel.play(sound)
         sound_data[sound].playtime = time.time()
-        channels.add(self.channel)
-        print(f"seen {(n := len(channels))} channels")
-        pygame.mixer.set_reserved(n)
 
     def get_sound_slices(self):
         slices = [s if rec is None else rec for s, rec in zip(
