@@ -894,10 +894,32 @@ class Sample:
 
         return QueuedSound(t, step, sound, fx)
 
+    def queue_step_repeat_steps(self, step, step_time, step_interval):
+        self.step_repeating = True
+        self.clear_sound_queue()
+        # TODO could save work here, only process each
+        subslices = [range(self.step_repeat_index, self.step_repeat_index + length)
+                        for length in self.step_repeat_lengths]
+        all_slices = []
+        for subslice in subslices:
+            all_slices.extend(subslice)
+        logger.info(
+            f"{self.name} has {len(all_slices)} step repeat slices for sr length {self.step_repeat_length}, index {self.step_repeat_index}")
+        for i, substep in enumerate(all_slices):
+            spice_factor = 2 if self.spices_param.stretch_chance.toss(
+                step) else 1
+            rate = self.get_rate() / spice_factor
+            ts = step_time + i * step_interval / rate
+            for_step = step + i
+            qs = self.get_step_sound(for_step, ts, source_step=substep)
+            logger.info(
+                f"step repeat queueing {substep} for step {for_step} {qs.t_string() if qs else '?'}")
+            self.queue(qs)
+
     # TODO save measure start
-    def queue_step(self, step: int, t: float, step_interval: float):
+    def queue_step(self, step: int, step_time: float, step_interval: float):
         if step == 0:
-            self.seq_start = t
+            self.seq_start = step_time
         step = (step - self.oneshot_start_step) % 64
         srlength = round(self.step_repeat_length / self.get_rate())
         do_step_repeat = self.step_repeat and (
@@ -906,30 +928,12 @@ class Sample:
             # last step is stretched 2x, skip this one to give it time to finish
             return
         if do_step_repeat and step in range(self.step_repeat_index % srlength, self.slices_per_loop, srlength):
-            self.step_repeating = True
-            self.clear_sound_queue()
-            # TODO could save work here, only process each
-            subslices = [range(self.step_repeat_index, self.step_repeat_index + length)
-                         for length in self.step_repeat_lengths]
-            all_slices = []
-            for subs in subslices:
-                all_slices.extend(subs)
-            logger.info(
-                f"{self.name} has {len(all_slices)} step repeat slices for sr length {self.step_repeat_length}, index {self.step_repeat_index}")
-            for i, substep in enumerate(all_slices):
-                spice_factor = 2 if self.spices_param.stretch_chance.toss(
-                    step) else 1
-                rate = self.get_rate() / spice_factor
-                ts = t + i * step_interval / rate
-                for_step = step + i
-                qs = self.get_step_sound(for_step, ts, source_step=substep)
-                logger.info(
-                    f"step repeat queueing {substep} for step {for_step} {qs.t_string() if qs else '?'}")
-                self.queue(qs)
+            self.queue_step_repeat_steps(step, step_time, step_interval)
+
         should_be_queued = (not self.is_muted()
                             or self.looping or self.step_repeat)
         if not self.step_repeating and should_be_queued:
-            self.queue(self.get_step_sound(step, t))
+            self.queue(self.get_step_sound(step, step_time))
 
     @staticmethod
     def source_sound(sound, ignore_bpm_changes=False):
