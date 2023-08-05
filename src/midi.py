@@ -133,7 +133,7 @@ def get_status():
         if isinstance(msg, list):
             # logger.info(f"got midi msg {msg}")
             time_prev_midi_message = time.time()
-            if is_note_on(status := msg[0]):
+            if is_note_on(msg[0]):
                 note_q.append(msg[1])
             return msg[0], msg[1:]
     except Exception as e:
