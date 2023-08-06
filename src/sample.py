@@ -129,6 +129,7 @@ sample_banks = []
 
 def init():
     channels = init_channels()
+    logger.info(f"init_channels created {channels}")
     sample_count = 0
     for i in range(1, NUM_BANKS + 1):
         sample_dir = f'{dir_path}/samples/{i}'
@@ -144,6 +145,8 @@ def init():
             else:
                 logger.warn(
                     f"wrong filename format for {filename}, not loaded")
+        for smpl in bank:
+            logger.info(f"{smpl.name} got {smpl.channel}")
         logger.info([s.name for s in bank])
 
 
@@ -160,6 +163,7 @@ def all_samples() -> list['Sample']:
 def find_channel(i: int) -> pygame.mixer.Channel:
     channel = pygame.mixer.find_channel()
     pygame.mixer.set_reserved(i + 1)
+    logger.info(f"found channel {channel}")
     return channel
 
 
@@ -773,7 +777,7 @@ class Sample:
             self.channel.queue(qsound.sound)
             sound_data[qsound.sound].playtime = predicted_finish
             logger.info(
-                f"{self.name}: queued sample {qsound.t_string()} {qsound}")
+                f"{self.name}: queued sample on {self.channel} {qsound.t_string()} {qsound}")
             return None
 
         logger.info(f"{self.name} fell through, putting back on queue")
@@ -793,6 +797,7 @@ class Sample:
 
     def play_sound(self, sound):
         self.channel.play(sound)
+        logger.info(f"{self.name} playing sound on {self.channel}")
         sound_data[sound].playtime = time.time()
 
     def get_sound_slices(self):
