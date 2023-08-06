@@ -1,6 +1,7 @@
 # import board
-import digitalio
 from enum import Enum
+
+import digitalio
 import utility
 
 logger = utility.get_logger(__name__)

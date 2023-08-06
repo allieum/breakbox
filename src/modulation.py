@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from random import random
+
 import utility
 
 logger = utility.get_logger(__name__)
@@ -48,7 +48,7 @@ class Param:
     def __init__(self, value, min_value=None, max_value=None, round=False) -> None:
         self.value = value
         self.default_value = value
-        self.lfo = None
+        self.lfo: None | Lfo = None
         self.start_step = None
         self.steps = None
         self.encoder = None
@@ -97,13 +97,12 @@ class Param:
     def add_change_handler(self, handler):
         self.on_change.append(handler)
 
-    def get(self, step = -1):
-        if step == -1:
-            if self.encoder:
-                delta = self.encoder_scale * \
-                    (self.encoder.value() - self.encoder_prev)
-                self.value += delta
-                self.encoder_prev = self.encoder.value()
+    def get(self, step=-1):
+        if step == -1 and self.encoder:
+            delta = self.encoder_scale * \
+                (self.encoder.value() - self.encoder_prev)
+            self.value += delta
+            self.encoder_prev = self.encoder.value()
         value = self.value
         if self.steps is not None:
             self.steps -= 1
@@ -139,7 +138,7 @@ class Param:
     def set(self, value=None, delta=None):
         if (value is None and delta is None) or (value is not None and delta is not None):
             logger.error(f"must specify just 1 of value and delta")
-            return
+            return None
         if delta is None:
             delta = 0
         if value is None:
@@ -156,12 +155,14 @@ class Param:
 
     def normalize(self, value, scale=1.0):
         if self.max_value is None or self.min_value is None:
-            logger.error(f"tried to normalize param {self} with unbounded range")
+            logger.error(
+                f"tried to normalize param {self} with unbounded range")
             return value
         range = self.max_value - self.min_value
         norm = value - self.min_value
         ratio = norm / range
         return ratio * scale
+
 
 @dataclass
 class SpiceParams:

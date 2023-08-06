@@ -1,17 +1,18 @@
-from dataclasses import dataclass, field
-from math import inf
+import logging
 import os
 import sys
-import logging
+from dataclasses import dataclass, field
+from math import inf
+
 
 def get_logger(name):
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s %(threadName)s:%(funcName)s: %(message)s',
-        # filename='break.log'
     )
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
     return logger
+
 
 @dataclass
 class TimeInterval:
@@ -31,6 +32,13 @@ class TimeInterval:
     def has_end(self):
         return self.end != inf
 
+
 def restart_program():
     python = sys.executable
     os.execl(python, python, * sys.argv)
+
+
+def make_even(x):
+    if x % 2 == 1:
+        x -= 1
+    return x

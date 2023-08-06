@@ -1,21 +1,11 @@
 import time
+
 import pygame.mixer
 
-from midi import START, STOP, CLOCK
-import midi
 import sample
-import modulation
 import utility
-import sample
-from midi import START, STOP, CLOCK
-import time
-# import pygame
-import pygame.mixer
-import pkg_resources
-# dists = [str(d).replace(" ", "==") for d in pkg_resources.working_set]
-# for i in dists:
-#     print(i)
-
+import modulation
+from midi import CLOCK, START, STOP
 
 logger = utility.get_logger(__name__)
 
@@ -79,18 +69,18 @@ class Sequence:
     def calculate_midi_bpm(self, beat_time):
         sec_per_beat = beat_time - self.last_midi_beat
         logger.debug(f"sec per beat {sec_per_beat}")
-        bpm = round(60 / sec_per_beat)
-        return bpm
+        return round(60 / sec_per_beat)
 
     def update_midi_bpm(self, t):
         bpm = self.calculate_midi_bpm(t)
+        min_beats_to_change = 5
         if bpm != self.midi_bpm:
             if bpm == self.provisional_midi_bpm:
                 self.midi_stable_beats += 1
             else:
                 self.midi_stable_beats = 0
                 self.provisional_midi_bpm = bpm
-            if self.midi_stable_beats > 5:
+            if self.midi_stable_beats > min_beats_to_change:
                 sample.stretch_samples(bpm)
                 self.midi_bpm = bpm
                 logger.info(f"midi bpm changed to {bpm} on step {self.step}")
@@ -121,15 +111,18 @@ class Sequence:
                 self.stop_midi()
 
             if midi_status == CLOCK and self.midi_started:
-                self.clock_count = (self.clock_count + 1) % 24
+                clocks_per_quarter_note = 24
+                self.clock_count = (self.clock_count +
+                                    1) % clocks_per_quarter_note
                 if self.clock_count == 0:
                     self.update_midi_bpm(now)
                     self.last_midi_beat = now
-                if self.clock_count % (24 / STEPS_PER_BEAT) == 0:
+                if self.clock_count % (clocks_per_quarter_note / STEPS_PER_BEAT) == 0:
                     self.step_forward(time.time())
 
         prev = self.last_queued_step
-        for i in (self.inc(prev), self.inc(prev, 2), self.inc(prev, 3)):
+        next_steps = (self.inc(prev), self.inc(prev, 2), self.inc(prev, 3))
+        for i in next_steps:
             if self.is_started and now + lookahead_time >= (t := self.step_time(i)):
                 logger.debug(
                     f"------- queuing step {i} === {t - self.measure_start}")
@@ -161,19 +154,8 @@ class Sequence:
         self.played_step = False
         if self.step == 0:
             self.measure_start = t
-        # if self.step % 16 == 0:
-        #     for file in midi.load_midi_files():
-        #         sample.Sample.audio_executor.submit(midi.send_midi, file)
         logger.debug(f"step {self.step}")
         if self.callback is not None:
-            # TODO should be async
             self.callback(self.step)
-        # for lfo in self.lfos:
-        #     lfo.step()
-
-    # def make_lfo(self, period, shape):
-    #     self.lfos.append(lfo := modulation.Lfo(period, shape))
-    #     return lfo
-
 
 sequence = Sequence()

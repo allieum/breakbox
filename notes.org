@@ -1,4 +1,33 @@
 #+title: Notes
+Cool things:
+- spice can change current pitch mod value (randomly :))
+- step repeat but for last step that was played, with effects recorde`d
+
+Outside Lands must haves:
+- channel_init must work
+- partial_trigger don't break things
+- drum vs keys selection
+
+go thru remove obsolete comments
+
+
+Aug 3, 2023 todos:
+- group cymbal hits, if main hit is paired with rim or bell, ignore main. Allows using breakbox without triggering 404 effects
+ vspice mapped to number of drum hits w/ cooloff
+- snare roll to toggle loop
+  - use other pad than snare: tom3
+- step repeat
+  - could do retrig, keep repeating as long as you keep hitting pad
+  - rate == length
+- fix pitch mod
+- take away program change
+- gate
+  - faster hits == shorter gate period
+  - velocity --> gate duty cycle
+  - try on ride
+
+    unclear how to implement
+- program change, map to new knob so you can change breakbox samples without changing drum kit
 
 
 * wow

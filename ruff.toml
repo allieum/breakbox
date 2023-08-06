@@ -1,0 +1,77 @@
+ select = [
+     "E",   # pycodestyle errors
+     "F",   # pyflakes
+     "UP",  # pyupgrade
+     "W",   # pycodestyle warnings
+     "PL",  # pylint
+     "FBT", # boolean trap 
+     "I",   # isort 
+     "BLE", # blind except
+     "SIM", # simplify
+     "C90", # mccabe - complexity 
+     # more info:
+     # https://here-be-pythons.readthedocs.io/en/latest/python/mccabe.html
+     # https://en.wikipedia.org/wiki/Cyclomatic_complexity#Implications_for_software_testing
+
+     # flake8 - “The wrapper which verifies pep8, pyflakes, and circular complexity. It has a low rate of false positives."
+     "YTT",   # 2020 - checks for misuse of `sys.version` or `sys.version_info`
+     "ASYNC", # checks bad async / asyncio practices
+     "S",     # bandit - security issues
+     "B",     # bugbear - likely bugs and design problems in your program
+     "COM",   # commas - checks for missing or misplaced commas
+     "C4",    # comprehensions - better list/set/dict comprehensions 
+    #  "DTZ",   # datetimez - usage of unsafe naive datetime class
+     "SLF",   # self - private member access
+     #"A",     # shadowing builtins
+
+     "RET",  # return statement best practices
+     "PIE",  # misc lints 
+     "TRY",  # try - checks for invalid try/except/finally statements
+     "PERF", # performance - checks for performance issues
+     "RUF",  # ruff specific rules
+
+     #"INP", # pep420 - checks for invalid imports
+     ]
+
+#select = ["SIM"] # code that can be simplified
+
+
+# skip line length and use of bare "except"
+ignore = [
+    "E501", # line length
+    "E722", # bare except
+    "F541", # f-string without placeholders
+    "S311",  # PRNGs are not suitable for crypto
+    "FBT002" # boolean trap
+]
+
+# Group violations by containing file.
+format = "grouped"
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    "src/nestup.py",
+    "src/dmx/",
+    "src/nested-tuplets/",
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+]
+per-file-ignores = {}
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+# Assume Python 3.10.
+target-version = "py311"
+
+[pylint]
+max-branches = 12
+max-returns = 6
+
+[mccabe]
+max-complexity = 12
