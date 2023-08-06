@@ -708,7 +708,7 @@ class Sample:
                     f"{self.name} volume to {volume}, {ratio}% faded in")
 
     # returns callable to do the sound making
-    def process_queue(self, now, step_duration):
+    def process_queue(self, now, step_duration) -> callable | None:
         self.unmute_active_intervals()
         playing_sound: pygame.mixer.Sound | None = self.channel.get_sound() if self.channel else None
         if playing_sound:
@@ -757,6 +757,7 @@ class Sample:
 
         logger.debug(
             f"{self.name} processing {datetime.fromtimestamp(qsound.start_time)}")
+        # todo: move these two returns past all the early "None" returns to facilitate consolidation in refactor
         if self.channel is None:
             logger.debug(f"{self.name}: played sample on new channel")
             return self.play_step(self.play_sound, qsound.sound, qsound.step, qsound.start_time)
