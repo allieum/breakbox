@@ -94,14 +94,14 @@ sound_data = defaultdict(SoundData)
 # Slice of a sound, with effects applied
 @dataclass(order=True)
 class SampleSlice:
-    t: float
+    start_time: float
     step: int = field(compare=False)
     sound: pygame.mixer.Sound = field(compare=False)
     fx: list[Callable[[pygame.mixer.Sound],
                       pygame.mixer.Sound]] = field(compare=False, default_factory=list)
 
     def apply_fx(self):
-        if self.fx is None or time.time() > self.t:
+        if self.fx is None or time.time() > self.start_time:
             return
         while len(self.fx) > 0:
             effect = self.fx[0]
@@ -110,7 +110,7 @@ class SampleSlice:
             self.fx.pop(0)
 
     def t_string(self):
-        return datetime.fromtimestamp(self.t)
+        return datetime.fromtimestamp(self.start_time)
 
 
 def remaining_time(sound):
@@ -655,9 +655,9 @@ class Sample:
             return
         logger.info(
             f"queuing sound for {sample_slice.t_string()} {sample_slice}")
-        sample_slice.t += self.oneshot_offset
+        sample_slice.start_time += self.oneshot_offset
         logger.debug(
-            f"queued sound in {self.name} for step {sample_slice.step} {datetime.fromtimestamp(sample_slice.t)}")
+            f"queued sound in {self.name} for step {sample_slice.step} {datetime.fromtimestamp(sample_slice.start_time)}")
         # _, prev_t = self.sound_queue[len(self.sound_queue) - 1] if len(self.sound_queue) > 0 else None, None
         if self.recording:
             self.recorded_steps[i := sample_slice.step %
@@ -761,7 +761,7 @@ class Sample:
         qsound = self.sound_queue.get()
 
         dropped = []
-        while now > qsound.t + self.timeout:
+        while now > qsound.start_time + self.timeout:
             dropped.append(qsound)
             if self.sound_queue.empty():
                 self.warn_dropped(dropped, now)
@@ -769,8 +769,8 @@ class Sample:
             qsound = self.sound_queue.get()
         self.warn_dropped(dropped, now)
 
-        in_play_window = now >= qsound.t - self.lookahead
-        in_queue_window = now >= qsound.t - self.lookahead - step_duration
+        in_play_window = now >= qsound.start_time - self.lookahead
+        in_queue_window = now >= qsound.start_time - self.lookahead - step_duration
         if not in_queue_window:
             logger.debug(f"{self.name}: too early for queue her")
             self.sound_queue.put(qsound)
@@ -796,10 +796,10 @@ class Sample:
             self.channel.stop()
 
         logger.debug(
-            f"{self.name} processing {datetime.fromtimestamp(qsound.t)}")
+            f"{self.name} processing {datetime.fromtimestamp(qsound.start_time)}")
         if self.channel is None:
             logger.debug(f"{self.name}: played sample on new channel")
-            return self.play_step(self.play_sound, qsound.sound, qsound.step, qsound.t)
+            return self.play_step(self.play_sound, qsound.sound, qsound.step, qsound.start_time)
         if in_play_window:
             if self.channel.get_busy():
                 logger.warn(
@@ -809,11 +809,11 @@ class Sample:
                 logger.warn(f"dropping")
                 # return None
             logger.debug(f"{self.name}: played sample")
-            return self.play_step(self.play_sound, qsound.sound, qsound.step, qsound.t)
+            return self.play_step(self.play_sound, qsound.sound, qsound.step, qsound.start_time)
         if self.channel.get_queue() is None:
             predicted_finish = time.time() + remaining_time(playing_sound)
             max_start_discrepancy = 0.015
-            if (error := predicted_finish - qsound.t) > max_start_discrepancy:
+            if (error := predicted_finish - qsound.start_time) > max_start_discrepancy:
                 logger.debug(
                     f"{self.name} queueing sample would make it late by {error}, putting back on queue")
                 self.sound_queue.put(qsound)
