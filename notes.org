@@ -1,6 +1,7 @@
 #+title: Notes
 Cool things:
 - spice can change current pitch mod value (randomly :))
+- step repeat but for last step that was played, with effects recorde`d
 
 Outside Lands must haves:
 - channel_init must work
