@@ -727,7 +727,7 @@ class Sample:
         # todo: move these two returns past all the early "None" returns to facilitate consolidation in refactor
         if self.channel is None:
             logger.debug(f"{self.name}: played sample on new channel")
-            return self.play_step(self.play_sound, qsound.sound, qsound.step, qsound.start_time)
+            return self.play_step(self.play_sound_new_channel, qsound.sound, qsound.step, qsound.t)
         if in_play_window:
             if self.channel.get_busy():
                 logger.warn(
@@ -764,9 +764,18 @@ class Sample:
         return fn
 
     def play_sound(self, sound):
-        self.channel.play(sound)
-        logger.info(f"{self.name} playing sound on {self.channel}")
+        if self.channel is None:
+            self.play_sound_new_channel(sound)
+        else:
+            self.channel.play(sound)
+            sound_data[sound].playtime = time.time()
+
+    def play_sound_new_channel(self, sound):
+        self.channel = sound.play()
         sound_data[sound].playtime = time.time()
+        channels.add(self.channel)
+        print(f"seen {(n := len(channels))} channels")
+        pygame.mixer.set_reserved(n)
 
     def get_sound_slices(self):
         slices = [s if rec is None else rec for s, rec in zip(
