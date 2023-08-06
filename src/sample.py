@@ -829,10 +829,10 @@ class Sample:
             return self.channel.get_sound()
         return None
 
-    def play_step(self, sound_player, sound, step, t):
+    def play_step(self, sound_player, sound, step: int, start_time: float):
         def fn():
             sound_player(sound)
-            return step, t
+            return step, start_time
         return fn
 
     def play_sound(self, sound):
