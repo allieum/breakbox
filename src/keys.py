@@ -235,11 +235,6 @@ def sample_press(i, is_repeat):
         logger.info(
             f"{selected_sample.name} looping set to {selected_sample.looping}")
 
-    # if key_held[K_GATE_FOLLOW] and prev_selected and prev_selected != selected_sample:
-    #     logger.info(f"set {prev_selected.name} to invert gates of {selected_sample.name}")
-    #     selected_sample.gate_mirror = prev_selected
-    #     prev_selected.gate_mirror = selected_sample
-
     if not sequence.is_started:
         sequence.start_internal()
 
@@ -497,22 +492,6 @@ def key_pressed(e):
             new_sample.swap_channel(old_sample)
         if looping_index is not None:
             sample.current_samples()[looping_index].looping = True
-
-    # cases for hold button:
-    # active means at least one key frozen
-    #
-    #   1) inactive, no other keys held -> do nothing
-    #   2) inactive, keys held -> freeze those keys
-    #   3) active, no other keys held -> unfreeze all
-    #   4) active, nonfrozen keys held -> freeze them
-    #    **active vs inactive irrelevant**
-    #   5) frozen key pressed -> unfreeze
-    #
-    # freeze key by press down when hold pressed, or press hold when key pressed
-
-    # if e.name == K_RESET:
-    #     logger.warn(f"Reset key pressed, restarting program")
-    #     utility.restart_program()
 
     logger.debug(f"finish press handler for {e}")
 

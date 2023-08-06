@@ -77,7 +77,6 @@ def run(display_q: Queue):
 
     while True:
         item = display_q.get()
-        # logger.info(f"got {item}")
         if isinstance(item, ParamUpdate):
             last_changed_param = item
             sample_states = prev_sample_states
@@ -88,8 +87,6 @@ def run(display_q: Queue):
             continue
         last_refresh = time.time()
 
-        # if state == last_state:
-        #     return
         if last_changed_param.is_visible():
             text = f"{last_changed_param.name}: {last_changed_param.value}"
         else:
@@ -117,7 +114,6 @@ def run(display_q: Queue):
 
             (left, top, right, bottom) = font.getbbox(text)
             (font_width, font_height) = right - left, bottom - top
-            # (font_width, font_height) = 64, 16
             logger.info(f"drawing text {text} {font_width} x {font_height}")
             draw.text(
                 (oled.width // 2 - font_width // 2,
@@ -135,7 +131,6 @@ def run(display_q: Queue):
 def draw_value_bar(draw, fullness):
     bar_height = 16
     bar_width = 100
-    # thickness = 2
 
     xmid = W // 2
     ymid = H // 2
@@ -150,21 +145,14 @@ def draw_value_bar(draw, fullness):
     # Draw rectangle for filled portion
     draw.rectangle((x1, y1, x1 + round(fullness * bar_width), y2),
                    outline=255, fill=255)
-    # draw.rectangle(
-    #     (0, 0, oled.width - 1, oled.height - 1),
-    #     outline=0,
-    #     fill=0,
-
 
 def draw_param(draw, param: ParamUpdate):
     # Load default font.
-    # font = ImageFont.load_default()
     name_font = ImageFont.truetype("DejaVuSans.ttf", size=12)
     text = f"{param.name}: {param.value}"
 
     (left, top, right, bottom) = name_font.getbbox(text)
     (font_width, font_height) = right - left, bottom - top
-    # (font_width, font_height) = 64, 16
     logger.info(f"drawing text {text} {font_width} x {font_height}")
     draw.text(
         (5, H * 3 // 4 - font_height // 2),

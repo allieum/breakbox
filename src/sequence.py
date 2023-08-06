@@ -1,18 +1,11 @@
 import time
 
-import modulation
-
-# import pygame
 import pygame.mixer
+
 import sample
 import utility
-
+import modulation
 from midi import CLOCK, START, STOP
-
-# dists = [str(d).replace(" ", "==") for d in pkg_resources.working_set]
-# for i in dists:
-#     print(i)
-
 
 logger = utility.get_logger(__name__)
 
@@ -161,19 +154,8 @@ class Sequence:
         self.played_step = False
         if self.step == 0:
             self.measure_start = t
-        # if self.step % 16 == 0:
-        #     for file in midi.load_midi_files():
-        #         sample.Sample.audio_executor.submit(midi.send_midi, file)
         logger.debug(f"step {self.step}")
         if self.callback is not None:
-            # TODO should be async
             self.callback(self.step)
-        # for lfo in self.lfos:
-        #     lfo.step()
-
-    # def make_lfo(self, period, shape):
-    #     self.lfos.append(lfo := modulation.Lfo(period, shape))
-    #     return lfo
-
 
 sequence = Sequence()

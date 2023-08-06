@@ -19,22 +19,9 @@ midi_input = None
 midi_output = None
 last_connect_attempt = None
 
-# @dataclass
-# class NoteEvent:
-
 MIDI_DIR = f"midi"
-# getting the name of the directory
-# where the this file is present.
 current = os.path.dirname(os.path.realpath(__file__))
-
-# Getting the parent directory name
-# where the current directory is present.
 parent = os.path.dirname(current)
-logger.info(parent)
-# adding the parent directory to
-# the sys.path.
-
-# print(mido.get_output_names())
 
 
 def load_midi_files() -> list[MidiFile]:
@@ -95,7 +82,6 @@ def connect(block=False, suppress_output=False):
         pygame.midi.init()
         logger.info(pygame.midi.get_count())
         for i in range(pygame.midi.get_count()):
-            # print(i, pygame.midi.get_device_info(i))
             (_, name, inp, _, _) = pygame.midi.get_device_info(i)
             logger.info(f"{name} {inp}")
             if name == b"TR-8S MIDI 1" and inp == 1:
@@ -131,7 +117,6 @@ def get_status():
         events = midi_input.read(1)
         msg = events[0][0] if len(events) == 1 else None
         if isinstance(msg, list):
-            # logger.info(f"got midi msg {msg}")
             time_prev_midi_message = time.time()
             if is_note_on(msg[0]):
                 note_q.append(msg[1])

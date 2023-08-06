@@ -10,20 +10,11 @@ import lights
 import sample
 import utility
 
-# import rtmidi
-# from ctypes import *
-# from contextlib import contextmanager
-# import display
-# import lights
-# from dmx import DMXInterface
 from blink import update_dmx
 from dtxpro import DtxPad
 from sequence import sequence
 
 import midi
-
-# with DMXInterface() as interface:
-#
 
 
 logger = utility.get_logger(__name__)
@@ -32,7 +23,6 @@ logger.debug(f"Start time = {current_time}")
 
 
 def on_key(e):
-    # logger.info(f"{e.name} {e.event_type}")
     if e.event_type == keyboard.KEY_DOWN:
         keys.key_pressed(e)
     elif e.event_type == keyboard.KEY_UP:
@@ -41,17 +31,10 @@ def on_key(e):
 
 keyboard.hook(on_key)
 
-# control.init()
 sample.init()
 display.init(sample.all_samples())
 midi.connect()
-# midi.load_midi_files()
-# sequence.control_bpm(control.encoder)
 
-# if (now := time.time()) - last_dmx > 0.050: # and last_dmx_step != sequence.step:
-# TODO move into own file
-# sample.Sample.audio_executor.submit(dmx_interface.send_update)
-# logger.info(f"dmx frame send took {time.time() - now}s")
 sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
 
 subs = [
@@ -97,7 +80,6 @@ def update():
             if offset > sequence.step_duration():
                 offset -= sequence.step_duration()
 
-            # TODO quantize based on finishing a round eighth
             hit_gate = 3 * sequence.step_duration() - offset
 
             logger.info(f"hit DTX pad {dtxpad}")
@@ -110,8 +92,6 @@ def update():
                 case DtxPad.TOM1:
                     smpl.start_halftime(duration=hit_gate)
                 case DtxPad.TOM2:
-                    # smpl.drum_trigger(sequence.step, pitched=False)
-                    # TODO why not work
                     smpl.step_repeat_start(
                         sequence.step, 4, duration=hit_gate * 2)
                 case DtxPad.TOM3:
@@ -122,13 +102,11 @@ def update():
                 case DtxPad.CRASH2:
                     smpl.pitch_mod(-1, sequence.step, duration=hit_gate)
                 case DtxPad.RIDE:
-                    # add timer to gate param, velocity/position use
+                    # TODO add timer to gate param, velocity/position use
                     pass
             smpl.unmute(duration=hit_gate, step=(sequence.step - 1) %
                         sequence.steps, offset=offset)
             logger.info(f"hit combo: {dtxpro.total_hit_count()}")
-            # smpl.drum_trigger(sequence.step, velocity / 127)
-        # sample.Sample.audio_executor.submit(update_dmx, 0, note_number)
     elif midi.is_control_change(status):
         logger.info(
             f"received CC #{(cc_num := data[0])}: {(cc_value := data[1])}")
@@ -145,26 +123,12 @@ def update():
     except:
         pass
 
-    # if time.time() - last_dmx > 0.100:
-    #     sample.Sample.audio_executor.submit(update_dmx, 0, 69)
-    #     last_dmx = time.time()
-
-    # logger.info(f"putting {samples_on} in queue")
-    # f = sample.Sample.audio_executor.submit(lights.update, samples_on)
-    # f.add_done_callback(lambda _: lights.refresh_done())
-
-    # display.update(sequence.bpm.get(), sample_states)
-
     if midi.lost_connection():
         if sequence.midi_started:
             print("lost midi connection")
             sequence.stop_midi()
         midi.reconnect(suppress_output=True)
 
-    # sys.stdout.flush()
-    # sys.stderr.flush()
-    # import keyboard
-    # keyboard.hook(on_key)
     time.sleep(0.0005)
 
 
