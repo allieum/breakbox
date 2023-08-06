@@ -653,8 +653,6 @@ class Sample:
     def queue_sound(self, sample_slice: SampleSlice | None):
         if sample_slice is None:
             return
-        logger.info(
-            f"queuing sound for {sample_slice.t_string()} {sample_slice}")
         sample_slice.start_time += self.oneshot_offset
         logger.debug(
             f"queued sound in {self.name} for step {sample_slice.step} {datetime.fromtimestamp(sample_slice.start_time)}")
@@ -821,6 +819,9 @@ class Sample:
             logger.info(
                 f"{self.name}: queued sample {qsound.t_string()} {qsound}")
             return None
+
+        logger.info(f"{self.name} fell through, putting back on queue")
+        self.sound_queue.put(qsound)
         return None
 
     def get_playing(self):

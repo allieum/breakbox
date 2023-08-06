@@ -8,13 +8,17 @@ Outside Lands must haves:
 - partial_trigger don't break things
 - drum vs keys selection
 
+go thru remove obsolete comments
+
+
 Aug 3, 2023 todos:
 - group cymbal hits, if main hit is paired with rim or bell, ignore main. Allows using breakbox without triggering 404 effects
-- spice mapped to number of drum hits w/ cooloff
+ vspice mapped to number of drum hits w/ cooloff
 - snare roll to toggle loop
   - use other pad than snare: tom3
 - step repeat
   - could do retrig, keep repeating as long as you keep hitting pad
+  - rate == length
 - fix pitch mod
 - take away program change
 - gate
