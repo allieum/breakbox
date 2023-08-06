@@ -127,27 +127,18 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 sample_banks = []
 
 
-def init():
-    channels = init_channels()
-    logger.info(f"init_channels created {channels}")
-    sample_count = 0
+def load_samples():
     for i in range(1, NUM_BANKS + 1):
         sample_dir = f'{dir_path}/samples/{i}'
-        bank = []
-        sample_banks.append(bank)
-        for filename in sorted(os.listdir(sample_dir)):
-            if m := re.fullmatch(r"([0-9]{2,3}).+.wav", filename):
-                sample_count += 1
-                channel = channels[sample_count % BANK_SIZE]
+        sample_banks.append(bnk := [])
+        for f in sorted(os.listdir(sample_dir)):
+            if m := re.fullmatch(r"([0-9]{2,3}).+.wav", f):
+                # print(f)
                 bpm = int(m.group(1))
-                bank.append(
-                    Sample(f"{sample_dir}/{m.group()}", bpm, i - 1, channel))
+                bnk.append(Sample(f"{sample_dir}/{m.group()}", bpm, i - 1))
             else:
-                logger.warn(
-                    f"wrong filename format for {filename}, not loaded")
-        for smpl in bank:
-            logger.info(f"{smpl.name} got {smpl.channel}")
-        logger.info([s.name for s in bank])
+                logger.warn(f"wrong filename format for {f}, not loaded")
+        logger.info([s.name for s in bnk])
 
 
 def current_samples() -> list['Sample']:
@@ -157,32 +148,8 @@ def current_samples() -> list['Sample']:
 def all_samples() -> list['Sample']:
     return functools.reduce(lambda a, b: a + b, sample_banks)
 
-# TODO instead of find_channel need to ensure that it picks distinct channels. check play_sound_new_channel
 
-
-def find_channel(i: int) -> pygame.mixer.Channel:
-    channel = pygame.mixer.find_channel()
-    pygame.mixer.set_reserved(i + 1)
-    logger.info(f"found channel {channel}")
-    return channel
-
-
-def init_channels() -> list[pygame.mixer.Channel]:
-    # pygame.mixer.set_reserved(n) todo: set number of reserved channels
-    return [find_channel(i) for i in range(BANK_SIZE)]
-
-
-'''
-Sample class
-
-What it does (syntonic):
-    - represents a .wav file that has been loaded
-    - in charge of playing the sound
-    - applies effects to the sound
-What it does (dystonic)
-    - process_queue (priority queue based on time)
-    - sequencer stuff (mostly process_queue, also others)
-'''
+channels = set()
 
 
 class Sample:
@@ -207,7 +174,7 @@ class Sample:
                 self.sound = gen_sound()
             Sample.audio_executor.submit(set_sound)
 
-    def __init__(self, file: str, bpm: int, bank: int, channel: pygame.mixer.Channel):
+    def __init__(self, file, bpm, bank):
         self.name = file.split("samples/")[1]
         self.bank = bank
         self.looping = False
@@ -217,7 +184,7 @@ class Sample:
         self.step_repeat_lengths = []
         self.step_repeat_index = 0  # which step to repeat
         self.seq_start = 0
-        self.channel = channel
+        self.channel: pygame.mixer.Channel | None = None
         self.sound_queue: PriorityQueue[SampleSlice] = PriorityQueue()
         self.muted = True
         self.mute_timer: None | threading.Timer = None

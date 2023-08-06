@@ -9,13 +9,11 @@ import keys
 import lights
 import sample
 import utility
-
 from blink import update_dmx
 from dtxpro import DtxPad
 from sequence import sequence
 
 import midi
-
 
 logger = utility.get_logger(__name__)
 current_time = datetime.now().strftime("%H:%M:%S")
@@ -31,7 +29,8 @@ def on_key(e):
 
 keyboard.hook(on_key)
 
-sample.init()
+# control.init()
+sample.load_samples()
 display.init(sample.all_samples())
 midi.connect()
 
