@@ -813,7 +813,7 @@ class Sample:
         if self.channel.get_queue() is None:
             predicted_finish = time.time() + remaining_time(playing_sound)
             max_start_discrepancy = 0.015
-            if should_queue(self.name, qsound, predicted_finish, max_start_discrepancy) is False:
+            if not should_queue(self.name, qsound, predicted_finish, max_start_discrepancy):
                 self.sound_queue.put(qsound)
                 return None
             self.channel.queue(qsound.sound)
