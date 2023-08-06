@@ -439,7 +439,7 @@ press = {
     K_ONESHOT: momentary_fx_press(oneshot_press),
     K_ERASE: erase_press,
     K_FX_CANCEL: fx_cancel_press,
-    **dict(zip(SAMPLE_KEYS, [make_handler(sample_press, i) for i in range(len(SAMPLE_KEYS))])),
+    **dict(zip(SAMPLE_KEYS, [make_handler(sample_press, i) for i in range(len(SAMPLE_KEYS))], strict=True)),
     **{sr_key: momentary_fx_press(make_handler(step_repeat_press, length)) for sr_key, length in SR_KEYS.items()},
 }
 
@@ -452,7 +452,7 @@ release = {
     K_PITCH_DOWN: momentary_fx_release(pitch_down_release, shift_persist=False),
     K_RECORD: momentary_fx_release(record_release, autoplay_sample=False),
     K_ONESHOT: momentary_fx_release(oneshot_release),
-    **dict(zip(SAMPLE_KEYS, [make_handler(sample_release, i) for i in range(len(SAMPLE_KEYS))])),
+    **dict(zip(SAMPLE_KEYS, [make_handler(sample_release, i) for i in range(len(SAMPLE_KEYS))], strict=True)),
     **{sr_key: momentary_fx_release(make_handler(step_repeat_release, length)) for sr_key, length in SR_KEYS.items()},
 }
 
@@ -493,7 +493,7 @@ def key_pressed(e):
         # cancel held keys
         delta = -1 if key_held[K_SHIFT] else 1
         sample.bank.set((sample.bank.get() + delta) % sample.NUM_BANKS)
-        for new_sample, old_sample in zip(sample.current_samples(), old_samples):
+        for new_sample, old_sample in zip(sample.current_samples(), old_samples, strict=True):
             new_sample.swap_channel(old_sample)
         if looping_index is not None:
             sample.current_samples()[looping_index].looping = True

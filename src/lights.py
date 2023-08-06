@@ -137,7 +137,7 @@ class LedState:
     def mix(self, color, strength=0.25):
         color = to_tuple(color)
         self.color = tuple(average(*ab, strength)
-                           for ab in zip(self.color, color))
+                           for ab in zip(self.color, color, strict=True))
 
 
 def run(lights_q: Queue):
