@@ -675,7 +675,7 @@ class Sample:
                     f"{self.name} volume to {volume}, {ratio}% faded in")
 
     # returns callable to do the sound making
-    def process_queue(self, now, step_duration) -> callable | None:
+    def process_queue(self, now, step_duration) -> Callable | None:
         self.unmute_active_intervals()
         playing_sound: pygame.mixer.Sound | None = self.channel.get_sound() if self.channel else None
         if playing_sound:
