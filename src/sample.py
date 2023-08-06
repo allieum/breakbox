@@ -810,7 +810,7 @@ class Sample:
                 # return None
             logger.debug(f"{self.name}: played sample")
             return self.play_step(self.play_sound, qsound.sound, qsound.step, qsound.t)
-        if self.channel.get_queue() is None and in_queue_window:
+        if self.channel.get_queue() is None:
             predicted_finish = time.time() + remaining_time(playing_sound)
             max_start_discrepancy = 0.015
             if (error := predicted_finish - qsound.t) > max_start_discrepancy:
