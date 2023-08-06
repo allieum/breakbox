@@ -727,7 +727,7 @@ class Sample:
         # todo: move these two returns past all the early "None" returns to facilitate consolidation in refactor
         if self.channel is None:
             logger.debug(f"{self.name}: played sample on new channel")
-            return self.play_step(self.play_sound_new_channel, qsound.sound, qsound.step, qsound.t)
+            return self.play_step(self.play_sound_new_channel, qsound.sound, qsound.step, qsound.start_time)
         if in_play_window:
             if self.channel.get_busy():
                 logger.warn(
