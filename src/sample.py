@@ -67,6 +67,7 @@ class SampleState:
         return SampleState(sample.is_playing(), sample.bank,
                            length, steps, selected, sample.recording, step, pad)
 
+
 @dataclass
 class SoundData:
     playtime: float = field(default=0)
@@ -154,6 +155,8 @@ def all_samples() -> list['Sample']:
     return functools.reduce(lambda a, b: a + b, sample_banks)
 
 # TODO instead of find_channel need to ensure that it picks distinct channels. check play_sound_new_channel
+
+
 def find_channel(i: int) -> pygame.mixer.Channel:
     channel = pygame.mixer.find_channel()
     pygame.mixer.set_reserved(i + 1)
@@ -176,6 +179,8 @@ What it does (dystonic)
     - process_queue (priority queue based on time)
     - sequencer stuff (mostly process_queue, also others)
 '''
+
+
 class Sample:
     MAX_VOLUME = 1
     slices_per_loop = 64
@@ -290,7 +295,7 @@ class Sample:
         self.oneshot_start_step = step
         self.oneshot_offset = offset
 
-    def drum_trigger(self, step, pitched=True, volume=0.5):
+    def drum_trigger(self, step: int, pitched=True, volume=0.5):
         max_roll_interval = 0.200
         if self.roll and time.time() - self.roll.last_hit > max_roll_interval:
             self.roll = None
@@ -371,7 +376,7 @@ class Sample:
             param.dice(data[:self.slices_per_loop])
         self.spice_gates()
 
-    def spice_gates(self, _=None):
+    def spice_gates(self, *_):
         spiced_gates = []
         for step, gate in enumerate(self.unspiced_gates):
             spicy_gate = gate
@@ -833,7 +838,7 @@ class Sample:
 
         return SampleSlice(t, step, sound, fx)
 
-    def queue_step_repeat_steps(self, step, step_time, step_interval):
+    def queue_step_repeat_steps(self, step: int, step_time: float, step_interval: float):
         self.step_repeating = True
         self.clear_sound_queue()
         # TODO could save work here, only process fx once for each loop slice
@@ -874,13 +879,13 @@ class Sample:
             self.queue_sound(self.get_step_sound(step, step_time))
 
     @staticmethod
-    def source_sound(sound):
+    def source_sound(sound: pygame.mixer.Sound):
         logger.info(f"getting source for {sound}")
         if sound not in sound_data or (src := sound_data[sound].source) is None:
             return sound
         return Sample.source_sound(src)
 
-    def change_pitch(self, step, sound, semitones):
+    def change_pitch(self, step: float, sound: pygame.mixer.Sound, semitones: int):
         if semitones == 0:
             return sound
         logger.info(f"{self.name}: step {step} by {semitones} semitones")
@@ -890,7 +895,7 @@ class Sample:
         return pitched_sound
 
     @staticmethod
-    def modulate(param, period, shape, amount, steps=None):
+    def modulate(param, period: int, shape, amount, steps=None):
         lfo = modulation.Lfo(period, shape)
         param.modulate(lfo, amount, steps)
 
@@ -910,12 +915,15 @@ def should_queue(name, qsound, predicted_finish, max_start_discrepancy) -> bool:
         return False
     return True
 
+
 def set_sound_bpm(sound, bpm):
     sound_data[sound].bpm = bpm
+
 
 def future_done(f):
     if (e := f.exception()):
         raise e
+
 
 def play_samples(step_duration):
     logger.debug("playing samples")
