@@ -813,19 +813,7 @@ class Sample:
         if self.channel.get_queue() is None:
             predicted_finish = time.time() + remaining_time(playing_sound)
             max_start_discrepancy = 0.015
-            if (error := predicted_finish - qsound.start_time) > max_start_discrepancy:
-                logger.debug(
-                    f"{self.name} queueing sample would make it late by {error}, putting back on queue")
-                self.sound_queue.put(qsound)
-                return None
-            if error < -1 * max_start_discrepancy:
-                logger.debug(
-                    f"{self.name} queueing sample would make it early by {-error}, putting back on queue")
-                self.sound_queue.put(qsound)
-                return None
-            if len(qsound.fx) > 0:
-                logger.info(
-                    f"{self.name} not queueing yet because fx haven't finished applying")
+            if should_queue(self.name, qsound, predicted_finish, max_start_discrepancy) is False:
                 self.sound_queue.put(qsound)
                 return None
             self.channel.queue(qsound.sound)
@@ -833,7 +821,6 @@ class Sample:
             logger.info(
                 f"{self.name}: queued sample {qsound.t_string()} {qsound}")
             return None
-
         return None
 
     def get_playing(self):
@@ -960,6 +947,22 @@ class Sample:
     def modulate(param, period, shape, amount, steps=None):
         lfo = modulation.Lfo(period, shape)
         param.modulate(lfo, amount, steps)
+
+
+def should_queue(name, qsound, predicted_finish, max_start_discrepancy) -> bool:
+    if (error := predicted_finish - qsound.start_time) > max_start_discrepancy:
+        logger.debug(
+            f"{name} queueing sample would make it late by {error}, putting back on queue")
+        return False
+    if error < -1 * max_start_discrepancy:
+        logger.debug(
+            f"{name} queueing sample would make it early by {-error}, putting back on queue")
+        return False
+    if len(qsound.fx) > 0:
+        logger.info(
+            f"{name} not queueing yet because fx haven't finished applying")
+        return False
+    return True
 
 
 def set_sound_bpm(sound, bpm):
