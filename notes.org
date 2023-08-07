@@ -4,6 +4,9 @@ Cool things:
 - step repeat but for last step that was played, with effects recorde`d
   - shorter window on pitch mod cymbals
 
+- allow list for step repeat, latching on other pads
+    - So that it only repeats cool sounding noises
+    - Have to make these manually by listening with ears and heart
 Outside Lands must haves:
 - partial_trigger don't break things
 - drum vs keys selection
