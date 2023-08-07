@@ -81,6 +81,7 @@ def update():
 
             hit_gate = 3 * sequence.step_duration() - offset
 
+            # todo: move to dtxpro.py
             logger.info(f"hit DTX pad {dtxpad}")
             match dtxpad.pad:
                 case DtxPad.SNARE:
