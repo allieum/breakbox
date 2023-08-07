@@ -2,6 +2,7 @@ import functools
 import time
 from collections import defaultdict
 
+import dtxpro
 import sample
 import utility
 from effects import decrease_ts_time, increase_ts_time
@@ -9,6 +10,8 @@ from modulation import Lfo
 from sequence import sequence
 
 logger = utility.get_logger(__name__)
+
+
 
 K_STOP = 'delete'
 K_NEXT_BANK = '#'
@@ -43,7 +46,8 @@ K_HT = 'w'
 # K_TS_UP = 'ctrl'
 K_TS_UP = 'ctrl.blah'
 K_ONESHOT = 'ctrl'
-K_TS_DOWN = 'space'
+K_TS_DOWN = 'space.blah'
+K_DTX = 'space'
 K_PITCH_UP = '3'
 K_PITCH_DOWN = 'e'
 
@@ -203,13 +207,21 @@ def is_pushed(s: sample.Sample):
     except ValueError:
         return False
 
-
 def sample_press(i, is_repeat):
     global selected_sample
     logger.debug(f"pressed sample key {i} {is_repeat} {selected_sample}")
 
     if is_repeat:
         return None
+
+    chosen_sample = sample.current_samples()[i]
+
+    if key_held[K_DTX]:
+        if dtxpro.selected_sample and dtxpro.selected_sample is not chosen_sample:
+            dtxpro.selected_sample.looping = False
+        dtxpro.selected_sample = chosen_sample
+        logger.info(f"dtxpro selected sample {chosen_sample.name}")
+        return
 
     prev_selected = selected_sample
     if prev_selected and sample.current_samples()[i] != prev_selected:
@@ -224,7 +236,7 @@ def sample_press(i, is_repeat):
         if not prev_selected.looping and not is_pushed(prev_selected):
             prev_selected.mute()
             prev_selected.mute_override = False
-    selected_sample = sample.current_samples()[i]
+    selected_sample = chosen_sample
 
     if key_held[K_SHIFT]:
         selected_sample.looping = True
@@ -453,6 +465,7 @@ release = {
 
 
 def key_pressed(e):
+    global selected_sample
     logger.debug(f"start press handler for {e.name}")
 
     if all(key_held[k] for k in RESET_KEYS):
@@ -479,19 +492,14 @@ def key_pressed(e):
             sequence.stop_internal()
 
     if e.name == K_NEXT_BANK:
-        looping_index = None
         old_samples = sample.current_samples()
-        for i, s in enumerate(old_samples):
-            if not s.is_muted() and not key_held[(SAMPLE_KEYS[i])]:
-                looping_index = i
-                # print(f"looping index {i}")
-        # cancel held keys
         delta = -1 if key_held[K_SHIFT] else 1
         sample.bank.set((sample.bank.get() + delta) % sample.NUM_BANKS)
         for new_sample, old_sample in zip(sample.current_samples(), old_samples, strict=True):
+            # old_sample.looping = False
             new_sample.swap_channel(old_sample)
-        if looping_index is not None:
-            sample.current_samples()[looping_index].looping = True
+        selected_sample = None
+        dtxpro.selected_sample = None
 
     logger.debug(f"finish press handler for {e}")
 

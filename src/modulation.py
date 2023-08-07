@@ -156,7 +156,7 @@ class Param:
     def normalize(self, value, scale=1.0):
         if self.max_value is None or self.min_value is None:
             logger.error(
-                f"tried to normalize param {self} with unbounded range")
+                f"tried to normalize param with unbounded range: default {self.default_value}, [{self.min_value}, {self.max_value}]")
             return value
         range = self.max_value - self.min_value
         norm = value - self.min_value

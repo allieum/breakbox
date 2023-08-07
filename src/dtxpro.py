@@ -2,6 +2,7 @@
 import time
 from dataclasses import dataclass, field
 from enum import Enum
+from sample import Sample
 
 from utility import get_logger
 
@@ -22,6 +23,7 @@ class DtxPad(Enum):
 HIT_TIMEOUT = 0.25
 ROLL_THRESHOLD = 5
 ROLL_DEBOUNCE = 2
+PRO_HIT_COUNT = 100
 
 
 @dataclass
@@ -47,6 +49,7 @@ class DrumPad:
         if time.time() - self.last_hit > HIT_TIMEOUT:
             self.hit_count = 0
 
+selected_sample: Sample | None = None
 
 pads = [
     DrumPad(DtxPad.SNARE, [38, 37, 40]),

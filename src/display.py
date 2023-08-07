@@ -20,6 +20,7 @@ logger.setLevel("WARN")
 class ParamUpdate:
     name: str
     value: str
+    show_bar: bool
     fullness: float
     time: float
 
@@ -48,14 +49,14 @@ def init(samples: list[Sample]):
             param = getattr(sample, param_name)
             param.add_change_handler(on_param_changed(param, param_name))
     bank.add_change_handler(on_param_changed(bank, "bank"))
-    sequence.bpm.add_change_handler(on_param_changed(sequence.bpm, "bpm"))
+    sequence.bpm.add_change_handler(on_param_changed(sequence.bpm, "bpm", show_bar=False))
 
 
-def on_param_changed(param: Param, name: str):
+def on_param_changed(param: Param, name: str, show_bar=True):
     def on_change(value):
-        fullness = param.normalize(value)
+        fullness = param.normalize(value) if show_bar else 0
         with contextlib.suppress(Exception):
-            q.put(ParamUpdate(name, value, fullness, time.time()), block=False)
+            q.put(ParamUpdate(name, value, show_bar, fullness, time.time()), block=False)
 
         logger.info(f"updated param {param}")
     return on_change
@@ -73,7 +74,7 @@ def run(display_q: Queue):
     last_text = None
     prev_sample_states = []
     bpm = "BEYOND"
-    last_changed_param = ParamUpdate("dummy", "hot", 0.69, 0)
+    last_changed_param = ParamUpdate("dummy", "hot", False, 0.69, 0)
 
     while True:
         item = display_q.get()
@@ -161,7 +162,8 @@ def draw_param(draw, param: ParamUpdate):
         fill=255,
     )
 
-    draw_value_bar(draw, param.fullness)
+    if param.show_bar:
+        draw_value_bar(draw, param.fullness)
 
 
 def draw_sample_icons(draw, sample_states: list[SampleState]):

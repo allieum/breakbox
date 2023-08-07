@@ -21,6 +21,7 @@ logger.debug(f"Start time = {current_time}")
 
 
 def on_key(e):
+    logger.info(f"this is {e.modifiers}")
     if e.event_type == keyboard.KEY_DOWN:
         keys.key_pressed(e)
     elif e.event_type == keyboard.KEY_UP:
@@ -50,8 +51,8 @@ last_dmx_step = None
 
 def update():
     # control.update()
-    status, data = midi.get_status()
-    sequence.update(status)
+    midi_status, midi_data = midi.get_status()
+    sequence.update(midi_status)
     sample.play_samples(sequence.step_duration())
     sample_states = [lights.SampleState.of(
         s, keys.selected_sample, sequence.step, i) for i, s in enumerate(sample.current_samples())]
@@ -61,14 +62,15 @@ def update():
     # lights.refreshing = True
     # lights.update(samples_on)
 
-    if midi.is_note_on(status):
+    if midi.is_note_on(midi_status):
         # logger.info(f"{data} {status}")
-        note_number = data[0]
-        velocity = data[1]
+        note_number = midi_data[0]
+        velocity = midi_data[1]
         if (dtxpad := dtxpro.struck_pad(note_number)) is not None and velocity != 0:
-            if keys.selected_sample is None:
+            smpl = keys.selected_sample if not dtxpro.selected_sample else dtxpro.selected_sample
+            if smpl is None:
                 keys.selected_sample = sample.current_samples()[0]
-            smpl = keys.selected_sample
+                smpl = keys.selected_sample
 
             if not sequence.is_started:
                 sequence.start_internal()
@@ -79,7 +81,7 @@ def update():
             if offset > sequence.step_duration():
                 offset -= sequence.step_duration()
 
-            hit_gate = 3 * sequence.step_duration() - offset
+            hit_gate = 2 * sequence.step_duration() - offset
 
             # todo: move to dtxpro.py
             logger.info(f"hit DTX pad {dtxpad}")
@@ -107,12 +109,14 @@ def update():
             smpl.unmute(duration=hit_gate, step=(sequence.step - 1) %
                         sequence.steps, offset=offset)
             logger.info(f"hit combo: {dtxpro.total_hit_count()}")
-    elif midi.is_control_change(status):
+            spiciness = dtxpro.total_hit_count() / dtxpro.PRO_HIT_COUNT
+            smpl.spice_level.set(spiciness)
+    elif midi.is_control_change(midi_status):
         logger.info(
-            f"received CC #{(cc_num := data[0])}: {(cc_value := data[1])}")
+            f"received CC #{(cc_num := midi_data[0])}: {(cc_value := midi_data[1])}")
         dtxpro.update_bank(cc_num, cc_value)
-    elif midi.is_program_change(status):
-        prog_num = data[0]
+    elif midi.is_program_change(midi_status):
+        prog_num = midi_data[0]
         kit = dtxpro.kit_index(prog_num)
         logger.info(f"received program change {prog_num} -> {kit}")
         keys.select_sample(kit)
