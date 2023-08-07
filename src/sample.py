@@ -644,6 +644,7 @@ class Sample:
 
     def apply_gate(self, playing_sound: pygame.mixer.Sound):
         if self.channel and playing_sound in sound_data and sound_data[playing_sound].step is not None:
+            start_volume = playing_sound.get_volume()
             playing_step = sound_data[playing_sound].step
             if playing_step is None:
                 # Shouldnt happen, but this makes red squiggles happy
@@ -673,6 +674,8 @@ class Sample:
                     volume := self.volume.get(playing_step) * ratio)
                 logger.debug(
                     f"{self.name} volume to {volume}, {ratio}% faded in")
+            end_volume = playing_sound.get_volume()
+            logger.debug(f"{self.name} channel vol={self.channel.get_volume()} changed volume from {start_volume} to {end_volume}")
 
     # returns callable to do the sound making
     def process_queue(self, now, step_duration) -> Callable | None:
