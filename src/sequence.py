@@ -1,10 +1,10 @@
 import time
 
+import modulation
 import pygame.mixer
-
 import sample
 import utility
-import modulation
+
 from midi import CLOCK, START, STOP
 
 logger = utility.get_logger(__name__)

@@ -627,11 +627,11 @@ class Sample:
         future.add_done_callback(future_done)
         return future
 
-    def warn_dropped(self, dropped, now):
+    def warn_dropped(self, dropped: list[SampleSlice], now: float):
         if (n := len(dropped)) == 0:
             return
         dropped = dropped[0]
-        msg = f"{self.name} dropped {n}/{n+self.sound_queue.qsize()} samples stale by: {1000 * (now - dropped.t - self.timeout):10.6}ms for step {dropped.step}"
+        msg = f"{self.name} dropped {n}/{n+self.sound_queue.qsize()} samples stale by: {1000 * (now - dropped.start_time - self.timeout):10.6}ms for step {dropped.step}"
         msg += f" sched. {datetime.fromtimestamp(dropped.t)}"
         logger.debug(msg)
 

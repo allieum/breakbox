@@ -5,7 +5,6 @@ Cool things:
   - shorter window on pitch mod cymbals
 
 Outside Lands must haves:
-- channel_init must work
 - partial_trigger don't break things
 - drum vs keys selection
 
