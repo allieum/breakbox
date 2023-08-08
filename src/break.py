@@ -1,3 +1,4 @@
+import random
 import time
 from datetime import datetime
 from multiprocessing import Process
@@ -21,7 +22,6 @@ logger.debug(f"Start time = {current_time}")
 
 
 def on_key(e):
-    logger.info(f"this is {e.modifiers}")
     if e.event_type == keyboard.KEY_DOWN:
         keys.key_pressed(e)
     elif e.event_type == keyboard.KEY_UP:
@@ -90,9 +90,14 @@ def update():
                     smpl.drum_trigger(sequence.step)
                 case DtxPad.HAT:
                     logger.info(f"hit hat")
-                    pass
+                    step = min(63, round(random.random() * 64))
+                    smpl.scatter_queue = step
+                case DtxPad.CLOSED_HAT:
+                    logger.info(f"closed hat")
+                    smpl.dice()
+                    smpl.spice_level.set_gradient(1, 0, 5)
                 case DtxPad.TOM1:
-                    smpl.start_halftime(duration=hit_gate)
+                    smpl.start_halftime(duration=hit_gate * 2)
                 case DtxPad.TOM2:
                     smpl.step_repeat_start(
                         sequence.step, 4, duration=hit_gate * 2)
@@ -104,8 +109,16 @@ def update():
                 case DtxPad.CRASH2:
                     smpl.pitch_mod(-1, sequence.step, duration=hit_gate)
                 case DtxPad.RIDE:
-                    # TODO add timer to gate param, velocity/position use
-                    pass
+                    max_velocity = 127
+                    intensity = velocity / max_velocity
+                    gate = 0.1 + 1 - intensity
+                    smpl.gate.set_gradient(gate, 1, duration=hit_gate * 2)
+
+                    gate_period = 2 if dtxpad.hit_count < 5 else 1
+                    smpl.gate_period.set(gate_period)
+                    smpl.update_gates()
+                    hit_gate *= 2
+
             smpl.unmute(duration=hit_gate, step=(sequence.step - 1) %
                         sequence.steps, offset=offset)
             logger.info(f"hit combo: {dtxpro.total_hit_count()}")

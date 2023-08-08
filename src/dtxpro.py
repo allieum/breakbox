@@ -18,6 +18,7 @@ class DtxPad(Enum):
     CRASH2 = 5
     RIDE = 6
     HAT = 7
+    CLOSED_HAT = 8
 
 
 HIT_TIMEOUT = 0.25
@@ -59,7 +60,8 @@ pads = [
     DrumPad(DtxPad.CRASH1, [49, 55, 59]),
     DrumPad(DtxPad.CRASH2, [16, 17, 20, 57]),
     DrumPad(DtxPad.RIDE, [51, 52, 53]),
-    DrumPad(DtxPad.HAT, [46, 77, 78, 42, 79]),
+    DrumPad(DtxPad.HAT, [46, 77, 78, 79]),
+    DrumPad(DtxPad.CLOSED_HAT, [42]),
 ]
 
 
@@ -82,6 +84,7 @@ def hit_count(dtx_pad: DtxPad):
 def struck_pad(note_number) -> DrumPad | None:
     if any(note_number in (drum_pad := p).note_numbers for p in pads):
         drum_pad.register_hit()
+        logger.info(f"got dtx note {note_number}")
         return drum_pad
     return None
 

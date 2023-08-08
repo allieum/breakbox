@@ -184,6 +184,7 @@ class Sample:
         self.step_repeat_lengths = []
         self.step_repeat_index = 0  # which step to repeat
         self.seq_start = 0
+        self.scatter_queue: int | None = None
         self.channel: pygame.mixer.Channel | None = None
         self.sound_queue: PriorityQueue[SampleSlice] = PriorityQueue()
         self.muted = True
@@ -194,6 +195,7 @@ class Sample:
         self.oneshot_offset = 0.0
         self.step_repeat_was_muted = False
         self.step_repeat_timer = None
+        self.played_buffer: list[pygame.mixer.Sound] = []
 
         self.roll: Sample.Roll | None = None
 
@@ -232,6 +234,7 @@ class Sample:
         )
 
         self.gate = modulation.Param(1.0, min_value=0.25, max_value=1)
+        self.gate.add_change_handler(self.update_gates)
         self.gate_period = modulation.Param(2, min_value=1, max_value=32)
         self.volume = modulation.Param(
             1, min_value=0, max_value=1).spice(self.spices_param.volume)
@@ -440,6 +443,7 @@ class Sample:
             rate *= 0.25
         return rate
 
+    # TODO could use on_change for update_gates?
     def gate_increase(self):
         self.gate.set(delta=0.25)
         self.update_gates()
@@ -463,12 +467,14 @@ class Sample:
         self.gate.restore_default()
         self.update_gates()
 
-    def update_gates(self):
+    def update_gates(self, gate=None):
         gates = [0.0] * len(self.unspiced_gates)
         step_length = self.sound_slices[0].get_length()
         period = self.gate_period.get()
         max_gate = period * step_length
-        gate_length = max_gate * self.gate.get()
+        if gate is None:
+            gate = self.gate.value
+        gate_length = max_gate * gate
         steps = gate_length / step_length
         whole_steps = math.floor(steps)
         step_gate = steps - whole_steps
@@ -635,6 +641,7 @@ class Sample:
         msg += f" sched. {datetime.fromtimestamp(dropped.start_time)}"
         logger.debug(msg)
 
+
     def unmute_active_intervals(self):
         for interval in self.unmute_intervals:
             if interval.contains(self.elapsed_sequence_time()):
@@ -747,7 +754,7 @@ class Sample:
                 return None
             self.channel.queue(qsound.sound)
             sound_data[qsound.sound].playtime = predicted_finish
-            logger.info(
+            logger.debug(
                 f"{self.name}: queued sample on {self.channel} {qsound.t_string()} {qsound}")
             return None
 
@@ -771,9 +778,11 @@ class Sample:
             self.play_sound_new_channel(sound)
         else:
             self.channel.play(sound)
+            self.played_buffer.append(sound)
             sound_data[sound].playtime = time.time()
 
     def play_sound_new_channel(self, sound):
+        self.played_buffer.append(sound)
         self.channel = sound.play()
         sound_data[sound].playtime = time.time()
         channels.add(self.channel)
@@ -803,6 +812,9 @@ class Sample:
         sound_slices = self.get_sound_slices()
         if source_step is None:
             source_step = step
+        if self.scatter_queue is not None:
+            source_step = self.scatter_queue
+            self.scatter_queue = None
         sound = sound_slices[(source_step // steps_per_slice) %
                              len(sound_slices)]
         fx = []
