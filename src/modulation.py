@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
+from threading import Timer
 import time
 from typing import Any
 
@@ -48,7 +49,7 @@ class Lfo:
 
 class Param:
     def __init__(self, value, min_value=None, max_value=None, round=False) -> None:
-        self.gradient_start = None
+        self.gradient_timer = None
         self.value = value
         self.default_value = value
         self.lfo: None | Lfo = None
@@ -126,11 +127,6 @@ class Param:
             value = max(value, self.min_value)
         if self.max_value is not None:
             value = min(value, self.max_value)
-        if self.gradient_start:
-            progress = max(1, (time.time() - self.gradient_start) / self.gradient_duration)
-            value += self.gradient_delta * progress
-            if progress == 1:
-                self.gradient_start = None
         if self.round:
             value = round(value)
         if value != self.last_value:
@@ -163,9 +159,14 @@ class Param:
 
     def set_gradient(self, start_value: float | int, end_value: float | int, duration: float):
         self.set(start_value)
-        self.gradient_start = time.time()
-        self.gradient_delta = end_value - start_value
-        self.gradient_duration = duration
+        update_rate = 0.1
+        if self.gradient_timer is not None:
+            self.gradient_timer.cancel()
+        gradient_delta = end_value - start_value
+        update_delta = gradient_delta * 0.1 / duration
+        self.gradient_timer = Timer(update_rate, self.set_gradient,
+                                    [start_value + update_delta, end_value, duration - update_rate])
+        self.gradient_timer.start()
 
     def normalize(self, value, scale=1.0):
         if self.max_value is None or self.min_value is None:

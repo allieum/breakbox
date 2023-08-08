@@ -110,7 +110,8 @@ def update():
                         sequence.steps, offset=offset)
             logger.info(f"hit combo: {dtxpro.total_hit_count()}")
             spiciness = dtxpro.total_hit_count() / dtxpro.PRO_HIT_COUNT
-            smpl.spice_level.set(spiciness)
+            if spiciness > smpl.spice_level.get():
+                smpl.spice_level.set_gradient(spiciness, 0, 5)
     elif midi.is_control_change(midi_status):
         logger.info(
             f"received CC #{(cc_num := midi_data[0])}: {(cc_value := midi_data[1])}")
