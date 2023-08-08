@@ -54,7 +54,7 @@ def update():
     midi_status, midi_data = midi.get_status()
     sequence.update(midi_status)
     sample.play_samples(sequence.step_duration())
-    sample_states = [lights.SampleState.of(
+    sample_states = [sample.SampleState.of(
         s, keys.selected_sample, sequence.step, i) for i, s in enumerate(sample.current_samples())]
     dtxpro.update()
 
@@ -97,10 +97,18 @@ def update():
                     smpl.dice()
                     smpl.spice_level.set_gradient(1, 0, 5)
                 case DtxPad.TOM1:
-                    smpl.start_halftime(duration=hit_gate * 2)
+                    velocity_threshold = 40
+                    if velocity < velocity_threshold:
+                        hit_gate *= 2
+                        smpl.start_halftime(duration=hit_gate)
+                    else:
+                        hit_gate *= 4
+                        smpl.start_quartertime(duration=hit_gate)
                 case DtxPad.TOM2:
-                    smpl.step_repeat_start(
-                        sequence.step, 4, duration=hit_gate * 2)
+                    # smpl.step_repeat_start(
+                    #     sequence.step, 4, duration=hit_gate * 2)
+                    hit_gate *= 2
+                    smpl.start_latch_repeat(4, duration=hit_gate)
                 case DtxPad.TOM3:
                     if dtxpad.roll_detected():
                         smpl.looping = not smpl.looping

@@ -5,7 +5,7 @@ import os
 import re
 import threading
 import time
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -50,7 +50,7 @@ class SampleState:
     pad: int = field(default=0)
 
     @staticmethod
-    def of(sample: 'Sample', selected_sample: 'Sample', step, pad):
+    def of(sample: 'Sample', selected_sample: Optional['Sample'], step, pad):
         if sample is None:
             return SampleState()
 
@@ -75,7 +75,7 @@ class SoundData:
     source_step: int = field(default=0)
     step: int | None = field(default=None)
     semitones: int = field(default=0)
-    source: Optional['SoundData'] = field(default=None)
+    source: Optional[pygame.mixer.Sound] = field(default=None)
 
 
 sound_data = defaultdict(SoundData)
@@ -195,13 +195,16 @@ class Sample:
         self.oneshot_offset = 0.0
         self.step_repeat_was_muted = False
         self.step_repeat_timer = None
-        self.played_buffer: list[pygame.mixer.Sound] = []
+        self.played_steps: deque[SampleSlice] = deque(maxlen=Sample.slices_per_loop)
+        self.latched_steps: Optional[deque[SampleSlice]] = None
+        self.latch_timer: Optional[threading.Timer] = None
 
         self.roll: Sample.Roll | None = None
 
         # TODO rate param affected by these two
         self.halftime = False
-        self.halftime_timer = None
+        self.halftime_timer: Optional[threading.Timer] = None
+        self.quartertime_timer: Optional[threading.Timer] = None
         self.quartertime = False
 
         self.bpm = bpm
@@ -307,6 +310,20 @@ class Sample:
         self.roll.update(functools.partial(self.change_pitch,
                          slice_i, self.roll.sound, self.roll.pitch_delta))
 
+    # TODO maybe all step repeat could be implemented with latch?
+    def start_latch_repeat(self, length, restart=False, duration=None):
+        self.latch_timer = self.after_delay(self.stop_latch_repeat, self.latch_timer, duration)
+        if self.latched_steps and not restart:
+            logger.info(f"{self.name} already latched {self.latched_steps}, skipping new latch of length {length}")
+            return
+        if len(self.played_steps) < length:
+            logger.info(f"{self.name} not enough recent steps to start latch repeat")
+            return
+        self.latched_steps = deque(self.played_steps, maxlen=length)
+
+    def stop_latch_repeat(self):
+        self.latched_steps = None
+
     def pitch_mod(self, delta, step, duration=None):
         self.step_repeat_start(step, 1, duration)
         self.pitch_timer = self.after_delay(
@@ -368,6 +385,12 @@ class Sample:
         self.halftime = True
         self.halftime_timer = self.after_delay(
             self.stop_halftime, self.halftime_timer, duration)
+
+    def start_quartertime(self, duration=None):
+        logger.info(f"{self.name} quartertime started")
+        self.quartertime = True
+        self.quartertime_timer = self.after_delay(
+            self.stop_quartertime, self.quartertime_timer, duration)
 
     def stop_halftime(self, *_):
         logger.info(f"{self.name} halftime stopped")
@@ -536,6 +559,10 @@ class Sample:
             return
         logger.info(f"{self.name} unmuted")
         self.muted = False
+
+        if step is not None and offset is not None:
+            self.partial_trigger(step, offset)
+
         if self.recording and not suppress_recording:
             logger.info(
                 f"{self.name} start mute interval [{self.elapsed_sequence_time()}, ]")
@@ -636,9 +663,9 @@ class Sample:
     def warn_dropped(self, dropped: list[SampleSlice], now: float):
         if (n := len(dropped)) == 0:
             return
-        dropped = dropped[0]
-        msg = f"{self.name} dropped {n}/{n+self.sound_queue.qsize()} samples stale by: {1000 * (now - dropped.start_time - self.timeout):10.6}ms for step {dropped.step}"
-        msg += f" sched. {datetime.fromtimestamp(dropped.start_time)}"
+        dropped_sample = dropped[0]
+        msg = f"{self.name} dropped {n}/{n+self.sound_queue.qsize()} samples stale by: {1000 * (now - dropped_sample.start_time - self.timeout):10.6}ms for step {dropped_sample.step}"
+        msg += f" sched. {datetime.fromtimestamp(dropped_sample.start_time)}"
         logger.debug(msg)
 
 
@@ -734,19 +761,16 @@ class Sample:
 
         logger.debug(
             f"{self.name} processing {datetime.fromtimestamp(qsound.start_time)}")
-        # todo: move these two returns past all the early "None" returns to facilitate consolidation in refactor
-        if self.channel is None:
-            logger.debug(f"{self.name}: played sample on new channel")
-            return self.play_step(self.play_sound_new_channel, qsound.sound, qsound.step, qsound.start_time)
+        # todo: move this return past all the early "None" returns to facilitate consolidation in refactor
         if in_play_window:
-            if self.channel.get_busy():
+            if self.channel and self.channel.get_busy() and playing_sound:
                 logger.warn(
                     f"{self.name} interrupted sample with {remaining_time(playing_sound)}s left")
                 logger.warn(
                     f"sample length {playing_sound.get_length()} vs step length {step_duration}")
             logger.debug(f"{self.name}: played sample")
-            return self.play_step(self.play_sound, qsound.sound, qsound.step, qsound.start_time)
-        if self.channel.get_queue() is None:
+            return self.step_player(qsound)
+        if self.channel and self.channel.get_queue() is None:
             predicted_finish = time.time() + remaining_time(playing_sound)
             max_start_discrepancy = 0.015
             if not should_queue(self.name, qsound, predicted_finish, max_start_discrepancy):
@@ -767,10 +791,11 @@ class Sample:
             return self.channel.get_sound()
         return None
 
-    def play_step(self, sound_player, sound, step: int, start_time: float):
+    def step_player(self, sample_slice: SampleSlice):
         def fn():
-            sound_player(sound)
-            return step, start_time
+            self.play_sound(sample_slice.sound)
+            self.played_steps.append(sample_slice)
+            return sample_slice.step, sample_slice.start_time
         return fn
 
     def play_sound(self, sound):
@@ -778,11 +803,9 @@ class Sample:
             self.play_sound_new_channel(sound)
         else:
             self.channel.play(sound)
-            self.played_buffer.append(sound)
             sound_data[sound].playtime = time.time()
 
     def play_sound_new_channel(self, sound):
-        self.played_buffer.append(sound)
         self.channel = sound.play()
         sound_data[sound].playtime = time.time()
         channels.add(self.channel)
@@ -802,7 +825,11 @@ class Sample:
         return slices
 
     def get_step_sound(self, step, t, source_step=None, force=False) -> SampleSlice | None:
-        # TODO
+        if self.latched_steps is not None and len(self.latched_steps) > 0:
+            sample_slice = self.latched_steps[0]
+            self.latched_steps.rotate(-1)
+            return SampleSlice(t, step, sample_slice.sound)
+
         spice_factor = 2 if self.spices_param.stretch_chance.toss(
             step) else 1
         rate = self.get_rate() / spice_factor
@@ -815,8 +842,10 @@ class Sample:
         if self.scatter_queue is not None:
             source_step = self.scatter_queue
             self.scatter_queue = None
+
         sound = sound_slices[(source_step // steps_per_slice) %
                              len(sound_slices)]
+
         fx = []
         if rate != 1:
             fx.append(lambda sound: timestretch(
