@@ -47,14 +47,14 @@ K_HT = 'w'
 K_TS_UP = 'ctrl.blah'
 K_ONESHOT = 'ctrl'
 K_TS_DOWN = 'space.blah'
-K_DTX = 'space'
+K_DTX = 'z'
 K_PITCH_UP = '3'
 K_PITCH_DOWN = 'e'
 
 K_SPICE_UP = '1'
 K_SPICE_DOWN = 'q'
 
-K_FX_CANCEL = 'z'
+K_FX_CANCEL = 'space'
 
 K_RECORD = 'enter'
 K_ERASE = 'alt'
