@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum
+import time
+from typing import Any
 
 import utility
 
@@ -46,6 +48,7 @@ class Lfo:
 
 class Param:
     def __init__(self, value, min_value=None, max_value=None, round=False) -> None:
+        self.gradient_start = None
         self.value = value
         self.default_value = value
         self.lfo: None | Lfo = None
@@ -123,6 +126,11 @@ class Param:
             value = max(value, self.min_value)
         if self.max_value is not None:
             value = min(value, self.max_value)
+        if self.gradient_start:
+            progress = max(1, (time.time() - self.gradient_start) / self.gradient_duration)
+            value += self.gradient_delta * progress
+            if progress == 1:
+                self.gradient_start = None
         if self.round:
             value = round(value)
         if value != self.last_value:
@@ -152,6 +160,12 @@ class Param:
                 handler(value)
         self.value = value
         return changed
+
+    def set_gradient(self, start_value: float | int, end_value: float | int, duration: float):
+        self.set(start_value)
+        self.gradient_start = time.time()
+        self.gradient_delta = end_value - start_value
+        self.gradient_duration = duration
 
     def normalize(self, value, scale=1.0):
         if self.max_value is None or self.min_value is None:
