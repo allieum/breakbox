@@ -165,6 +165,12 @@ class Sample:
     ])
 
     @dataclass
+    class LatchRepeat:
+        steps: deque[SampleSlice]
+        timer: threading.Timer
+        is_rotating: bool = field(default=False)
+
+    @dataclass
     class Roll:
         last_hit: float
         sound: pygame.mixer.Sound
@@ -198,8 +204,7 @@ class Sample:
         self.step_repeat_was_muted = False
         self.step_repeat_timer = None
         self.played_steps: deque[SampleSlice] = deque(maxlen=Sample.slices_per_loop)
-        self.latched_steps: Optional[deque[SampleSlice]] = None
-        self.latch_timer: Optional[threading.Timer] = None
+        self.latch: Optional[Sample.LatchRepeat] = None
 
         self.roll: Sample.Roll | None = None
 
@@ -313,18 +318,19 @@ class Sample:
                          slice_i, self.roll.sound, self.roll.pitch_delta))
 
     # TODO maybe all step repeat could be implemented with latch?
-    def start_latch_repeat(self, length, restart=False, duration=None):
-        self.latch_timer = self.after_delay(self.stop_latch_repeat, self.latch_timer, duration)
-        if self.latched_steps and not restart:
-            logger.info(f"{self.name} already latched {self.latched_steps}, skipping new latch of length {length}")
+    def start_latch_repeat(self, length: int, duration: Optional[float]=None):
+        if self.latch:
+            self.latch.timer = self.after_delay(self.stop_latch_repeat, self.latch.timer, duration)
             return
         if len(self.played_steps) < length:
             logger.info(f"{self.name} not enough recent steps to start latch repeat")
             return
-        self.latched_steps = deque(self.played_steps, maxlen=length)
+        timer = self.after_delay(self.stop_latch_repeat, None, duration)
+        latched_steps = deque(self.played_steps, maxlen=length)
+        self.latch = Sample.LatchRepeat(latched_steps, timer)
 
     def stop_latch_repeat(self):
-        self.latched_steps = None
+        self.latch = None
 
     def pitch_mod(self, delta, step, duration=None):
         self.step_repeat_start(step, 1, duration)
@@ -827,9 +833,13 @@ class Sample:
         return slices
 
     def get_step_sound(self, step, t, source_step=None, force=False) -> SampleSlice | None:
-        if self.latched_steps is not None and len(self.latched_steps) > 0:
-            sample_slice = self.latched_steps[0]
-            self.latched_steps.rotate(-1)
+        # TODO LatchRepeat method to get SampleSlice
+        if self.latch:
+            sample_slice = self.latch.steps[0]
+            if self.latch.is_rotating:
+                self.latch.steps.rotate(-1)
+            elif step % len(self.latch.steps) == sample_slice.step % len(self.latch.steps):
+                self.latch.is_rotating = True
             return SampleSlice(t, step, sample_slice.sound)
 
         spice_factor = 2 if self.spices_param.stretch_chance.toss(
