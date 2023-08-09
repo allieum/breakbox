@@ -166,8 +166,9 @@ class Sample:
 
     @dataclass
     class LatchRepeat:
-        steps: deque[SampleSlice]
-        timer: threading.Timer
+        steps: deque[SampleSlice] = field(default_factory=deque)
+        timer: threading.Timer = field(default_factory=lambda: threading.Timer(0, lambda: 0))
+        active: bool = field(default=False)
         is_rotating: bool = field(default=False)
 
     @dataclass
@@ -204,7 +205,7 @@ class Sample:
         self.step_repeat_was_muted = False
         self.step_repeat_timer = None
         self.played_steps: deque[SampleSlice] = deque(maxlen=Sample.slices_per_loop)
-        self.latch: Optional[Sample.LatchRepeat] = None
+        self.latch = Sample.LatchRepeat()
 
         self.roll: Sample.Roll | None = None
 
@@ -319,7 +320,7 @@ class Sample:
 
     # TODO maybe all step repeat could be implemented with latch?
     def start_latch_repeat(self, length: int, duration: Optional[float]=None):
-        if self.latch:
+        if self.latch.active:
             self.latch.timer = self.after_delay(self.stop_latch_repeat, self.latch.timer, duration)
             return
         if len(self.played_steps) < length:
@@ -327,10 +328,10 @@ class Sample:
             return
         timer = self.after_delay(self.stop_latch_repeat, None, duration)
         latched_steps = deque(self.played_steps, maxlen=length)
-        self.latch = Sample.LatchRepeat(latched_steps, timer)
+        self.latch = Sample.LatchRepeat(latched_steps, timer, active=True)
 
     def stop_latch_repeat(self):
-        self.latch = None
+        self.latch.active = False
 
     def pitch_mod(self, delta, step, duration=None):
         self.step_repeat_start(step, 1, duration)
@@ -592,9 +593,9 @@ class Sample:
         next_sound = self.get_step_sound(step + 1, time.time(), force=True)
         self.queue_sound(next_sound)
 
-    def after_delay(self, action, timer: threading.Timer | None, duration):
+    def after_delay(self, action, timer: threading.Timer | None, duration) -> threading.Timer:
         if duration is None:
-            return None
+            return threading.Timer(0, lambda: 0)
         if timer is not None:
             timer.cancel()
         timer = threading.Timer(duration, action)
@@ -834,11 +835,20 @@ class Sample:
 
     def get_step_sound(self, step, t, source_step=None, force=False) -> SampleSlice | None:
         # TODO LatchRepeat method to get SampleSlice
-        if self.latch:
+        if self.latch.active:
             sample_slice = self.latch.steps[0]
+            # TODO could get rid of is_rotating? check step alignment instead
             if self.latch.is_rotating:
                 self.latch.steps.rotate(-1)
-            elif step % len(self.latch.steps) == sample_slice.step % len(self.latch.steps):
+            else:
+                length = len(self.latch.steps)
+                count = 0
+                while step % length != sample_slice.step % length:
+                    count += 1
+                    if count > len(self.latch.steps):
+                        break
+                    self.latch.steps.rotate(-1)
+                    sample_slice = self.latch.steps[0]
                 self.latch.is_rotating = True
             return SampleSlice(t, step, sample_slice.sound)
 
