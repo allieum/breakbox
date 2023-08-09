@@ -108,6 +108,7 @@ def update():
                     # smpl.step_repeat_start(
                     #     sequence.step, 4, duration=hit_gate * 2)
                     smpl.start_latch_repeat(4, duration=hit_gate * 4)
+                    hit_gate *= 1.5
                 case DtxPad.TOM3:
                     if dtxpad.roll_detected():
                         smpl.looping = not smpl.looping
