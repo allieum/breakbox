@@ -55,7 +55,7 @@ def update():
     sequence.update(midi_status)
     sample.play_samples(sequence.step_duration())
     sample_states = [sample.SampleState.of(
-        s, keys.selected_sample, sequence.step, i) for i, s in enumerate(sample.current_samples())]
+        s, keys.selected_sample, sequence.step, i, dtxpro.selected_sample) for i, s in enumerate(sample.current_samples())]
     dtxpro.update()
 
     # if lights.refresh_ready(samples_on):
@@ -113,26 +113,28 @@ def update():
                     if dtxpad.roll_detected():
                         smpl.looping = not smpl.looping
                 case DtxPad.CRASH1:
-                    smpl.pitch_mod(1, sequence.step, duration=hit_gate)
+                    smpl.pitch_mod(1, sequence.step, duration=hit_gate * 1.5)
                 case DtxPad.CRASH2:
-                    smpl.pitch_mod(-1, sequence.step, duration=hit_gate)
+                    smpl.pitch_mod(-1, sequence.step, duration=hit_gate * 1.5)
                 case DtxPad.RIDE:
-                    max_velocity = 127
-                    intensity = velocity / max_velocity
-                    gate = 0.1 + 1 - intensity
-                    smpl.gate.set_gradient(gate, 1, duration=hit_gate * 2)
-
-                    gate_period = 2 if dtxpad.hit_count < 5 else 1
-                    smpl.gate_period.set(gate_period)
-                    smpl.update_gates()
                     hit_gate *= 2
+                    pass
+                    # max_velocity = 127
+                    # intensity = velocity / max_velocity
+                    # gate = 0.1 + 1 - intensity
+                    # smpl.gate.set_gradient(gate, 1, duration=hit_gate * 2)
+
+                    # gate_period = 2 if dtxpad.hit_count < 5 else 1
+                    # smpl.gate_period.set(gate_period)
+                    # smpl.update_gates()
+                    # hit_gate *= 2
 
             smpl.unmute(duration=hit_gate, step=(sequence.step - 1) %
                         sequence.steps, offset=offset)
             logger.info(f"hit combo: {dtxpro.total_hit_count()}")
-            spiciness = dtxpro.total_hit_count() / dtxpro.PRO_HIT_COUNT
-            if spiciness > smpl.spice_level.get():
-                smpl.spice_level.set_gradient(spiciness, 0, 5)
+            # spiciness = dtxpro.total_hit_count() / dtxpro.PRO_HIT_COUNT
+            # if spiciness > smpl.spice_level.get():
+            #     smpl.spice_level.set_gradient(spiciness, 0, 5)
     elif midi.is_control_change(midi_status):
         logger.info(
             f"received CC #{(cc_num := midi_data[0])}: {(cc_value := midi_data[1])}")

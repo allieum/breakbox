@@ -45,16 +45,18 @@ class SampleState:
     length: float = field(default=0, compare=False)
     steps: int = field(default=0, compare=False)
     selected: bool = field(default=False)
+    dtx_selected: bool = field(default=False)
     recording: bool = field(default=False)
     step: int | None = field(compare=False, default=None)
     pad: int = field(default=0)
 
     @staticmethod
-    def of(sample: 'Sample', selected_sample: Optional['Sample'], step, pad):
+    def of(sample: 'Sample', selected_sample: Optional['Sample'], step, pad, dtx_selected_sample: Optional['Sample']):
         if sample is None:
             return SampleState()
 
         selected = selected_sample == sample
+        dtx_selected = dtx_selected_sample == sample
         length = sum(s.get_length() for s in sample.get_sound_slices())
         length = sample.sound.get_length()
         steps = len(sample.sound_slices)
@@ -65,7 +67,7 @@ class SampleState:
         length *= (1 - progress)
         length -= 0.5
         return SampleState(sample.is_playing(), sample.bank,
-                           length, steps, selected, sample.recording, step, pad)
+                           length, steps, selected, dtx_selected, sample.recording, step, pad)
 
 
 @dataclass
@@ -560,8 +562,8 @@ class Sample:
         logger.info(f"{self.name} unmuted")
         self.muted = False
 
-        if step is not None and offset is not None:
-            self.partial_trigger(step, offset)
+        # if step is not None and offset is not None:
+        #     self.partial_trigger(step, offset)
 
         if self.recording and not suppress_recording:
             logger.info(
