@@ -30,13 +30,41 @@ pygame.mixer.init(frequency=SAMPLE_RATE, buffer=256, channels=1)
 pygame.mixer.set_num_channels(32)
 logger.info(pygame.mixer.get_init())
 
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
-def set_bank(i):
-    old_samples = current_samples()
-    bank.set(i)
-    for new_sample, old_sample in zip(current_samples(), old_samples, strict=True):
+
+# TODO: does it make sense to create banks.py for sample loading / selection?
+#
+loaded_samples = []
+sample_banks = []
+channels = set()
+def load_samples():
+    for i in range(1, NUM_BANKS + 1):
+        sample_dir = f'{dir_path}/samples/{i}'
+        sample_banks.append(bnk := [])
+        for f in sorted(os.listdir(sample_dir)):
+            if m := re.fullmatch(r"([0-9]{2,3}).+.wav", f):
+                # print(f)
+                bpm = int(m.group(1))
+                bnk.append(Sample(f"{sample_dir}/{m.group()}", bpm, i - 1))
+            else:
+                logger.warn(f"wrong filename format for {f}, not loaded")
+        logger.info([s.name for s in bnk])
+    load_bank(0)
+
+
+def all_samples() -> list['Sample']:
+    return functools.reduce(lambda a, b: a + b, sample_banks)
+
+def load_bank(bank_index):
+    global loaded_samples
+    old_samples = loaded_samples
+    bank.set(bank_index)
+    loaded_samples = sample_banks[bank_index].copy()
+    if len(old_samples) == 0:
+        return
+    for new_sample, old_sample in zip(loaded_samples, old_samples, strict=True):
         new_sample.swap_channel(old_sample)
-
 
 @dataclass
 class SampleState:
@@ -124,34 +152,6 @@ def write_wav(soundbytes, filename):
         channels=1,
     ).export(filename, format='wav')
 
-
-dir_path = os.path.dirname(os.path.realpath(__file__))
-sample_banks = []
-
-
-def load_samples():
-    for i in range(1, NUM_BANKS + 1):
-        sample_dir = f'{dir_path}/samples/{i}'
-        sample_banks.append(bnk := [])
-        for f in sorted(os.listdir(sample_dir)):
-            if m := re.fullmatch(r"([0-9]{2,3}).+.wav", f):
-                # print(f)
-                bpm = int(m.group(1))
-                bnk.append(Sample(f"{sample_dir}/{m.group()}", bpm, i - 1))
-            else:
-                logger.warn(f"wrong filename format for {f}, not loaded")
-        logger.info([s.name for s in bnk])
-
-
-def current_samples() -> list['Sample']:
-    return sample_banks[bank.get()]
-
-
-def all_samples() -> list['Sample']:
-    return functools.reduce(lambda a, b: a + b, sample_banks)
-
-
-channels = set()
 
 
 class Sample:
@@ -978,7 +978,7 @@ def play_samples(step_duration):
     logger.debug("playing samples")
     now = time.time()
     play_hooks = [s.process_queue(now, step_duration)
-                  for s in current_samples()]
+                  for s in loaded_samples]
     played_steps = [hook() if hook else hook for hook in play_hooks]
     if any(played_steps):
         logger.debug(played_steps_string(played_steps))
@@ -997,29 +997,29 @@ def played_steps_string(played_steps):
 
 
 def queues_empty():
-    return all([s.sound_queue.qsize() == 0] for s in current_samples())
+    return all([s.sound_queue.qsize() == 0] for s in loaded_samples)
 
 
 def queue_samples(step, t, step_duration):
-    for sample in current_samples():
+    for sample in loaded_samples:
         sample.queue_step(step, t, step_duration)
 
 
 def queues_to_string():
     s = "\n============\n"
-    for sample in current_samples():
+    for sample in loaded_samples:
         s += " " + "o" * sample.sound_queue.qsize() + "\n"
         s += "============\n"
     return s
 
 
 def step_repeat_stop(length):
-    for sample in [s for s in current_samples() if length in s.step_repeat_lengths]:
+    for sample in [s for s in loaded_samples if length in s.step_repeat_lengths]:
         sample.step_repeat_stop(length)
 
 
 def stop_halftime():
-    for s in current_samples():
+    for s in loaded_samples:
         s.stop_stretch()
 
 

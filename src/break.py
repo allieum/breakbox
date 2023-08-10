@@ -55,7 +55,7 @@ def update():
     sequence.update(midi_status)
     sample.play_samples(sequence.step_duration())
     sample_states = [sample.SampleState.of(
-        s, keys.selected_sample, sequence.step, i, dtxpro.selected_sample) for i, s in enumerate(sample.current_samples())]
+        s, keys.selected_sample, sequence.step, i, dtxpro.selected_sample) for i, s in enumerate(sample.loaded_samples)]
     dtxpro.update()
 
     # if lights.refresh_ready(samples_on):
@@ -69,7 +69,7 @@ def update():
         if (dtxpad := dtxpro.struck_pad(note_number)) is not None and velocity != 0:
             smpl = keys.selected_sample if not dtxpro.selected_sample else dtxpro.selected_sample
             if smpl is None:
-                keys.selected_sample = sample.current_samples()[0]
+                keys.selected_sample = sample.loaded_samples[0]
                 smpl = keys.selected_sample
 
             if not sequence.is_started:

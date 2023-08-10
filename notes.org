@@ -1,8 +1,7 @@
 #+title: Notes
 
 
-should cancel fx on hitting ride?
-
+sample flipping on single channel
 
 
 fx on latch

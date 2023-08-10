@@ -45,7 +45,8 @@ K_QT = '2'
 K_HT = 'w'
 # K_TS_UP = 'ctrl'
 K_TS_UP = 'ctrl.blah'
-K_ONESHOT = 'ctrl'
+K_ONESHOT = 'ctrl.blahh'
+K_FLIP = 'ctrl'
 K_TS_DOWN = 'space.blah'
 K_DTX = 'z'
 K_PITCH_UP = '3'
@@ -89,17 +90,19 @@ selected_sample = None
 selected_effects = []
 key_held = defaultdict(bool)
 
+sample_flip_counts = [0] * len(SAMPLE_KEYS)
+
 
 def select_sample(i):
     global selected_sample
     bank = (i // sample.BANK_SIZE) % sample.NUM_BANKS
     if bank != sample.bank.get():
-        sample.set_bank(bank)
+        sample.load_bank(bank)
     selected_sample = sample.all_samples()[i % len(sample.all_samples())]
 
 
 def get_activated_samples():
-    return [sample.current_samples()[i] for i, k in enumerate(SAMPLE_KEYS) if key_held[(k)]]
+    return [sample.loaded_samples[i] for i, k in enumerate(SAMPLE_KEYS) if key_held[(k)]]
 
 
 def pitch_down_mod(s):
@@ -115,10 +118,10 @@ def pitch_up_mod(s):
 persist_fx_count = 0
 
 
-def momentary_fx_press(handler, shift_persist=True, autoplay_sample=True):
+def momentary_fx_press(handler, shift_persist=True, autoplay_sample=True, retrigger=False):
     def fxpress(is_repeat, *args):
         global persist_fx_count
-        if selected_sample is None or is_repeat:
+        if selected_sample is None or is_repeat and not retrigger:
             return
         if autoplay_sample:
             selected_sample.mute_override = True
@@ -202,7 +205,7 @@ def pitch_down_release(selected):
 
 def is_pushed(s: sample.Sample):
     try:
-        i = sample.current_samples().index(s)
+        i = sample.loaded_samples.index(s)
         return key_held[SAMPLE_KEYS[i]]
     except ValueError:
         return False
@@ -214,7 +217,7 @@ def sample_press(i, is_repeat):
     if is_repeat:
         return None
 
-    chosen_sample = sample.current_samples()[i]
+    chosen_sample = sample.loaded_samples[i]
 
     if key_held[K_DTX]:
         if dtxpro.selected_sample and dtxpro.selected_sample is not chosen_sample:
@@ -224,9 +227,9 @@ def sample_press(i, is_repeat):
         return
 
     prev_selected = selected_sample
-    if prev_selected and sample.current_samples()[i] != prev_selected:
+    if prev_selected and sample.loaded_samples[i] != prev_selected:
         logger.info(
-            f"{prev_selected.name} clearing active effects, switch to {sample.current_samples()[i].name}")
+            f"{prev_selected.name} clearing active effects, switch to {sample.loaded_samples[i].name}")
         logger.info(
             f"{prev_selected.name} looping = {prev_selected.looping}, {selected_effects}")
         for effect in selected_effects:
@@ -270,7 +273,7 @@ def sample_press(i, is_repeat):
 
 
 def sample_release(i):
-    s = sample.current_samples()[i]
+    s = sample.loaded_samples[i]
     if is_current := s == selected_sample:
         selected_effects.clear()
     if not s.looping and not (is_current and any(key_held[k] for k in AUTOPLAY_KEYS)):
@@ -286,7 +289,7 @@ def shift_press(repeat):
     persist_fx_count += fx_keys_pressed
     if persist_fx_count > 0 and selected_sample is not None:
         selected_sample.looping = True
-    for s in [sample.current_samples()[i] for i, k in enumerate(SAMPLE_KEYS) if key_held[k]]:
+    for s in [sample.loaded_samples[i] for i, k in enumerate(SAMPLE_KEYS) if key_held[k]]:
         s.looping = True
         logger.info(f"{s.name} set looping to {s.looping}")
     if key_held[K_FX_CANCEL]:
@@ -382,7 +385,7 @@ def fx_cancel_press(repeat, shift=None):
     if repeat:
         return
     if shift:
-        for s in sample.current_samples():
+        for s in sample.loaded_samples:
             s.cancel_fx()
     elif selected_sample is not None:
         selected_sample.cancel_fx()
@@ -423,6 +426,20 @@ def make_handler(handler, x):
         handler(x, *args)
     return f
 
+def flip_press(selected: sample.Sample):
+    global selected_sample
+    try:
+        sample_index = sample.loaded_samples.index(selected)
+    except ValueError:
+        return
+    sample_flip_counts[sample_index] += 1
+    bank_offset = sample_flip_counts[sample_index]
+    flipped_sample = sample.sample_banks[bank_offset % sample.NUM_BANKS][sample_index]
+    flipped_sample.swap_channel(selected)
+    sample.loaded_samples[sample_index] = flipped_sample
+    logger.info(f"swapping out {selected.name} for {flipped_sample.name}")
+    selected_sample = flipped_sample
+
 
 press = {
     K_TS_UP: increase_ts_time,
@@ -439,6 +456,7 @@ press = {
     K_GATE_PERIOD_UP: gate_period_up_press,
     K_DICE_DOWN: dice_press,
     K_DICE_UP: dice_press,
+    K_FLIP: momentary_fx_press(flip_press, shift_persist=False, retrigger=True),
     # K_GATE_INVERT: gate_invert_press,
     # K_GATE_FOLLOW: gate_follow_press,
     K_SHIFT: shift_press,
@@ -482,7 +500,7 @@ def key_pressed(e):
 
     if e.name == K_STOP:
         # cancel held keys
-        for s in sample.current_samples():
+        for s in sample.loaded_samples:
             s.mute()
             s.clear_sound_queue()
             if s.channel and (sound := s.channel.get_sound()):
@@ -492,12 +510,11 @@ def key_pressed(e):
             sequence.stop_internal()
 
     if e.name == K_NEXT_BANK:
-        old_samples = sample.current_samples()
         delta = -1 if key_held[K_SHIFT] else 1
-        sample.bank.set((sample.bank.get() + delta) % sample.NUM_BANKS)
-        for new_sample, old_sample in zip(sample.current_samples(), old_samples, strict=True):
-            # old_sample.looping = False
-            new_sample.swap_channel(old_sample)
+        new_bank = (sample.bank.get() + delta) % sample.NUM_BANKS
+        sample.load_bank(new_bank)
+        for i in range(len(sample_flip_counts)):
+            sample_flip_counts[i] = 0
         selected_sample = None
         dtxpro.selected_sample = None
 

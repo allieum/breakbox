@@ -94,7 +94,7 @@ def update_dmx(step, note_number=None):
 
     Light.scale(0.8)
 
-    for i, s in enumerate(sample.current_samples()):
+    for i, s in enumerate(sample.loaded_samples):
         if s.channel and s.channel.get_busy():
             source_step = sample.sound_data[s.channel.get_sound()].source_step
             if source_step != sequence.step:
