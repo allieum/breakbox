@@ -1,9 +1,11 @@
 # Yamaha DTX-pro drum module
+import random
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from sample import Sample
 
+import sample
+from sample import Sample
 from utility import get_logger
 
 logger = get_logger(__name__)
@@ -136,3 +138,53 @@ def update_bank(cc_num, cc_val):
 # gate_period = 2 if dtxpad.hit_count < 5 else 1
 # smpl.gate_period.set(gate_period)
 # smpl.update_gates()
+
+def hit_dtx_pad(keys, sequence, dtxpad, velocity):
+    smpl = selected_sample if selected_sample else keys.selected_sample
+    if smpl is None:
+        keys.selected_sample = sample.loaded_samples[0]
+        smpl = keys.selected_sample
+
+    if not sequence.is_started:
+        sequence.start_internal()
+
+    step_time = sequence.step_duration()
+    unmute_time = 2 * step_time
+
+    # todo: move to dtxpro.py
+    # logger.info(f"hit DTX pad {dtxpad}")
+    match dtxpad.pad:
+        case DtxPad.SNARE:
+            smpl.drum_trigger(sequence.step)
+        case DtxPad.HAT:
+            logger.info(f"hit hat")
+            step = min(63, round(random.random() * 64))
+            smpl.scatter_queue = step
+        case DtxPad.CLOSED_HAT:
+            logger.info(f"closed hat")
+            smpl.dice()
+            smpl.spice_level.set_gradient(1, 0, 5)
+        case DtxPad.TOM1:
+            velocity_threshold = 40
+            if velocity < velocity_threshold:
+                unmute_time *= 2
+                smpl.start_halftime(duration=unmute_time)
+            else:
+                unmute_time *= 4
+                smpl.start_quartertime(duration=unmute_time)
+        case DtxPad.TOM2:
+            smpl.start_latch_repeat(4, duration=unmute_time * 4)
+            unmute_time *= 1.5
+        case DtxPad.TOM3:
+            if dtxpad.roll_detected():
+                smpl.looping = not smpl.looping
+        case DtxPad.CRASH1:
+            smpl.pitch_mod(1, sequence.step, duration=unmute_time * 1.5)
+        case DtxPad.CRASH2:
+            smpl.pitch_mod(-1, sequence.step, duration=unmute_time * 1.5)
+        case DtxPad.RIDE:
+            unmute_time *= 2
+            smpl.stop_latch_repeat()
+            smpl.stop_stretch()
+    smpl.unmute(duration=unmute_time)
+    logger.debug(f"hit combo: {total_hit_count()}")
