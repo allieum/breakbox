@@ -75,16 +75,11 @@ def update():
             if not sequence.is_started:
                 sequence.start_internal()
 
-            last_step_time = sequence.step_time(
-                sequence.step) - sequence.step_duration()
-            offset = time.time() - last_step_time
-            if offset > sequence.step_duration():
-                offset -= sequence.step_duration()
-
-            hit_gate = 2 * sequence.step_duration() - offset
+            step_time = sequence.step_duration()
+            unmute_time = 2 * step_time
 
             # todo: move to dtxpro.py
-            logger.info(f"hit DTX pad {dtxpad}")
+            # logger.info(f"hit DTX pad {dtxpad}")
             match dtxpad.pad:
                 case DtxPad.SNARE:
                     smpl.drum_trigger(sequence.step)
@@ -99,51 +94,27 @@ def update():
                 case DtxPad.TOM1:
                     velocity_threshold = 40
                     if velocity < velocity_threshold:
-                        hit_gate *= 2
-                        smpl.start_halftime(duration=hit_gate)
+                        unmute_time *= 2
+                        smpl.start_halftime(duration=unmute_time)
                     else:
-                        hit_gate *= 4
-                        smpl.start_quartertime(duration=hit_gate)
+                        unmute_time *= 4
+                        smpl.start_quartertime(duration=unmute_time)
                 case DtxPad.TOM2:
-                    # smpl.step_repeat_start(
-                    #     sequence.step, 4, duration=hit_gate * 2)
-                    smpl.start_latch_repeat(4, duration=hit_gate * 4)
-                    hit_gate *= 1.5
+                    smpl.start_latch_repeat(4, duration=unmute_time * 4)
+                    unmute_time *= 1.5
                 case DtxPad.TOM3:
                     if dtxpad.roll_detected():
                         smpl.looping = not smpl.looping
                 case DtxPad.CRASH1:
-                    smpl.pitch_mod(1, sequence.step, duration=hit_gate * 1.5)
+                    smpl.pitch_mod(1, sequence.step, duration=unmute_time * 1.5)
                 case DtxPad.CRASH2:
-                    smpl.pitch_mod(-1, sequence.step, duration=hit_gate * 1.5)
+                    smpl.pitch_mod(-1, sequence.step, duration=unmute_time * 1.5)
                 case DtxPad.RIDE:
-                    hit_gate *= 2
-                    pass
-                    # max_velocity = 127
-                    # intensity = velocity / max_velocity
-                    # gate = 0.1 + 1 - intensity
-                    # smpl.gate.set_gradient(gate, 1, duration=hit_gate * 2)
-
-                    # gate_period = 2 if dtxpad.hit_count < 5 else 1
-                    # smpl.gate_period.set(gate_period)
-                    # smpl.update_gates()
-                    # hit_gate *= 2
-
-            smpl.unmute(duration=hit_gate, step=(sequence.step - 1) %
-                        sequence.steps, offset=offset)
-            logger.info(f"hit combo: {dtxpro.total_hit_count()}")
-            # spiciness = dtxpro.total_hit_count() / dtxpro.PRO_HIT_COUNT
-            # if spiciness > smpl.spice_level.get():
-            #     smpl.spice_level.set_gradient(spiciness, 0, 5)
-    # elif midi.is_control_change(midi_status):
-    #     logger.info(
-    #         f"received CC #{(cc_num := midi_data[0])}: {(cc_value := midi_data[1])}")
-    #     dtxpro.update_bank(cc_num, cc_value)
-    # elif midi.is_program_change(midi_status):
-    #     prog_num = midi_data[0]
-    #     kit = dtxpro.kit_index(prog_num)
-    #     logger.info(f"received program change {prog_num} -> {kit}")
-    #     keys.select_sample(kit)
+                    unmute_time *= 2
+                    smpl.stop_latch_repeat()
+                    smpl.stop_stretch()
+            smpl.unmute(duration=unmute_time)
+            logger.debug(f"hit combo: {dtxpro.total_hit_count()}")
 
     try:
         lights.q.put(sample_states, block=False)

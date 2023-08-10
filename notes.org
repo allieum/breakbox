@@ -1,6 +1,11 @@
 #+title: Notes
 
 
+should cancel fx on hitting ride?
+
+
+
+fx on latch
 cpu usage???
 joy stick
 maybe never, but try do gate mirroring strictly tied to current volume / play status a la lights

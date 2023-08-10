@@ -84,7 +84,7 @@ def hit_count(dtx_pad: DtxPad):
 def struck_pad(note_number) -> DrumPad | None:
     if any(note_number in (drum_pad := p).note_numbers for p in pads):
         drum_pad.register_hit()
-        logger.info(f"got dtx note {note_number}")
+        logger.debug(f"got dtx note {note_number}")
         return drum_pad
     return None
 
@@ -109,3 +109,30 @@ def update_bank(cc_num, cc_val):
     global bank_lsb
     if cc_num == 32:
         bank_lsb = cc_val
+
+#
+# nonsense pile
+#
+
+# spiciness = dtxpro.total_hit_count() / dtxpro.PRO_HIT_COUNT
+# if spiciness > smpl.spice_level.get():
+#     smpl.spice_level.set_gradient(spiciness, 0, 5)
+# elif midi.is_control_change(midi_status):
+#     logger.info(
+#         f"received CC #{(cc_num := midi_data[0])}: {(cc_value := midi_data[1])}")
+#     dtxpro.update_bank(cc_num, cc_value)
+# elif midi.is_program_change(midi_status):
+#     prog_num = midi_data[0]
+#     kit = dtxpro.kit_index(prog_num)
+#     logger.info(f"received program change {prog_num} -> {kit}")
+#     keys.select_sample(kit)
+#
+#
+# max_velocity = 127
+# intensity = velocity / max_velocity
+# gate = 0.1 + 1 - intensity
+# smpl.gate.set_gradient(gate, 1, duration=hit_gate * 2)
+
+# gate_period = 2 if dtxpad.hit_count < 5 else 1
+# smpl.gate_period.set(gate_period)
+# smpl.update_gates()

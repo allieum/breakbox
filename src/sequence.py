@@ -48,19 +48,20 @@ class Sequence:
     def start_internal(self):
         self.internal_start_time = time.time()
         self._start()
-        print("starting internal clock")
+        logger.info("starting internal clock")
 
     def stop_internal(self):
         if not self.is_internal():
             return
         self.internal_start_time = None
         self._stop()
-        print("stopping internal clock")
+        logger.info("stopping internal clock")
 
     def is_internal(self):
         return self.internal_start_time is not None
 
     def start_midi(self):
+        logger.info("starting midi clock")
         self.stop_internal()
         self.midi_started = True
         self._start()
@@ -86,6 +87,7 @@ class Sequence:
                 logger.info(f"midi bpm changed to {bpm} on step {self.step}")
 
     def stop_midi(self):
+        logger.info("stopping midi clock")
         self.midi_started = False
         self._stop()
 
@@ -118,7 +120,7 @@ class Sequence:
                     self.update_midi_bpm(now)
                     self.last_midi_beat = now
                 if self.clock_count % (clocks_per_quarter_note / STEPS_PER_BEAT) == 0:
-                    self.step_forward(time.time())
+                    self.step_forward(now)
 
         prev = self.last_queued_step
         next_steps = (self.inc(prev), self.inc(prev, 2), self.inc(prev, 3))

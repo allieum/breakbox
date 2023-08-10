@@ -449,12 +449,13 @@ class Sample:
 
     def cancel_fx(self):
         logger.info(f"{self.name} cancelling sample fx")
-        self.step_repeat_stop()
         self.pitch.restore_default()
         self.spice_level.restore_default()
         self.volume.restore_default()
         self.default_gates()
+        self.stop_latch_repeat()
         self.stop_stretch()
+        self.step_repeat_stop()
         for i, sound in enumerate(self.sound_slices):
             self.sound_slices[i] = self.source_sound(sound)
 
@@ -566,7 +567,7 @@ class Sample:
             self.mute, self.mute_timer, duration)
         if not self.is_muted():
             return
-        logger.info(f"{self.name} unmuted")
+        logger.info(f"{self.name} unmuted duration={duration}")
         self.muted = False
 
         # if step is not None and offset is not None:
