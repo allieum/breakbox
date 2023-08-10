@@ -135,15 +135,15 @@ def update():
             # spiciness = dtxpro.total_hit_count() / dtxpro.PRO_HIT_COUNT
             # if spiciness > smpl.spice_level.get():
             #     smpl.spice_level.set_gradient(spiciness, 0, 5)
-    elif midi.is_control_change(midi_status):
-        logger.info(
-            f"received CC #{(cc_num := midi_data[0])}: {(cc_value := midi_data[1])}")
-        dtxpro.update_bank(cc_num, cc_value)
-    elif midi.is_program_change(midi_status):
-        prog_num = midi_data[0]
-        kit = dtxpro.kit_index(prog_num)
-        logger.info(f"received program change {prog_num} -> {kit}")
-        keys.select_sample(kit)
+    # elif midi.is_control_change(midi_status):
+    #     logger.info(
+    #         f"received CC #{(cc_num := midi_data[0])}: {(cc_value := midi_data[1])}")
+    #     dtxpro.update_bank(cc_num, cc_value)
+    # elif midi.is_program_change(midi_status):
+    #     prog_num = midi_data[0]
+    #     kit = dtxpro.kit_index(prog_num)
+    #     logger.info(f"received program change {prog_num} -> {kit}")
+    #     keys.select_sample(kit)
 
     try:
         lights.q.put(sample_states, block=False)
