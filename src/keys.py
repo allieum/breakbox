@@ -427,6 +427,7 @@ def make_handler(handler, x):
     return f
 
 def flip_press(selected: sample.Sample):
+    # TODO try schedule flip for after next X steps?
     global selected_sample
     try:
         sample_index = sample.loaded_samples.index(selected)

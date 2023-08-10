@@ -320,12 +320,17 @@ class Sample:
 
     # TODO maybe all step repeat could be implemented with latch?
     def start_latch_repeat(self, length: int, duration: Optional[float]=None):
+        latch_delay_steps = 0
         if self.latch.active:
             self.latch.timer = self.after_delay(self.stop_latch_repeat, self.latch.timer, duration)
             return
-        if len(self.played_steps) < length:
+        if len(self.played_steps) < length + latch_delay_steps:
             logger.info(f"{self.name} not enough recent steps to start latch repeat")
             return
+        while latch_delay_steps > 0:
+            # discard latest steps to alter timing feel
+            self.played_steps.pop()
+            latch_delay_steps -= 1
         timer = self.after_delay(self.stop_latch_repeat, None, duration)
         latched_steps = deque(self.played_steps, maxlen=length)
         self.latch = Sample.LatchRepeat(latched_steps, timer, active=True)
@@ -733,35 +738,35 @@ class Sample:
             logger.debug(f"{self.name}: queue empty")
             return None
 
-        qsound = self.sound_queue.get()
+        sample_slice = self.sound_queue.get()
 
         dropped = []
-        while now > qsound.start_time + self.timeout:
-            dropped.append(qsound)
+        while now > sample_slice.start_time + self.timeout:
+            dropped.append(sample_slice)
             if self.sound_queue.empty():
                 self.warn_dropped(dropped, now)
                 return None
-            qsound = self.sound_queue.get()
+            sample_slice = self.sound_queue.get()
         self.warn_dropped(dropped, now)
 
-        in_play_window = now >= qsound.start_time - self.lookahead
-        in_queue_window = now >= qsound.start_time - self.lookahead - step_duration
+        in_play_window = now >= sample_slice.start_time - self.lookahead
+        in_queue_window = now >= sample_slice.start_time - self.lookahead - step_duration
         if not in_queue_window:
             logger.debug(f"{self.name}: too early for queue her")
-            self.sound_queue.put(qsound)
+            self.sound_queue.put(sample_slice)
             return None
         if not in_play_window and self.channel is None:
             logger.debug(f"{self.name}: too early for channel her")
-            self.sound_queue.put(qsound)
+            self.sound_queue.put(sample_slice)
             return None
 
         if self.channel and not self.channel.get_busy() and not in_play_window:
-            self.sound_queue.put(qsound)
+            self.sound_queue.put(sample_slice)
             return None
 
         if not in_play_window and self.channel and self.channel.get_busy() and self.channel.get_queue() is not None:
             logger.debug(f"{self.name}: channel full")
-            self.sound_queue.put(qsound)
+            self.sound_queue.put(sample_slice)
             return None
 
         if self.channel and not self.channel.get_busy() and self.channel.get_queue() is not None:
@@ -770,7 +775,7 @@ class Sample:
             self.channel.stop()
 
         logger.debug(
-            f"{self.name} processing {datetime.fromtimestamp(qsound.start_time)}")
+            f"{self.name} processing {datetime.fromtimestamp(sample_slice.start_time)}")
         # todo: move this return past all the early "None" returns to facilitate consolidation in refactor
         if in_play_window:
             if self.channel and self.channel.get_busy() and playing_sound:
@@ -779,21 +784,22 @@ class Sample:
                 logger.warn(
                     f"sample length {playing_sound.get_length()} vs step length {step_duration}")
             logger.debug(f"{self.name}: played sample")
-            return self.step_player(qsound)
+            return self.step_player(sample_slice)
         if self.channel and self.channel.get_queue() is None:
             predicted_finish = time.time() + remaining_time(playing_sound)
             max_start_discrepancy = 0.015
-            if not should_queue(self.name, qsound, predicted_finish, max_start_discrepancy):
-                self.sound_queue.put(qsound)
+            if not should_queue(self.name, sample_slice, predicted_finish, max_start_discrepancy):
+                self.sound_queue.put(sample_slice)
                 return None
-            self.channel.queue(qsound.sound)
-            sound_data[qsound.sound].playtime = predicted_finish
+            self.channel.queue(sample_slice.sound)
+            self.played_steps.append(sample_slice)
+            sound_data[sample_slice.sound].playtime = predicted_finish
             logger.debug(
-                f"{self.name}: queued sample on {self.channel} {qsound.t_string()} {qsound}")
+                f"{self.name}: queued sample on {self.channel} {sample_slice.t_string()} {sample_slice}")
             return None
 
         logger.info(f"{self.name} fell through, putting back on queue")
-        self.sound_queue.put(qsound)
+        self.sound_queue.put(sample_slice)
         return None
 
     def get_playing(self):
@@ -839,18 +845,18 @@ class Sample:
         if self.latch.active:
             sample_slice = self.latch.steps[0]
             # TODO could get rid of is_rotating? check step alignment instead
-            if self.latch.is_rotating:
-                self.latch.steps.rotate(-1)
-            else:
+            if not self.latch.is_rotating:
                 length = len(self.latch.steps)
                 count = 0
                 while step % length != sample_slice.step % length:
                     count += 1
                     if count > len(self.latch.steps):
+                        logger.warn(f"weirdly aligned latch! {list(map(lambda sample_slice: sample_slice.step, self.latch.steps))}")
                         break
                     self.latch.steps.rotate(-1)
                     sample_slice = self.latch.steps[0]
                 self.latch.is_rotating = True
+            self.latch.steps.rotate(-1)
             return SampleSlice(t, step, sample_slice.sound)
 
         spice_factor = 2 if self.spices_param.stretch_chance.toss(
