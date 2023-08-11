@@ -434,8 +434,20 @@ def flip_press(selected: sample.Sample):
     except ValueError:
         return
     sample_flip_counts[sample_index] += 1
-    bank_offset = sample_flip_counts[sample_index]
-    flipped_sample = sample.sample_banks[bank_offset % sample.NUM_BANKS][sample_index]
+    flip_count = sample_flip_counts[sample_index]
+    start_bank = selected.bank
+    total_flippable = sample.NUM_BANKS + len(sample.extra_samples)
+    # if bigger than banks
+    if sample_flip_counts[sample_index] >= total_flippable: # flipped all we can flop
+        sample_flip_counts[sample_index] = 0
+    flip_count = sample_flip_counts[sample_index]
+    if flip_count < sample.NUM_BANKS:
+        flipped_sample = sample.sample_banks[(start_bank + flip_count) % sample.NUM_BANKS][sample_index]
+    elif flip_count < total_flippable:
+        flipped_sample = sample.extra_samples[(sample_flip_counts[sample_index] - sample.NUM_BANKS) % len(sample.extra_samples)]
+    else:
+        return
+
     flipped_sample.swap_channel(selected)
     sample.loaded_samples[sample_index] = flipped_sample
     logger.info(f"swapping out {selected.name} for {flipped_sample.name}")
