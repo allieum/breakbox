@@ -2,3 +2,4 @@
 /.dir-locals.el
 *.reapeaks
 src/**/__pycache__/*.pyc
+/src/.dir-locals.el

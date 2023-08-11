@@ -1,3 +1,4 @@
+from collections import namedtuple
 import contextlib
 import time
 from dataclasses import dataclass
@@ -27,6 +28,8 @@ class ParamUpdate:
     def is_visible(self):
         return time.time() - self.time < UPDATE_LINGER
 
+Point = namedtuple("Point", ["x", "y"])
+Size = namedtuple("Size", ["w", "h"])
 
 REFRESH_RATE = 0.025
 UPDATE_LINGER = 3
@@ -169,11 +172,38 @@ def draw_param(draw, param: ParamUpdate):
 def draw_sample_icons(draw, sample_states: list[SampleState]):
     xpad = 10
     ypad = 10
+    y = ypad
     total_width = W - xpad * 2
+    heart_size = Size(15, 12)
+    big_dot_size = 10
+    lil_dot_size = 1
     for x, sample_state in zip(range(xpad, W - xpad + 1, total_width // 5), sample_states, strict=True):
-        size = 8 if sample_state.selected else 4
-        y = ypad - size // 2
-        fill = WHITE if sample_state.selected else BLACK
-        left = x - size // 2
-        draw.rounded_rectangle((left, y, left + size, y + size),
-                               radius=3, fill=fill, outline=WHITE)
+        position = Point(x, y)
+        if sample_state.dtx_selected:
+            draw_heart(draw, heart_size, position, WHITE)
+        if sample_state.selected:
+            draw_icon(draw, position, big_dot_size, fill=BLACK, outline=WHITE)
+        draw_icon(draw, position, lil_dot_size, fill=BLACK, outline=WHITE)
+
+
+def draw_icon(draw: ImageDraw.ImageDraw, position: Point, diameter, fill, outline):
+    r = diameter // 2
+    draw.ellipse((position.x - r, position.y - r, position.x + r, position.y + r),
+                  fill=fill, outline=outline, width=2)
+
+def draw_heart(draw: ImageDraw.ImageDraw, size: Size, position: Point, fill):
+    xmid = size.w // 2
+    ymid = size.h // 2
+    dx = position.x - xmid
+    dy = position.y - ymid
+    poly = [
+        Point(size.w / 10, size.h / 3),
+        Point(size.w / 10, 81 * size.h / 120),
+        Point(size.w / 2, size.h),
+        Point(size.w - size.w / 10, 81 * size.h / 120),
+        Point(size.w - size.w / 10, size.h / 3),
+    ]
+    trans_poly = [(point.x + dx, point.y + dy) for point in poly]
+    draw.polygon(trans_poly, fill=fill)
+    draw.ellipse((dx, dy,  size.w / 2 + dx, 3 * size.h / 4 + dy), fill=fill)
+    draw.ellipse((size.w / 2 + dx, dy,  size.w + dx, 3 * size.h / 4 + dy), fill=fill)
