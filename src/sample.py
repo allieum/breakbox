@@ -67,7 +67,8 @@ def load_if_wav(directory: str, filename: str, bank: int) -> Optional['Sample']:
         logger.warn(f"wrong filename format for {filename}, not loaded")
 
 def all_samples() -> list['Sample']:
-    return functools.reduce(lambda a, b: a + b, sample_banks)
+    bank_samples = functools.reduce(lambda a, b: a + b, sample_banks)
+    return bank_samples + extra_samples
 
 def load_current_bank(bank_index):
     global loaded_samples

@@ -453,7 +453,6 @@ def flip_press(selected: sample.Sample):
     logger.info(f"swapping out {selected.name} for {flipped_sample.name}")
     selected_sample = flipped_sample
 
-
 press = {
     K_TS_UP: increase_ts_time,
     K_TS_DOWN: decrease_ts_time,
