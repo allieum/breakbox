@@ -163,7 +163,7 @@ def run(lights_q: Queue):
     min_refresh = 2
     max_refresh = 0.010
     last_update = time.time()
-    sample_states = [SampleState()] * 6
+    sample_states: list[SampleState] = [SampleState()] * 6
     while True:
         # make a copy
         prev_samples = list(map(dataclasses.replace, sample_states))
@@ -179,7 +179,7 @@ def run(lights_q: Queue):
             # pulse on sample loop
             # strength = 0.1 if sample.selected else 0.3
             strength = 0.3
-            first_step = sample.step % sample.steps == 0
+            first_step = sample.step is not None and sample.step % sample.steps == 0
             new_step = prev.step != sample.step
             if sample.playing and new_step and first_step:
                 led.fade(palette[sample.bank % len(palette)],

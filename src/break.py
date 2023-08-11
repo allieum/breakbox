@@ -29,7 +29,7 @@ def on_key(e):
 keyboard.hook(on_key)
 
 # control.init()
-sample.load_samples()
+sample.load_samples_from_disk()
 display.init(sample.all_samples())
 midi.connect()
 
@@ -42,11 +42,6 @@ subs = [
 for sub in subs:
     sub.start()
 
-# blink.Light.set_brightness(50)
-# last_dmx = time.time()
-# last_dmx_step = None
-
-
 def update():
     # control.update()
     midi_status, midi_data = midi.get_status()
@@ -56,12 +51,7 @@ def update():
         s, keys.selected_sample, sequence.step, i, dtxpro.selected_sample) for i, s in enumerate(sample.loaded_samples)]
     dtxpro.update()
 
-    # if lights.refresh_ready(samples_on):
-    # lights.refreshing = True
-    # lights.update(samples_on)
-
     if midi.is_note_on(midi_status):
-        # logger.info(f"{data} {status}")
         note_number = midi_data[0]
         velocity = midi_data[1]
         if (dtxpad := dtxpro.struck_pad(note_number)) is not None and velocity != 0:

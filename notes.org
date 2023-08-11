@@ -1,10 +1,11 @@
 #+title: Notes
 
 
-sample flipping on single channel
-backup banks
-display drum selection
+backup banks !!!
+step indicator
+sample names on display
 
+improve doom docs for python std lib stuff
 
 fx on latch
 cpu usage???

@@ -1,8 +1,9 @@
 from collections import namedtuple
 import contextlib
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from multiprocessing import Queue
+from typing import Any, Optional
 
 import adafruit_ssd1306
 import board
@@ -10,7 +11,7 @@ import busio
 import utility
 from modulation import Param
 from PIL import Image, ImageDraw, ImageFont
-from sample import Sample, SampleState, bank
+from sample import Sample, SampleState, current_bank
 from sequence import sequence
 
 logger = utility.get_logger(__name__)
@@ -19,7 +20,7 @@ logger.setLevel("WARN")
 
 @dataclass
 class ParamUpdate:
-    name: str
+    name: Optional[str]
     value: str
     show_bar: bool
     fullness: float
@@ -27,6 +28,10 @@ class ParamUpdate:
 
     def is_visible(self):
         return time.time() - self.time < UPDATE_LINGER
+
+    def text(self):
+        label = f"{self.name}: " if self.name else ""
+        return label + str(self.value)
 
 Point = namedtuple("Point", ["x", "y"])
 Size = namedtuple("Size", ["w", "h"])
@@ -50,22 +55,22 @@ def init(samples: list[Sample]):
                 "gate", "gate_period", "spice_level",
                 "volume", "pitch"]:
             param = getattr(sample, param_name)
-            param.add_change_handler(on_param_changed(param, param_name))
-    bank.add_change_handler(on_param_changed(bank, "bank"))
-    sequence.bpm.add_change_handler(on_param_changed(sequence.bpm, "bpm", show_bar=False))
+            display_on_change(q, param, param_name, True)
+    display_on_change(q, current_bank, "bank", True)
+    display_on_change(q, sequence.bpm, "bpm")
 
 
-def on_param_changed(param: Param, name: str, show_bar=True):
+def display_on_change(display_q: 'Queue[list[SampleState] | ParamUpdate]', param: Param, name: Optional[str] = None, show_bar=False):
     def on_change(value):
         fullness = param.normalize(value) if show_bar else 0
         with contextlib.suppress(Exception):
-            q.put(ParamUpdate(name, value, show_bar, fullness, time.time()), block=False)
+            display_q.put(ParamUpdate(name, value, show_bar, fullness, time.time()), block=False)
 
         logger.info(f"updated param {param}")
-    return on_change
+    param.add_change_handler(on_change)
 
 
-def run(display_q: Queue):
+def run(display_q: 'Queue[list[SampleState] | ParamUpdate]'):
     try:
         i2c = busio.I2C(board.SCL, board.SDA)
         oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3d)
@@ -76,6 +81,8 @@ def run(display_q: Queue):
     last_refresh = time.time()
     last_text = None
     prev_sample_states = []
+    selected_sample_name = Param("juice_fruit.wav")
+    display_on_change(display_q, selected_sample_name)
     bpm = "BEYOND"
     last_changed_param = ParamUpdate("dummy", "hot", False, 0.69, 0)
 
@@ -91,8 +98,12 @@ def run(display_q: Queue):
             continue
         last_refresh = time.time()
 
+        if any(smpl.selected for smpl in sample_states
+                if selected_sample_name.get() != (selected_sample := smpl).name):
+            selected_sample_name.set(selected_sample.name)
+
         if last_changed_param.is_visible():
-            text = f"{last_changed_param.name}: {last_changed_param.value}"
+            text = last_changed_param.text()
         else:
             text = f"{bpm} bpm"
 
@@ -153,7 +164,7 @@ def draw_value_bar(draw, fullness):
 def draw_param(draw, param: ParamUpdate):
     # Load default font.
     name_font = ImageFont.truetype("DejaVuSans.ttf", size=12)
-    text = f"{param.name}: {param.value}"
+    text = param.text()
 
     (left, top, right, bottom) = name_font.getbbox(text)
     (font_width, font_height) = right - left, bottom - top

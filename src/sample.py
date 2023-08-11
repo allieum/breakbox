@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 NUM_BANKS = 10
 BANK_SIZE = 6
 SAMPLE_RATE = 22050
-bank = Param(0, min_value=0, max_value=NUM_BANKS - 1, round=True)
+current_bank = Param(0, min_value=0, max_value=NUM_BANKS - 1, round=True)
 
 pygame.mixer.init(frequency=SAMPLE_RATE, buffer=256, channels=1)
 pygame.mixer.set_num_channels(32)
@@ -32,34 +32,47 @@ logger.info(pygame.mixer.get_init())
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
+# samples other than those in main banks (can be swapped in)
+EXTRA_SAMPLES_DIR = f'{dir_path}/samples/extra'
 
 # TODO: does it make sense to create banks.py for sample loading / selection?
 #
-loaded_samples = []
-sample_banks = []
-channels = set()
-def load_samples():
-    for i in range(1, NUM_BANKS + 1):
-        sample_dir = f'{dir_path}/samples/{i}'
-        sample_banks.append(bnk := [])
-        for f in sorted(os.listdir(sample_dir)):
-            if m := re.fullmatch(r"([0-9]{2,3}).+.wav", f):
-                # print(f)
-                bpm = int(m.group(1))
-                bnk.append(Sample(f"{sample_dir}/{m.group()}", bpm, i - 1))
-            else:
-                logger.warn(f"wrong filename format for {f}, not loaded")
-        logger.info([s.name for s in bnk])
-    load_bank(0)
+loaded_samples: list['Sample'] = []
+extra_samples: list['Sample'] = []
+sample_banks: list[list['Sample']] = []
+channels: set[pygame.mixer.Channel] = set()
+def load_samples_from_disk():
+    global extra_samples
+    for bank_index in range(NUM_BANKS):
+        bank_number = bank_index +  1
+        sample_dir = f'{dir_path}/samples/{bank_number}'
+        files = sorted(os.listdir(sample_dir))
+        bank_samples = [smpl for file in files
+                        if (smpl := load_if_wav(sample_dir, file, bank_index))
+                            is not None]
+        sample_banks.append(bank_samples)
 
+        logger.info([smpl.name for smpl in bank_samples])
+    extra_files = sorted(os.listdir(EXTRA_SAMPLES_DIR))
+    extra_samples = [smpl for file in extra_files
+                    if (smpl := load_if_wav(EXTRA_SAMPLES_DIR, file, NUM_BANKS + 1))
+                        is not None]
+    load_current_bank(0)
+
+def load_if_wav(directory: str, filename: str, bank: int) -> Optional['Sample']:
+    if m := re.fullmatch(r"([0-9]{2,3}).+.wav", filename):
+        bpm = int(m.group(1))
+        return Sample(f"{directory}/{m.group()}", bpm, bank)
+    else:
+        logger.warn(f"wrong filename format for {filename}, not loaded")
 
 def all_samples() -> list['Sample']:
     return functools.reduce(lambda a, b: a + b, sample_banks)
 
-def load_bank(bank_index):
+def load_current_bank(bank_index):
     global loaded_samples
     old_samples = loaded_samples
-    bank.set(bank_index)
+    current_bank.set(bank_index)
     loaded_samples = sample_banks[bank_index].copy()
     if len(old_samples) == 0:
         return
@@ -68,6 +81,7 @@ def load_bank(bank_index):
 
 @dataclass
 class SampleState:
+    name: str = field(default="amen sister")
     playing: bool = field(default=False)
     bank: int = field(default=0)
     length: float = field(default=0, compare=False)
@@ -94,7 +108,7 @@ class SampleState:
         progress = (step % steps) / steps
         length *= (1 - progress)
         length -= 0.5
-        return SampleState(sample.is_playing(), sample.bank,
+        return SampleState(sample.name, sample.is_playing(), sample.bank,
                            length, steps, selected, dtx_selected, sample.recording, step, pad)
 
 

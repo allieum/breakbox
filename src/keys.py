@@ -96,8 +96,8 @@ sample_flip_counts = [0] * len(SAMPLE_KEYS)
 def select_sample(i):
     global selected_sample
     bank = (i // sample.BANK_SIZE) % sample.NUM_BANKS
-    if bank != sample.bank.get():
-        sample.load_bank(bank)
+    if bank != sample.current_bank.get():
+        sample.load_current_bank(bank)
     selected_sample = sample.all_samples()[i % len(sample.all_samples())]
 
 
@@ -512,8 +512,8 @@ def key_pressed(e):
 
     if e.name == K_NEXT_BANK:
         delta = -1 if key_held[K_SHIFT] else 1
-        new_bank = (sample.bank.get() + delta) % sample.NUM_BANKS
-        sample.load_bank(new_bank)
+        new_bank = (sample.current_bank.get() + delta) % sample.NUM_BANKS
+        sample.load_current_bank(new_bank)
         for i in range(len(sample_flip_counts)):
             sample_flip_counts[i] = 0
         selected_sample = None
