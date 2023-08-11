@@ -2,6 +2,8 @@
 
 
 sample flipping on single channel
+backup banks
+display drum selection
 
 
 fx on latch

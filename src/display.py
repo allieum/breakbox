@@ -169,11 +169,11 @@ def draw_param(draw, param: ParamUpdate):
 def draw_sample_icons(draw, sample_states: list[SampleState]):
     xpad = 10
     ypad = 10
-    size = 8
-    y = ypad - size // 2
     total_width = W - xpad * 2
-    for x, state in zip(range(xpad, W - xpad + 1, total_width // 5), sample_states, strict=True):
-        fill = WHITE if state.selected else BLACK
+    for x, sample_state in zip(range(xpad, W - xpad + 1, total_width // 5), sample_states, strict=True):
+        size = 8 if sample_state.selected else 4
+        y = ypad - size // 2
+        fill = WHITE if sample_state.selected else BLACK
         left = x - size // 2
         draw.rounded_rectangle((left, y, left + size, y + size),
                                radius=3, fill=fill, outline=WHITE)
