@@ -4,8 +4,10 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 
+import keys
 import sample
 from sample import Sample
+from sequence import Sequence
 from utility import get_logger
 
 logger = get_logger(__name__)
@@ -139,7 +141,7 @@ def update_bank(cc_num, cc_val):
 # smpl.gate_period.set(gate_period)
 # smpl.update_gates()
 
-def hit_dtx_pad(keys, sequence, dtxpad, velocity):
+def hit_dtx_pad(sequence: Sequence, dtxpad: DrumPad, velocity: int):
     smpl = selected_sample if selected_sample else keys.selected_sample
     if smpl is None:
         keys.selected_sample = sample.loaded_samples[0]
@@ -156,6 +158,7 @@ def hit_dtx_pad(keys, sequence, dtxpad, velocity):
     match dtxpad.pad:
         case DtxPad.SNARE:
             smpl.drum_trigger(sequence.step)
+            smpl.spice_level.set_gradient(1, 0, 3)
         case DtxPad.HAT:
             logger.info(f"hit hat")
             step = min(63, round(random.random() * 64))
@@ -165,19 +168,26 @@ def hit_dtx_pad(keys, sequence, dtxpad, velocity):
             smpl.dice()
             smpl.spice_level.set_gradient(1, 0, 5)
         case DtxPad.TOM1:
-            velocity_threshold = 40
+            velocity_threshold = 60
             if velocity < velocity_threshold:
                 unmute_time *= 2
                 smpl.start_halftime(duration=unmute_time)
             else:
                 unmute_time *= 4
                 smpl.start_quartertime(duration=unmute_time)
+            smpl.spice_level.set_gradient(.6, 0, 15)
         case DtxPad.TOM2:
             smpl.start_latch_repeat(4, duration=unmute_time * 4)
             unmute_time *= 1.5
         case DtxPad.TOM3:
+            min_gate = 0.5
+            if smpl.gate.value <= min_gate:
+                smpl.gate.set(1)
+            else:
+                smpl.gate_decrease()
             if dtxpad.roll_detected():
                 smpl.looping = not smpl.looping
+                smpl.gate.set(1)
         case DtxPad.CRASH1:
             smpl.pitch_mod(1, sequence.step, duration=unmute_time * 1.5)
         case DtxPad.CRASH2:

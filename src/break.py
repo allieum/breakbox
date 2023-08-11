@@ -43,8 +43,8 @@ for sub in subs:
     sub.start()
 
 # blink.Light.set_brightness(50)
-last_dmx = time.time()
-last_dmx_step = None
+# last_dmx = time.time()
+# last_dmx_step = None
 
 
 def update():
@@ -65,7 +65,7 @@ def update():
         note_number = midi_data[0]
         velocity = midi_data[1]
         if (dtxpad := dtxpro.struck_pad(note_number)) is not None and velocity != 0:
-            dtxpro.hit_dtx_pad(keys, sequence, dtxpad, velocity)
+            dtxpro.hit_dtx_pad(sequence, dtxpad, velocity)
 
     try:
         lights.q.put(sample_states, block=False)
