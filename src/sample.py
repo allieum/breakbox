@@ -77,6 +77,8 @@ def all_samples() -> list['Sample']:
 
 
 def load_current_bank(bank_index):
+    if bank_index < 0 or bank_index >= len(sample_banks):
+        return
     global loaded_samples
     old_samples = loaded_samples
     current_bank.set(bank_index)

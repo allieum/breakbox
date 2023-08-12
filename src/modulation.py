@@ -1,8 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from threading import Timer
-import time
-from typing import Any
 
 import utility
 
@@ -48,7 +46,7 @@ class Lfo:
 
 
 class Param:
-    def __init__(self, value, min_value=None, max_value=None, round=False) -> None:
+    def __init__(self, value: float | int | str, min_value=None, max_value=None, round=False) -> None:
         self.gradient_timer = None
         self.value = value
         self.default_value = value
@@ -74,7 +72,7 @@ class Param:
         self.spice_params = spice_params
         return self
 
-    def modulate(self, lfo, amount, steps=None):
+    def modulate(self, lfo, amount: int | float, steps=None):
         logger.info(f"modulating param with {lfo} x {amount}")
         self.lfo = lfo
         self.scale = amount

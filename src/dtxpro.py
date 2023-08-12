@@ -54,6 +54,7 @@ class DrumPad:
         if time.time() - self.last_hit > HIT_TIMEOUT:
             self.hit_count = 0
 
+
 selected_sample: Sample | None = None
 
 pads = [
@@ -140,6 +141,7 @@ def update_bank(cc_num, cc_val):
 # gate_period = 2 if dtxpad.hit_count < 5 else 1
 # smpl.gate_period.set(gate_period)
 # smpl.update_gates()
+
 
 def hit_dtx_pad(sequence: Sequence, dtxpad: DrumPad, velocity: int):
     smpl = selected_sample if selected_sample else keys.selected_sample

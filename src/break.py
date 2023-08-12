@@ -42,6 +42,7 @@ subs = [
 for sub in subs:
     sub.start()
 
+
 def update():
     # control.update()
     midi_status, midi_data = midi.get_status()
@@ -50,6 +51,10 @@ def update():
     sample_states = [sample.SampleState.of(
         s, keys.selected_sample, sequence.step, i, dtxpro.selected_sample) for i, s in enumerate(sample.loaded_samples)]
     dtxpro.update()
+
+    if midi.is_program_change(midi_status):
+        prog_num = midi_data[0]
+        sample.load_current_bank(prog_num)
 
     if midi.is_note_on(midi_status):
         note_number = midi_data[0]
