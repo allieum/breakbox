@@ -24,7 +24,7 @@ class ParamUpdate:
     show_bar: bool
     fullness: float
     time: float
-    priority: int = field(default=0) # higher is bigger priority
+    priority: int = field(default=0)  # higher is bigger priority
 
     def is_visible(self):
         return time.time() - self.time < UPDATE_LINGER
@@ -32,6 +32,7 @@ class ParamUpdate:
     def text(self):
         label = f"{self.name}: " if self.name else ""
         return label + str(self.value)
+
 
 Point = namedtuple("Point", ["x", "y"])
 Size = namedtuple("Size", ["w", "h"])
@@ -55,8 +56,8 @@ def init(samples: list[Sample]):
                 "gate", "gate_period", "spice_level",
                 "volume", "pitch"]:
             param = getattr(sample, param_name)
-            display_on_change(q, param, param_name, True)
-    display_on_change(q, current_bank, "bank", True)
+            display_on_change(q, param, param_name, show_bar=True)
+    display_on_change(q, current_bank, "bank", show_bar=True)
     display_on_change(q, sequence.bpm, "bpm")
 
 
@@ -64,7 +65,8 @@ def display_on_change(display_q: 'Queue[list[SampleState] | ParamUpdate]', param
     def on_change(value):
         fullness = param.normalize(value) if show_bar else 0
         with contextlib.suppress(Exception):
-            display_q.put(ParamUpdate(name, value, show_bar, fullness, time.time()), block=False)
+            display_q.put(ParamUpdate(name, value, show_bar,
+                          fullness, time.time()), block=False)
 
         logger.info(f"updated param {param}")
     param.add_change_handler(on_change)
@@ -84,7 +86,8 @@ def run(display_q: 'Queue[list[SampleState] | ParamUpdate]'):
     selected_sample_name = Param("juice_fruit.wav")
     display_on_change(display_q, selected_sample_name, priority=1)
     bpm = "BEYOND"
-    last_changed_param = ParamUpdate("dummy", "hot", False, 0.69, 0)
+    last_changed_param = ParamUpdate(
+        "dummy", "hot", show_bar=False, fullness=0.69, time=0)
 
     while True:
         item = display_q.get()
@@ -166,6 +169,7 @@ def draw_value_bar(draw, fullness):
     draw.rectangle((x1, y1, x1 + round(fullness * bar_width), y2),
                    outline=255, fill=255)
 
+
 def draw_param(draw, param: ParamUpdate):
     # Load default font.
     name_font = ImageFont.truetype("DejaVuSans.ttf", size=12)
@@ -184,6 +188,7 @@ def draw_param(draw, param: ParamUpdate):
     if param.show_bar:
         draw_value_bar(draw, param.fullness)
 
+
 def draw_step_indicator(draw: ImageDraw.ImageDraw, selected: SampleState, y: int, height: int):
     # do the things
     # start with love
@@ -196,7 +201,6 @@ def draw_step_indicator(draw: ImageDraw.ImageDraw, selected: SampleState, y: int
     step_width = W // selected.steps
     x = selected.step * step_width
     draw.rectangle(((x, y), (x + step_width, y + height)), fill=WHITE)
-
 
 
 def draw_sample_icons(draw, sample_states: list[SampleState]):
@@ -219,7 +223,8 @@ def draw_sample_icons(draw, sample_states: list[SampleState]):
 def draw_icon(draw: ImageDraw.ImageDraw, position: Point, diameter, fill, outline):
     r = diameter // 2
     draw.ellipse((position.x - r, position.y - r, position.x + r, position.y + r),
-                  fill=fill, outline=outline, width=2)
+                 fill=fill, outline=outline, width=2)
+
 
 def draw_heart(draw: ImageDraw.ImageDraw, size: Size, position: Point, fill):
     xmid = size.w // 2
@@ -236,4 +241,5 @@ def draw_heart(draw: ImageDraw.ImageDraw, size: Size, position: Point, fill):
     trans_poly = [(point.x + dx, point.y + dy) for point in poly]
     draw.polygon(trans_poly, fill=fill)
     draw.ellipse((dx, dy,  size.w / 2 + dx, 3 * size.h / 4 + dy), fill=fill)
-    draw.ellipse((size.w / 2 + dx, dy,  size.w + dx, 3 * size.h / 4 + dy), fill=fill)
+    draw.ellipse((size.w / 2 + dx, dy,  size.w + dx,
+                 3 * size.h / 4 + dy), fill=fill)
