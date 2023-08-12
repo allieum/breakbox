@@ -224,7 +224,7 @@ def sample_press(i, is_repeat):
             dtxpro.selected_sample.looping = False
         dtxpro.selected_sample = chosen_sample
         logger.info(f"dtxpro selected sample {chosen_sample.name}")
-        return
+        return None
 
     prev_selected = selected_sample
     if prev_selected and sample.loaded_samples[i] != prev_selected:

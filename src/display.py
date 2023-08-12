@@ -1,9 +1,8 @@
-from collections import namedtuple
 import contextlib
 import time
+from collections import namedtuple
 from dataclasses import dataclass, field
 from multiprocessing import Queue
-from typing import Any, Optional
 
 import adafruit_ssd1306
 import board
@@ -20,7 +19,7 @@ logger.setLevel("WARN")
 
 @dataclass
 class ParamUpdate:
-    name: Optional[str]
+    name: str | None
     value: str
     show_bar: bool
     fullness: float
@@ -61,7 +60,7 @@ def init(samples: list[Sample]):
     display_on_change(q, sequence.bpm, "bpm")
 
 
-def display_on_change(display_q: 'Queue[list[SampleState] | ParamUpdate]', param: Param, name: Optional[str] = None, show_bar=False, priority=0):
+def display_on_change(display_q: 'Queue[list[SampleState] | ParamUpdate]', param: Param, name: str | None = None, show_bar=False, priority=0):
     def on_change(value):
         fullness = param.normalize(value) if show_bar else 0
         with contextlib.suppress(Exception):
