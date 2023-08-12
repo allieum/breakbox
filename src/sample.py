@@ -866,6 +866,20 @@ class Sample:
         return slices
 
     def get_step_sound(self, step, t, source_step=None, force=False) -> SampleSlice | None:
+
+        spice_factor = 2 if self.spices_param.stretch_chance.toss(
+            step) else 1
+        rate = self.get_rate() / spice_factor
+        steps_per_slice = round(1 / rate)
+        if step % steps_per_slice != 0 and not force:
+            return None
+        sound_slices = self.get_sound_slices()
+        if source_step is None:
+            source_step = step
+        if self.scatter_queue is not None:
+            source_step = self.scatter_queue
+            self.scatter_queue = None
+
         # TODO LatchRepeat method to get SampleSlice
         if self.latch.active:
             sample_slice = self.latch.steps[0]
@@ -883,29 +897,16 @@ class Sample:
                     sample_slice = self.latch.steps[0]
                 self.latch.is_rotating = True
             self.latch.steps.rotate(-1)
-            return SampleSlice(t, step, sample_slice.sound)
-
-        spice_factor = 2 if self.spices_param.stretch_chance.toss(
-            step) else 1
-        rate = self.get_rate() / spice_factor
-        steps_per_slice = round(1 / rate)
-        if step % steps_per_slice != 0 and not force:
-            return None
-        sound_slices = self.get_sound_slices()
-        if source_step is None:
-            source_step = step
-        if self.scatter_queue is not None:
-            source_step = self.scatter_queue
-            self.scatter_queue = None
-
-        sound = sound_slices[(source_step // steps_per_slice) %
-                             len(sound_slices)]
+            sound = sample_slice.sound
+        else:
+            sound = sound_slices[(source_step // steps_per_slice) %
+                                 len(sound_slices)]
 
         fx = []
         if rate != 1:
             fx.append(lambda sound: timestretch(
                 sound, rate, sound_data, stretch_fade))
-        if (pitch := self.pitch.get(step)):
+        if (pitch := self.pitch.get(step)) and isinstance(pitch, int):
             logger.debug(f"{self.name} setting pitch to {pitch}")
             fx.append(lambda sound: self.change_pitch(
                 source_step, sound, pitch))
