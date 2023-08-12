@@ -208,7 +208,7 @@ def draw_sample_icons(draw, sample_states: list[SampleState]):
     heart_size = Size(15, 12)
     big_dot_size = 10
     lil_dot_size = 1
-    for x, sample_state in zip(range(xpad, W - xpad + 1, total_width // 5), sample_states, strict=True):
+    for x, sample_state in zip(range(xpad, W - xpad + 1, total_width // 5), sample_states, strict=False):
         position = Point(x, y)
         if sample_state.dtx_selected:
             draw_heart(draw, heart_size, position, WHITE)

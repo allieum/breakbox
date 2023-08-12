@@ -139,7 +139,6 @@ class LedState:
         self.color = tuple(average(*ab, strength)
                            for ab in zip(self.color, color, strict=True))
 
-
 def run(lights_q: Queue):
     # global last_update, last_state, refreshing
     logger.info(f"lights baby")
@@ -171,8 +170,8 @@ def run(lights_q: Queue):
         sample_states = lights_q.get()
         logger.debug(f"got {sample_states} from queue")
         bank_changed = any(((new_bank := sample.bank) != prev.bank for sample, prev in zip(
-            sample_states, prev_samples, strict=True)))
-        for sample, led, prev in zip(sample_states, led_states, prev_samples, strict=True):
+            sample_states, prev_samples, strict=False)))
+        for sample, led, prev in zip(sample_states, led_states, prev_samples, strict=False):
             # if sample.selected and prev.step != sample.step and sample.step % 4 == 0:
             #     color = 0xff0000 if sample.recording else 0x00ff00
             #     led.fade(color, 0.3, 0.5)

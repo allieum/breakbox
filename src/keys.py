@@ -217,7 +217,7 @@ def sample_press(i, is_repeat):
     if is_repeat:
         return None
 
-    chosen_sample = sample.loaded_samples[i]
+    chosen_sample = sample.loaded_samples[i % len(sample.loaded_samples)]
 
     if key_held[K_DTX]:
         if dtxpro.selected_sample and dtxpro.selected_sample is not chosen_sample:
@@ -528,8 +528,8 @@ def key_pressed(e):
         sample.load_current_bank(new_bank)
         for i in range(len(sample_flip_counts)):
             sample_flip_counts[i] = 0
-        selected_sample = None
-        dtxpro.selected_sample = None
+        selected_sample = sample.loaded_samples[4]
+        dtxpro.selected_sample = sample.loaded_samples[0]
 
     logger.debug(f"finish press handler for {e}")
 
