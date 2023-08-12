@@ -5,7 +5,7 @@ import os
 import re
 import threading
 import time
-from collections import defaultdict, namedtuple, deque
+from collections import defaultdict, deque, namedtuple
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -41,23 +41,26 @@ loaded_samples: list['Sample'] = []
 extra_samples: list['Sample'] = []
 sample_banks: list[list['Sample']] = []
 channels: set[pygame.mixer.Channel] = set()
+
+
 def load_samples_from_disk():
     global extra_samples
     for bank_index in range(NUM_BANKS):
-        bank_number = bank_index +  1
+        bank_number = bank_index + 1
         sample_dir = f'{dir_path}/samples/{bank_number}'
         files = sorted(os.listdir(sample_dir))
         bank_samples = [smpl for file in files
                         if (smpl := load_if_wav(sample_dir, file, bank_index))
-                            is not None]
+                        is not None]
         sample_banks.append(bank_samples)
 
         logger.info([smpl.name for smpl in bank_samples])
     extra_files = sorted(os.listdir(EXTRA_SAMPLES_DIR))
     extra_samples = [smpl for file in extra_files
-                    if (smpl := load_if_wav(EXTRA_SAMPLES_DIR, file, NUM_BANKS + 1))
-                        is not None]
+                     if (smpl := load_if_wav(EXTRA_SAMPLES_DIR, file, NUM_BANKS + 1))
+                     is not None]
     load_current_bank(0)
+
 
 def load_if_wav(directory: str, filename: str, bank: int) -> Optional['Sample']:
     if m := re.fullmatch(r"([0-9]{2,3}).+.wav", filename):
@@ -65,10 +68,13 @@ def load_if_wav(directory: str, filename: str, bank: int) -> Optional['Sample']:
         return Sample(f"{directory}/{m.group()}", bpm, bank)
     else:
         logger.warn(f"wrong filename format for {filename}, not loaded")
+        return None
+
 
 def all_samples() -> list['Sample']:
     bank_samples = functools.reduce(lambda a, b: a + b, sample_banks)
     return bank_samples + extra_samples
+
 
 def load_current_bank(bank_index):
     global loaded_samples
@@ -79,6 +85,7 @@ def load_current_bank(bank_index):
         return
     for new_sample, old_sample in zip(loaded_samples, old_samples, strict=True):
         new_sample.swap_channel(old_sample)
+
 
 @dataclass
 class SampleState:
@@ -119,7 +126,7 @@ class SoundData:
     source_step: int = field(default=0)
     step: int | None = field(default=None)
     semitones: int = field(default=0)
-    source: Optional[pygame.mixer.Sound] = field(default=None)
+    source: pygame.mixer.Sound | None = field(default=None)
 
 
 sound_data = defaultdict(SoundData)
@@ -167,7 +174,6 @@ def write_wav(soundbytes, filename):
     ).export(filename, format='wav')
 
 
-
 class Sample:
     MAX_VOLUME = 1
     slices_per_loop = 64
@@ -181,7 +187,8 @@ class Sample:
     @dataclass
     class LatchRepeat:
         steps: deque[SampleSlice] = field(default_factory=deque)
-        timer: threading.Timer = field(default_factory=lambda: threading.Timer(0, lambda: 0))
+        timer: threading.Timer = field(
+            default_factory=lambda: threading.Timer(0, lambda: 0))
         active: bool = field(default=False)
         is_rotating: bool = field(default=False)
 
@@ -218,15 +225,16 @@ class Sample:
         self.oneshot_offset = 0.0
         self.step_repeat_was_muted = False
         self.step_repeat_timer = None
-        self.played_steps: deque[SampleSlice] = deque(maxlen=Sample.slices_per_loop)
+        self.played_steps: deque[SampleSlice] = deque(
+            maxlen=Sample.slices_per_loop)
         self.latch = Sample.LatchRepeat()
 
         self.roll: Sample.Roll | None = None
 
         # TODO rate param affected by these two
         self.halftime = False
-        self.halftime_timer: Optional[threading.Timer] = None
-        self.quartertime_timer: Optional[threading.Timer] = None
+        self.halftime_timer: threading.Timer | None = None
+        self.quartertime_timer: threading.Timer | None = None
         self.quartertime = False
 
         self.bpm = bpm
@@ -262,7 +270,8 @@ class Sample:
         self.gate.add_change_handler(self.update_gates)
         self.gate_period = modulation.Param(2, min_value=1, max_value=32)
         self.volume = modulation.Param(
-            1, min_value=0, max_value=1).spice(self.spices_param.volume)
+            1, min_value=0, max_value=1)
+        # 1, min_value=0, max_value=1).spice(self.spices_param.volume)
         self.pitch = modulation.Param(
             0, min_value=-12, max_value=12, round=True).spice(self.spices_param.pitch)
         self.pitch_timer: None | threading.Timer = None
@@ -333,13 +342,15 @@ class Sample:
                          slice_i, self.roll.sound, self.roll.pitch_delta))
 
     # TODO maybe all step repeat could be implemented with latch?
-    def start_latch_repeat(self, length: int, duration: Optional[float]=None):
+    def start_latch_repeat(self, length: int, duration: float | None = None):
         latch_delay_steps = 0
         if self.latch.active:
-            self.latch.timer = self.after_delay(self.stop_latch_repeat, self.latch.timer, duration)
+            self.latch.timer = self.after_delay(
+                self.stop_latch_repeat, self.latch.timer, duration)
             return
         if len(self.played_steps) < length + latch_delay_steps:
-            logger.info(f"{self.name} not enough recent steps to start latch repeat")
+            logger.info(
+                f"{self.name} not enough recent steps to start latch repeat")
             return
         while latch_delay_steps > 0:
             # discard latest steps to alter timing feel
@@ -697,7 +708,6 @@ class Sample:
         msg += f" sched. {datetime.fromtimestamp(dropped_sample.start_time)}"
         logger.debug(msg)
 
-
     def unmute_active_intervals(self):
         for interval in self.unmute_intervals:
             if interval.contains(self.elapsed_sequence_time()):
@@ -738,7 +748,8 @@ class Sample:
                 logger.debug(
                     f"{self.name} volume to {volume}, {ratio}% faded in")
             end_volume = playing_sound.get_volume()
-            logger.debug(f"{self.name} channel vol={self.channel.get_volume()} changed volume from {start_volume} to {end_volume}")
+            logger.debug(
+                f"{self.name} channel vol={self.channel.get_volume()} changed volume from {start_volume} to {end_volume}")
 
     # returns callable to do the sound making
     def process_queue(self, now, step_duration) -> Callable | None:
@@ -865,7 +876,8 @@ class Sample:
                 while step % length != sample_slice.step % length:
                     count += 1
                     if count > len(self.latch.steps):
-                        logger.warn(f"weirdly aligned latch! {list(map(lambda sample_slice: sample_slice.step, self.latch.steps))}")
+                        logger.warn(
+                            f"weirdly aligned latch! {[sample_slice.step for sample_slice in self.latch.steps]}")
                         break
                     self.latch.steps.rotate(-1)
                     sample_slice = self.latch.steps[0]
