@@ -179,6 +179,16 @@ def draw_param(draw, param: ParamUpdate):
     if param.show_bar:
         draw_value_bar(draw, param.fullness)
 
+def draw_sample_step(draw: ImageDraw.ImageDraw, selected: SampleState, heart_selected: SampleState):
+    pass
+    # do the things
+    # start with love
+    # two bars on the bottom of the screen:
+    #   one, for each selected sample
+    #   shows you what step it is
+    selected.step
+    selected.steps
+
 
 def draw_sample_icons(draw, sample_states: list[SampleState]):
     xpad = 10

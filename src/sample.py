@@ -21,7 +21,7 @@ from pydub import AudioSegment
 from utility import TimeInterval, get_logger, make_even
 
 logger = get_logger(__name__)
-NUM_BANKS = 10
+NUM_BANKS = 6
 BANK_SIZE = 6
 SAMPLE_RATE = 22050
 current_bank = Param(0, min_value=0, max_value=NUM_BANKS - 1, round=True)
@@ -100,7 +100,6 @@ class SampleState:
 
         selected = selected_sample == sample
         dtx_selected = dtx_selected_sample == sample
-        length = sum(s.get_length() for s in sample.get_sound_slices())
         length = sample.sound.get_length()
         steps = len(sample.sound_slices)
         if sample.step_repeating:

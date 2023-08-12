@@ -457,6 +457,7 @@ press = {
     K_TS_UP: increase_ts_time,
     K_TS_DOWN: decrease_ts_time,
     K_SPICE_UP: momentary_fx_press(spice_up_press, shift_persist=False),
+
     K_SPICE_DOWN: momentary_fx_press(spice_down_press, shift_persist=False),
     K_HT: momentary_fx_press(ht_press),
     K_QT: momentary_fx_press(qt_press),
@@ -468,7 +469,7 @@ press = {
     K_GATE_PERIOD_UP: gate_period_up_press,
     K_DICE_DOWN: dice_press,
     K_DICE_UP: dice_press,
-    K_FLIP: momentary_fx_press(flip_press, shift_persist=False, retrigger=True),
+    K_FLIP: momentary_fx_press(flip_press, shift_persist=False),
     # K_GATE_INVERT: gate_invert_press,
     # K_GATE_FOLLOW: gate_follow_press,
     K_SHIFT: shift_press,
