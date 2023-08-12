@@ -140,10 +140,7 @@ class LedState:
                            for ab in zip(self.color, color, strict=True))
 
 def run(lights_q: Queue):
-    # global last_update, last_state, refreshing
     logger.info(f"lights baby")
-    # odata = board.D5
-    # oclock = board.D6
     odata = board.MOSI
     oclock = board.SCK
     numleds = 6
