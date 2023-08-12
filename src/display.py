@@ -25,6 +25,7 @@ class ParamUpdate:
     show_bar: bool
     fullness: float
     time: float
+    priority: int = field(default=0) # higher is bigger priority
 
     def is_visible(self):
         return time.time() - self.time < UPDATE_LINGER
@@ -60,7 +61,7 @@ def init(samples: list[Sample]):
     display_on_change(q, sequence.bpm, "bpm")
 
 
-def display_on_change(display_q: 'Queue[list[SampleState] | ParamUpdate]', param: Param, name: Optional[str] = None, show_bar=False):
+def display_on_change(display_q: 'Queue[list[SampleState] | ParamUpdate]', param: Param, name: Optional[str] = None, show_bar=False, priority=0):
     def on_change(value):
         fullness = param.normalize(value) if show_bar else 0
         with contextlib.suppress(Exception):
@@ -82,13 +83,16 @@ def run(display_q: 'Queue[list[SampleState] | ParamUpdate]'):
     last_text = None
     prev_sample_states = []
     selected_sample_name = Param("juice_fruit.wav")
-    display_on_change(display_q, selected_sample_name)
+    display_on_change(display_q, selected_sample_name, priority=1)
     bpm = "BEYOND"
     last_changed_param = ParamUpdate("dummy", "hot", False, 0.69, 0)
 
     while True:
         item = display_q.get()
         if isinstance(item, ParamUpdate):
+            if last_changed_param.priority >= item.priority:
+                # overruled
+                continue
             last_changed_param = item
             sample_states = prev_sample_states
         else:
@@ -98,8 +102,7 @@ def run(display_q: 'Queue[list[SampleState] | ParamUpdate]'):
             continue
         last_refresh = time.time()
 
-        if any(smpl.selected for smpl in sample_states
-                if selected_sample_name.get() != (selected_sample := smpl).name):
+        if any((selected_sample := smpl).selected for smpl in sample_states):
             selected_sample_name.set(selected_sample.name)
 
         if last_changed_param.is_visible():
@@ -121,6 +124,9 @@ def run(display_q: 'Queue[list[SampleState] | ParamUpdate]'):
         draw = ImageDraw.Draw(image)
 
         draw_sample_icons(draw, sample_states)
+
+        if any((selected_sample := smpl).selected for smpl in sample_states):
+            draw_step_indicator(draw, selected_sample, H - 2, 2)
 
         if last_changed_param.is_visible():
             draw_param(draw, last_changed_param)
@@ -179,15 +185,19 @@ def draw_param(draw, param: ParamUpdate):
     if param.show_bar:
         draw_value_bar(draw, param.fullness)
 
-def draw_sample_step(draw: ImageDraw.ImageDraw, selected: SampleState, heart_selected: SampleState):
-    pass
+def draw_step_indicator(draw: ImageDraw.ImageDraw, selected: SampleState, y: int, height: int):
     # do the things
     # start with love
     # two bars on the bottom of the screen:
     #   one, for each selected sample
     #   shows you what step it is
-    selected.step
+    if selected.step is None:
+        return
     selected.steps
+    step_width = W // selected.steps
+    x = selected.step * step_width
+    draw.rectangle(((x, y), (x + step_width, y + height)), fill=WHITE)
+
 
 
 def draw_sample_icons(draw, sample_states: list[SampleState]):

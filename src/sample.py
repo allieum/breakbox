@@ -90,7 +90,7 @@ class SampleState:
     selected: bool = field(default=False)
     dtx_selected: bool = field(default=False)
     recording: bool = field(default=False)
-    step: int | None = field(compare=False, default=None)
+    step: int | None = field(default=None)
     pad: int = field(default=0)
 
     @staticmethod
