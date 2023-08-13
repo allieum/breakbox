@@ -64,7 +64,11 @@ def update():
 
     if midi.is_program_change(midi_status):
         prog_num = midi_data[0]
-        sample.load_current_bank(prog_num)
+        if prog_num < sample.NUM_BANKS:
+            sample.load_current_bank(prog_num)
+        else:
+            dtxpro.handle_program_change(prog_num)
+
 
     if midi.is_note_on(midi_status):
         note_number = midi_data[0]
