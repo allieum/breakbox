@@ -45,7 +45,7 @@ init_selected_samples(sample.loaded_samples)
 
 subs = [
     Process(target=lights.run, args=(lights.q,)),
-    Process(target=display.run, args=(display.display_queue,)),
+    Process(target=display.run, args=(display.display_queue, display.param_queue)),
 ]
 for sub in subs:
     sub.start()
@@ -72,12 +72,12 @@ def update():
         if (dtxpad := dtxpro.struck_pad(note_number)) is not None and velocity != 0:
             dtxpro.hit_dtx_pad(sequence, dtxpad, velocity)
 
-    # if loop_counter % 5
-    try:
-        lights.q.put(sample_states, block=False)
-        display.display_queue.put(sample_states, block=False)
-    except:
-        pass
+    if loop_counter % 5 == 0:
+        try:
+            lights.q.put(sample_states, block=False)
+            display.display_queue.put(sample_states, block=False)
+        except:
+            pass
 
     if midi.lost_connection():
         if sequence.midi_started:

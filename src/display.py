@@ -1,5 +1,4 @@
 import contextlib
-from os import NGROUPS_MAX
 import time
 from collections import namedtuple
 from dataclasses import dataclass, field
@@ -40,7 +39,7 @@ Size = namedtuple("Size", ["w", "h"])
 REFRESH_RATE = 0.010
 UPDATE_LINGER = 1
 
-display_queue = Queue()
+display_queue = Queue(1)
 param_queue = Queue()
 
 
@@ -59,11 +58,11 @@ def init(samples: list[Sample]):
                 "volume", "pitch"]:
             param = getattr(sample, param_name)
             display_on_change(param_queue, param, param_name, True)
-    display_on_change(param_queue, current_bank, PARAM_BANK, priority=2, fn=lambda b: b + 1)
+    # display_on_change(param_queue, current_bank, PARAM_BANK, priority=2, fn=lambda b: b + 1)
     display_on_change(param_queue, sequence.bpm, "bpm")
 
 
-def display_on_change(param_q: 'Queue[list[SampleState] | ParamUpdate]', param: Param, name: str | None = None, show_bar=False, priority=0, fn=None):
+def display_on_change(param_q: 'Queue[ParamUpdate]', param: Param, name: str | None = None, show_bar=False, priority=0, fn=None):
     def on_change(value):
         fullness = param.normalize(value) if show_bar else 0
         with contextlib.suppress(Exception):
@@ -75,7 +74,7 @@ def display_on_change(param_q: 'Queue[list[SampleState] | ParamUpdate]', param: 
     param.add_change_handler(on_change)
 
 
-def run(display_q: 'Queue[list[SampleState] | ParamUpdate]', param_q: 'Queue[ParamUpdate]' = None):
+def run(display_q: 'Queue[list[SampleState]]', param_q: 'Queue[ParamUpdate]'):
     try:
         i2c = busio.I2C(board.SCL, board.SDA)
         oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3d)
@@ -87,31 +86,34 @@ def run(display_q: 'Queue[list[SampleState] | ParamUpdate]', param_q: 'Queue[Par
     last_text = None
     prev_sample_states = []
     selected_sample_name = Param("juice_fruit.wav")
-    display_on_change(display_q, selected_sample_name, priority=1)
-    bpm = "BEYOND"
+    display_on_change(param_q, selected_sample_name, priority=1)
     last_changed_param = ParamUpdate(
         "dummy", "hot", show_bar=False, fullness=0.69, time=0)
+    bank = "1"
 
     logger.info(f"display says hay")
     while True:
-        item = display_q.get()
-        if is_param_update := isinstance(item, ParamUpdate):
-            # logger.info(f"got {item.name}, (queue length {display_q.qsize()})")
-            if item.name == PARAM_BANK and isinstance(item.value, int):
-                bank = str(item.value + 1)
-            if last_changed_param.priority >= item.priority \
-                    and last_changed_param.is_alive():
-                display_q.put(item)
-                # overruled
-                continue
-            last_changed_param = item
-            sample_states = prev_sample_states
-        else:
-            sample_states = item
+        sample_states = display_q.get()
+        param_update = None
+        try:
+            param_update = param_q.get_nowait()
+            is_param_update = True
+        except:
+            is_param_update = False
 
-        if time.time() - last_refresh < REFRESH_RATE and not is_param_update:
-            continue
-        last_refresh = time.time()
+        if is_param_update and param_update:
+            # logger.info(f"got {param_update.name}, (queue length {display_q.qsize()})")
+            if param_update.name == PARAM_BANK and isinstance(param_update.value, int):
+                bank = str(param_update.value + 1)
+            if last_changed_param.priority >= param_update.priority \
+                    and last_changed_param.is_alive():
+                param_q.put(param_update)
+            else:
+                last_changed_param = param_update
+
+        # if time.time() - last_refresh < REFRESH_RATE and not is_param_update:
+        #     continue
+        # last_refresh = time.time()
 
         if any((selected_sample := smpl).selected for smpl in sample_states):
             selected_sample_name.set(selected_sample.name)
@@ -138,6 +140,9 @@ def run(display_q: 'Queue[list[SampleState] | ParamUpdate]', param_q: 'Queue[Par
 
         if any((selected_sample := smpl).selected for smpl in sample_states):
             draw_step_indicator(draw, selected_sample, H - 2, 2)
+
+        if any((dtx_selected_sample := smpl).dtx_selected for smpl in sample_states):
+            draw_step_indicator(draw, dtx_selected_sample, H - 4, 2)
 
         if last_changed_param.is_alive():
             draw_param(draw, last_changed_param)

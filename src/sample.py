@@ -90,6 +90,18 @@ def load_current_bank(bank_index):
     if bank_callback:
         bank_callback(loaded_samples)
 
+def get_next_bank_sample(current: Optional['Sample']):
+    if current is None:
+        return loaded_samples[0]
+    i = (loaded_samples.index(current) + 1) % len(loaded_samples)
+    return loaded_samples[i]
+
+def get_prev_bank_sample(current: Optional['Sample']):
+    if current is None:
+        return loaded_samples[0]
+    i = (loaded_samples.index(current) - 1) % len(loaded_samples)
+    return loaded_samples[i]
+
 bank_callback: Callable[[list['Sample']], None] | None = None
 def on_load_bank(callback: Callable[[list['Sample']], None]):
     global bank_callback

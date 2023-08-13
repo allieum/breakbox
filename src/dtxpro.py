@@ -93,8 +93,9 @@ def struck_pad(note_number) -> DrumPad | None:
         return drum_pad
     return None
 
-
-def kit_index(prog_num):
+last_kit_index = 0
+def handle_program_change(prog_num):
+    global last_kit_index, selected_sample
     match bank_lsb:
         case 0:
             offset = 0
@@ -104,12 +105,14 @@ def kit_index(prog_num):
             offset = 40 + 100
         case _:
             offset = 0
-    return prog_num + offset
-
+    kit_index = prog_num + offset
+    if kit_index > last_kit_index:
+        selected_sample = sample.get_next_bank_sample(selected_sample)
+    else:
+        selected_sample = sample.get_prev_bank_sample(selected_sample)
+    last_kit_index = kit_index
 
 bank_lsb = 0
-
-
 def update_bank(cc_num, cc_val):
     global bank_lsb
     if cc_num == 32:
@@ -141,6 +144,7 @@ def update_bank(cc_num, cc_val):
 # gate_period = 2 if dtxpad.hit_count < 5 else 1
 # smpl.gate_period.set(gate_period)
 # smpl.update_gates()
+
 
 
 def hit_dtx_pad(sequence: Sequence, dtxpad: DrumPad, velocity: int):
