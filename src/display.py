@@ -29,6 +29,8 @@ class ParamUpdate:
         return time.time() - self.time < UPDATE_LINGER
 
     def text(self):
+        if self.name == PARAM_BANK:
+            return ""
         label = f"{self.name}: " if self.name else ""
         return label + str(self.value)
 
@@ -58,7 +60,7 @@ def init(samples: list[Sample]):
                 "volume", "pitch"]:
             param = getattr(sample, param_name)
             display_on_change(param_queue, param, param_name, True)
-    # display_on_change(param_queue, current_bank, PARAM_BANK, priority=2, fn=lambda b: b + 1)
+    display_on_change(param_queue, current_bank, PARAM_BANK, priority=2)
     display_on_change(param_queue, sequence.bpm, "bpm")
 
 
@@ -105,6 +107,7 @@ def run(display_q: 'Queue[list[SampleState]]', param_q: 'Queue[ParamUpdate]'):
             # logger.info(f"got {param_update.name}, (queue length {display_q.qsize()})")
             if param_update.name == PARAM_BANK and isinstance(param_update.value, int):
                 bank = str(param_update.value + 1)
+                param_update.value = str(int(param_update.value) + 1)
             if last_changed_param.priority >= param_update.priority \
                     and last_changed_param.is_alive():
                 param_q.put(param_update)
