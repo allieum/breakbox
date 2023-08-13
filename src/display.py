@@ -1,4 +1,5 @@
 import contextlib
+from os import NGROUPS_MAX
 import time
 from collections import namedtuple
 from dataclasses import dataclass, field
@@ -10,11 +11,10 @@ import busio
 import utility
 from modulation import Param
 from PIL import Image, ImageDraw, ImageFont
-from sample import Sample, SampleState, current_bank
+from sample import NUM_BANKS, Sample, SampleState, current_bank
 from sequence import sequence
 
 logger = utility.get_logger(__name__)
-logger.setLevel("WARN")
 
 
 @dataclass
@@ -26,7 +26,7 @@ class ParamUpdate:
     time: float
     priority: int = field(default=0)  # higher is bigger priority
 
-    def is_visible(self):
+    def is_alive(self):
         return time.time() - self.time < UPDATE_LINGER
 
     def text(self):
@@ -37,10 +37,11 @@ class ParamUpdate:
 Point = namedtuple("Point", ["x", "y"])
 Size = namedtuple("Size", ["w", "h"])
 
-REFRESH_RATE = 0.025
-UPDATE_LINGER = 3
+REFRESH_RATE = 0.010
+UPDATE_LINGER = 1
 
-q = Queue(10)
+display_queue = Queue()
+param_queue = Queue()
 
 
 W = 128
@@ -49,6 +50,7 @@ H = 64
 WHITE = 255
 BLACK = 0
 
+PARAM_BANK = 'bank'
 
 def init(samples: list[Sample]):
     for sample in samples:
@@ -56,23 +58,24 @@ def init(samples: list[Sample]):
                 "gate", "gate_period", "spice_level",
                 "volume", "pitch"]:
             param = getattr(sample, param_name)
-            display_on_change(q, param, param_name, show_bar=True)
-    display_on_change(q, current_bank, "bank", show_bar=True)
-    display_on_change(q, sequence.bpm, "bpm")
+            display_on_change(param_queue, param, param_name, True)
+    display_on_change(param_queue, current_bank, PARAM_BANK, priority=2, fn=lambda b: b + 1)
+    display_on_change(param_queue, sequence.bpm, "bpm")
 
 
-def display_on_change(display_q: 'Queue[list[SampleState] | ParamUpdate]', param: Param, name: str | None = None, show_bar=False, priority=0):
+def display_on_change(param_q: 'Queue[list[SampleState] | ParamUpdate]', param: Param, name: str | None = None, show_bar=False, priority=0, fn=None):
     def on_change(value):
         fullness = param.normalize(value) if show_bar else 0
         with contextlib.suppress(Exception):
-            display_q.put(ParamUpdate(name, value, show_bar,
-                          fullness, time.time()), block=False)
+            if fn:
+                value = fn(value)
+            param_q.put(ParamUpdate(name, value, show_bar, fullness, time.time(), priority=priority), block=False)
 
         logger.info(f"updated param {param}")
     param.add_change_handler(on_change)
 
 
-def run(display_q: 'Queue[list[SampleState] | ParamUpdate]'):
+def run(display_q: 'Queue[list[SampleState] | ParamUpdate]', param_q: 'Queue[ParamUpdate]' = None):
     try:
         i2c = busio.I2C(board.SCL, board.SDA)
         oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3d)
@@ -89,10 +92,16 @@ def run(display_q: 'Queue[list[SampleState] | ParamUpdate]'):
     last_changed_param = ParamUpdate(
         "dummy", "hot", show_bar=False, fullness=0.69, time=0)
 
+    logger.info(f"display says hay")
     while True:
         item = display_q.get()
-        if isinstance(item, ParamUpdate):
-            if last_changed_param.priority >= item.priority:
+        if is_param_update := isinstance(item, ParamUpdate):
+            # logger.info(f"got {item.name}, (queue length {display_q.qsize()})")
+            if item.name == PARAM_BANK and isinstance(item.value, int):
+                bank = str(item.value + 1)
+            if last_changed_param.priority >= item.priority \
+                    and last_changed_param.is_alive():
+                display_q.put(item)
                 # overruled
                 continue
             last_changed_param = item
@@ -100,17 +109,17 @@ def run(display_q: 'Queue[list[SampleState] | ParamUpdate]'):
         else:
             sample_states = item
 
-        if time.time() - last_refresh < REFRESH_RATE:
+        if time.time() - last_refresh < REFRESH_RATE and not is_param_update:
             continue
         last_refresh = time.time()
 
         if any((selected_sample := smpl).selected for smpl in sample_states):
             selected_sample_name.set(selected_sample.name)
 
-        if last_changed_param.is_visible():
+        if last_changed_param.is_alive():
             text = last_changed_param.text()
         else:
-            text = f"{bpm} bpm"
+            text = f"bank {bank}"
 
         if last_text == text and sample_states == prev_sample_states:
             continue
@@ -130,14 +139,14 @@ def run(display_q: 'Queue[list[SampleState] | ParamUpdate]'):
         if any((selected_sample := smpl).selected for smpl in sample_states):
             draw_step_indicator(draw, selected_sample, H - 2, 2)
 
-        if last_changed_param.is_visible():
+        if last_changed_param.is_alive():
             draw_param(draw, last_changed_param)
         else:
             font = ImageFont.truetype("DejaVuSans.ttf", size=16)
 
             (left, top, right, bottom) = font.getbbox(text)
             (font_width, font_height) = right - left, bottom - top
-            logger.info(f"drawing text {text} {font_width} x {font_height}")
+            logger.debug(f"drawing text {text} {font_width} x {font_height}")
             draw.text(
                 (oled.width // 2 - font_width // 2,
                  oled.height // 2 - font_height // 2),
@@ -177,7 +186,7 @@ def draw_param(draw, param: ParamUpdate):
 
     (left, top, right, bottom) = name_font.getbbox(text)
     (font_width, font_height) = right - left, bottom - top
-    logger.info(f"drawing text {text} {font_width} x {font_height}")
+    logger.debug(f"drawing text {text} {font_width} x {font_height}")
     draw.text(
         (5, H * 3 // 4 - font_height // 2),
         text,
@@ -197,9 +206,8 @@ def draw_step_indicator(draw: ImageDraw.ImageDraw, selected: SampleState, y: int
     #   shows you what step it is
     if selected.step is None:
         return
-    selected.steps
     step_width = W // selected.steps
-    x = selected.step * step_width
+    x = (selected.step % selected.steps) * step_width
     draw.rectangle(((x, y), (x + step_width, y + height)), fill=WHITE)
 
 
@@ -218,6 +226,25 @@ def draw_sample_icons(draw, sample_states: list[SampleState]):
         if sample_state.selected:
             draw_icon(draw, position, big_dot_size, fill=BLACK, outline=WHITE)
         draw_icon(draw, position, lil_dot_size, fill=BLACK, outline=WHITE)
+
+        # show bank numbers
+        # bank_font = ImageFont.truetype("DejaVuSans.ttf", size=12)
+
+        # if sample_state.bank < NUM_BANKS:
+        #     text = str(sample_state.bank + 1)
+        # else:
+        #     text = "*"
+
+        # (left, top, right, bottom) = bank_font.getbbox(text)
+        # (font_width, font_height) = right - left, bottom - top
+        # logger.info(f"drawing text {text} {font_width} x {font_height}")
+        # draw.text(
+        #     (x, 0),
+        #     text,
+        #     font=bank_font,
+        #     fill=255,
+        # )
+
 
 
 def draw_icon(draw: ImageDraw.ImageDraw, position: Point, diameter, fill, outline):

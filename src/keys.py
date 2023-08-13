@@ -92,7 +92,6 @@ key_held = defaultdict(bool)
 
 sample_flip_counts = [0] * len(SAMPLE_KEYS)
 
-
 def select_sample(i):
     global selected_sample
     bank = (i // sample.BANK_SIZE) % sample.NUM_BANKS

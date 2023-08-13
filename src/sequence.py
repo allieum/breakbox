@@ -98,6 +98,7 @@ class Sequence:
         self.step = 0
         self.measure_start = time.time()
         self.last_queued_step = -1
+        self.played_step = False
 
     def _stop(self):
         self.is_started = False

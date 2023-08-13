@@ -25,6 +25,12 @@ def on_key(e):
     elif e.event_type == keyboard.KEY_UP:
         keys.key_released(e)
 
+def init_selected_samples(bank_samples: list[sample.Sample]):
+    BREAKS_START_PAD = 0
+    VOCALS_START_PAD = 4
+    keys.selected_sample = bank_samples[BREAKS_START_PAD % len(bank_samples)]
+    dtxpro.selected_sample = bank_samples[VOCALS_START_PAD % len(bank_samples)]
+
 
 keyboard.hook(on_key)
 
@@ -32,18 +38,22 @@ keyboard.hook(on_key)
 sample.load_samples_from_disk()
 display.init(sample.all_samples())
 midi.connect()
+sample.on_load_bank(init_selected_samples)
+init_selected_samples(sample.loaded_samples)
 
-sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
+# sequence.on_step(lambda s: sample.Sample.audio_executor.submit(update_dmx, s))
 
 subs = [
     Process(target=lights.run, args=(lights.q,)),
-    Process(target=display.run, args=(display.q,)),
+    Process(target=display.run, args=(display.display_queue,)),
 ]
 for sub in subs:
     sub.start()
 
-
+loop_counter = 0
 def update():
+    global loop_counter
+    loop_counter += 1
     # control.update()
     midi_status, midi_data = midi.get_status()
     sequence.update(midi_status)
@@ -62,9 +72,10 @@ def update():
         if (dtxpad := dtxpro.struck_pad(note_number)) is not None and velocity != 0:
             dtxpro.hit_dtx_pad(sequence, dtxpad, velocity)
 
+    # if loop_counter % 5
     try:
         lights.q.put(sample_states, block=False)
-        display.q.put(sample_states, block=False)
+        display.display_queue.put(sample_states, block=False)
     except:
         pass
 

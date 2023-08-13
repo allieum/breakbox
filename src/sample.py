@@ -87,7 +87,13 @@ def load_current_bank(bank_index):
         return
     for new_sample, old_sample in zip(loaded_samples, old_samples, strict=True):
         new_sample.swap_channel(old_sample)
+    if bank_callback:
+        bank_callback(loaded_samples)
 
+bank_callback: Callable[[list['Sample']], None] | None = None
+def on_load_bank(callback: Callable[[list['Sample']], None]):
+    global bank_callback
+    bank_callback = callback
 
 @dataclass
 class SampleState:
@@ -931,7 +937,7 @@ class Sample:
         all_slices = []
         for subslice in subslices:
             all_slices.extend(subslice)
-        logger.info(
+        logger.debug(
             f"{self.name} has {len(all_slices)} step repeat slices for sr length {self.step_repeat_length}, index {self.step_repeat_index}")
         for i, substep in enumerate(all_slices):
             spice_factor = 2 if self.spices_param.stretch_chance.toss(
@@ -940,7 +946,7 @@ class Sample:
             ts = step_time + i * step_interval / rate
             for_step = step + i
             qs = self.get_step_sound(for_step, ts, source_step=substep)
-            logger.info(
+            logger.debug(
                 f"step repeat queueing {substep} for step {for_step} {qs.t_string() if qs else '?'}")
             self.queue_sound(qs)
 
